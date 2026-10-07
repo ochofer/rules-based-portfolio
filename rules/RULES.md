@@ -93,7 +93,8 @@ The file holds the starting amount, the top-up and a random line that prevents a
 
 ## Amendments
 
-None.
+No rule has been amended. The table also records errata, corrections of wording that change no rule.
 
 | Committed | Rule | Change | Applies from cycle day |
 |---|---|---|---|
+| 2026-10-07 | 2 | Erratum, no rule changed: in rule 2, "the fingerprint in the last section" should read "the fingerprint under The private values". | not applicable |
