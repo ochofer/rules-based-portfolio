@@ -1,11 +1,12 @@
 """Derive the portfolio's split from the mandate's risk limit.
 
-The mandate sets a risk limit: a worst fall of at most 35 per cent, where the
-worst fall is the largest fall in value from a previous peak to a later low.
-This script measures, on monthly euro returns from February 1999 to December
-2025, the worst fall of every split from 40/60 to 100/0 in steps of 5 points,
-each rebalanced by the band of rule 5, and selects the largest equity target
-weight whose worst fall stays within the limit.
+The mandate sets a risk limit of a worst fall of about one third, which the
+test reads as at most 35 per cent. The worst fall is the largest fall in value
+from a previous peak to a later low. This script measures, on monthly euro
+returns from February 1999 to December 2025, the worst fall of every split from
+40/60 to 100/0 in steps of 5 points, each rebalanced by the band of rule 5, and
+selects the largest equity target weight whose worst fall stays within the
+limit.
 
 Data, downloaded at run time and cached in cache/ (never committed):
   - Kenneth French's developed-market and emerging-market factor files (the
@@ -18,7 +19,7 @@ Data, downloaded at run time and cached in cache/ (never committed):
     monthly averages (dataset IRS), used before the yield curve starts.
 
 Usage:   python3 mandate/allocation_check.py
-Output:  mandate/allocation_check_results.md, and the same table on screen.
+Output:  mandate/allocation_check_results.md, and the same text on screen.
 Requires Python 3.9 or later, pandas and numpy.
 """
 import io
@@ -39,11 +40,10 @@ OUT = os.path.join(ROOT, "mandate", "allocation_check_results.md")
 
 # The mandate's numbers.
 RISK_LIMIT = 0.35        # worst fall allowed in the test: one third, rounded up to the next 5 points
-OUTER_BOUND = 0.40       # the fall the mandate places outside the objective
 BAND_HALF_WIDTH = 0.05   # rule 5: the equity weight may move 5 points either side of its target
 EQUITY_GRID = [w / 100 for w in range(40, 101, 5)]
 EMERGING_SHARE = 0.10    # emerging markets' approximate share of a global index of developed and emerging markets
-BOND_MATURITY = 7.0      # years; close to the average duration of a euro government bond index
+BOND_MATURITY = 7.0      # in years, close to the average duration of a euro government bond index
 FIRST_MONTH, LAST_MONTH = "1999-01", "2025-12"
 
 SOURCES = {
@@ -58,11 +58,14 @@ SOURCES = {
 # markets, as their issuers publish them. The comparison shows how closely the
 # constructed returns follow returns an investor in euro received.
 FUND_CHECK = {
-    "equity": ("Amundi MSCI All Country World UCITS ETF EUR Acc (LU1829220216), factsheet of 31 August 2026",
+    "equity": ("Amundi MSCI All Country World UCITS ETF EUR Acc (LU1829220216)",
+               "an MSCI ACWI fund that reports its returns in euro",
                {2021: 27.33, 2022: -13.15, 2023: 17.91, 2024: 25.19, 2025: 7.68}),
-    "bonds": ("Vanguard EUR Eurozone Government Bond UCITS ETF (EUR) Accumulating (IE00BH04GL39), factsheet of 31 August 2026",
+    "bonds": ("Vanguard EUR Eurozone Government Bond UCITS ETF (EUR) Accumulating (IE00BH04GL39)",
+              "the bond ETF the portfolio holds",
               {2021: -3.54, 2022: -18.45, 2023: 7.15, 2024: 1.77, 2025: 0.57}),
 }
+FACTSHEET_DATE = "31 August 2026"
 
 
 def fetch(name, attempts=3):
@@ -104,7 +107,7 @@ def french_market(name):
         if m:
             rows.append([m.group(1)] + [float(x) for x in m.group(2).split(",")])
         elif rows and not line.strip():
-            break  # the monthly table ends at the first blank line; annual tables follow
+            break  # the monthly table ends at the first blank line, and annual tables follow
     table = pd.DataFrame(rows, columns=["month"] + [h.strip() for h in header[1:]])
     table.index = pd.PeriodIndex(table.pop("month"), freq="M")
     return (table["Mkt-RF"] + table["RF"]) / 100, lines[0].strip()
@@ -157,8 +160,8 @@ def monthly_returns():
 
     returns = pd.DataFrame({"equity": equity, "bonds": bonds}).loc[FIRST_MONTH:LAST_MONTH].dropna()
     vintages = {
-        "Kenneth French, developed markets": header_dev,
-        "Kenneth French, emerging markets": header_em,
+        "Kenneth French, developed markets": f'file header "{header_dev}"',
+        "Kenneth French, emerging markets": f'file header "{header_em}"',
         "ECB euro reference rate against the US dollar": "last observation " + str(usd_per_eur.index[-1]),
         "ECB seven-year spot rate": "last observation " + str(spot.index[-1]),
         "ECB ten-year government bond yield": "last observation " + str(ten_year.index[-1]),
@@ -189,8 +192,20 @@ def worst_fall(values, start=None, end=None):
     return -window.min(), peak, low
 
 
+def sleeve_return(returns, sleeve, peak, low):
+    """Compound return of one sleeve over the months after the peak, up to and including the low."""
+    return (1 + returns[sleeve].loc[peak + 1:low]).prod() - 1
+
+
 def calendar_years(monthly):
+    """Calendar-year returns compounded from monthly returns."""
     return (1 + monthly).groupby(monthly.index.year).prod() - 1
+
+
+def signed(x):
+    """A difference in percentage points with its sign, and 0.00 when it rounds to zero."""
+    text = f"{x:+.2f}"
+    return "0.00" if text in ("+0.00", "-0.00") else text
 
 
 def main():
@@ -213,12 +228,14 @@ def main():
     out.append("# Allocation check: results")
     out.append("")
     out.append(f"Generated by `mandate/allocation_check.py` on {date.today().isoformat()}. "
-               f"Monthly euro returns from {returns.index[0]} to {returns.index[-1]}, {len(returns)} months, month-end values, no costs and no taxes.")
+               f"The returns are monthly, in euro, from {returns.index[0]} to {returns.index[-1]}, {len(returns)} months, "
+               f"measured at month ends with no costs and no taxes.")
     out.append("")
     out.append("A split is the pair of target weights, written equity/bonds. Each split starts at its target weights and is "
                "rebalanced by its band, the interval of 5 points either side of the equity target weight: when the equity weight "
                "leaves it at a month end, the portfolio goes back to the target weights. The worst fall is the largest fall in value "
-               "from a previous peak to a later low. Growth per year is the compound annual growth of the portfolio's value, and "
+               "from a previous peak to a later low, and a fall in a named period runs from the highest earlier value to the lowest month end "
+               "in that period. Growth per year is the compound annual return, and "
                "volatility is the standard deviation of the monthly returns times the square root of 12.")
     out.append("")
     out.append("| Split | Growth per year | Volatility | Worst fall | Peak | Low | Fall 1999-2004 | Fall 2007-2010 | Fall 2022 | Within 35% |")
@@ -229,23 +246,41 @@ def main():
                    f"{f00 * 100:.1f}% | {f08 * 100:.1f}% | {f22 * 100:.1f}% | {'yes' if fall <= RISK_LIMIT else 'no'} |")
     out.append("")
     if chosen:
-        out.append(f"Largest equity target weight whose worst fall is within {RISK_LIMIT * 100:.0f} per cent: "
+        out.append(f"The largest equity target weight whose worst fall is within {RISK_LIMIT * 100:.0f} per cent is "
                    f"{round(chosen[0] * 100)} per cent, a split of {round(chosen[0] * 100)}/{round((1 - chosen[0]) * 100)}, "
-                   f"with a worst fall of {chosen[3] * 100:.1f} per cent from {chosen[4]} to {chosen[5]}. "
-                   f"Its worst fall is {'within' if chosen[3] <= OUTER_BOUND else 'beyond'} the outer bound of {OUTER_BOUND * 100:.0f} per cent.")
+                   f"with a worst fall of {chosen[3] * 100:.1f} per cent from {chosen[4]} to {chosen[5]}.")
     else:
         out.append(f"No split on the grid has a worst fall within {RISK_LIMIT * 100:.0f} per cent.")
+    if chosen:
+        split = f"{round(chosen[0] * 100)}/{round((1 - chosen[0]) * 100)}"
+        values = band_path(returns, chosen[0])
+        out.append("")
+        out.append(f"## {split} in the two falls")
+        out.append("")
+        out.append(f"The table gives, for {split}, the fall in each period and the return of each sleeve, the part of the portfolio held in one ETF, "
+                   f"over the months from the peak to the low, in per cent.")
+        out.append("")
+        out.append("| Period | Peak | Low | Fall | Equity return | Bond return |")
+        out.append("|---|---|---|---|---|---|")
+        for label, start, end in (("1999-2004", "1999-01", "2004-12"), ("2007-2010", "2007-01", "2010-12")):
+            fall, peak, low = worst_fall(values, start, end)
+            out.append(f"| {label} | {peak} | {low} | {fall * 100:.1f} | {sleeve_return(returns, 'equity', peak, low) * 100:+.1f} | "
+                       f"{sleeve_return(returns, 'bonds', peak, low) * 100:+.1f} |")
     out.append("")
     out.append("## How closely the constructed returns follow two funds")
     out.append("")
-    out.append("Calendar-year returns in per cent: the constructed series against a fund held in euro that tracks the same market.")
+    (equity_fund, equity_role, equity_published), (bond_fund, bond_role, bond_published) = FUND_CHECK["equity"], FUND_CHECK["bonds"]
+    out.append(f"The table gives calendar-year returns in euro, in per cent, of the constructed series and of a fund that tracks the same market. "
+               f"The equity fund is {equity_fund}, {equity_role}, and the bond fund is {bond_fund}, {bond_role}. "
+               f"The fund returns are from the issuers' factsheets of {FACTSHEET_DATE}. "
+               f"The difference is the constructed return minus the fund's, in percentage points.")
     out.append("")
-    out.append("| Sleeve | Fund | 2021 | 2022 | 2023 | 2024 | 2025 |")
+    out.append("| Year | Equity, constructed | Equity fund | Difference | Bonds, constructed | Bond fund | Difference |")
     out.append("|---|---|---|---|---|---|---|")
-    for sleeve, (fund, published) in FUND_CHECK.items():
-        built = calendar_years(returns[sleeve])
-        cells = " | ".join(f"{built.loc[y] * 100:.1f} against {published[y]:.1f}" for y in sorted(published))
-        out.append(f"| {sleeve} | {fund} | {cells} |")
+    built_equity, built_bonds = calendar_years(returns["equity"]) * 100, calendar_years(returns["bonds"]) * 100
+    for y in sorted(equity_published):
+        out.append(f"| {y} | {built_equity.loc[y]:.2f} | {equity_published[y]:.2f} | {signed(built_equity.loc[y] - equity_published[y])} | "
+                   f"{built_bonds.loc[y]:.2f} | {bond_published[y]:.2f} | {signed(built_bonds.loc[y] - bond_published[y])} |")
     out.append("")
     out.append("## Data used")
     out.append("")
