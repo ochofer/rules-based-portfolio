@@ -1,0 +1,18 @@
+# Private records: never committed
+private/
+ledger/
+exports/
+cache/
+data/
+*.pdf
+# Working files of the text checkers
+.public_text_terms
+.public_text_allow
+.style_terms
+.style_allow
+# Python and notebooks
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store
