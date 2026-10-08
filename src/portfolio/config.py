@@ -15,6 +15,11 @@ CACHE_DIR = ROOT / "cache"  # downloaded source files, ignored by git
 PRIVATE_DIR = ROOT / "private"  # private outputs, ignored by git
 TRANSACTIONS = LEDGER_DIR / "transactions.csv"
 CONTRIBUTIONS = LEDGER_DIR / "contributions.csv"
+OUTPUTS_DIR = ROOT / "outputs"  # public: shares, percentages and basis points only
+METHOD_DIR = ROOT / "method"  # public: the fixed tables the program applies
+SITE_DIR = ROOT / "site"  # public: the page template, its script and the palette
+REPOSITORY_URL = "https://github.com/ochofer/rules-based-portfolio"
+DASHBOARD_URL = "https://www.carlohofer.com/rules-based-portfolio/"
 
 EQUITY, BONDS = "equity", "bonds"
 SLEEVES = (EQUITY, BONDS)
@@ -47,3 +52,21 @@ MIN_ORDER_EUR = 1.00
 
 # Tradegate Exchange's quote page for each ETF: the real-time bid and ask recorded under rule 7.
 QUOTE_PAGE = {sleeve: f"https://www.tradegate.de/orderbuch.php?isin={isin}" for sleeve, isin in ISIN.items()}
+
+# The mandate's limits, drawn on chart 4: the test reads "about one third" as 35 per cent, and a worst
+# fall above 40 per cent is outside the mandate.
+RISK_LIMIT_TEST = 0.35
+RISK_LIMIT_OUTER = 0.40
+
+# The factor model of charts 18 and 19: French's developed five factors and momentum, in this order.
+FACTORS = ("Mkt-RF", "SMB", "HML", "RMW", "CMA", "WML")
+FACTOR_NAME = {
+    "Mkt-RF": "Market",
+    "SMB": "Size",
+    "HML": "Value",
+    "RMW": "Profitability",
+    "CMA": "Investment",
+    "WML": "Momentum",
+}
+FACTOR_WINDOW_MONTHS = 36
+

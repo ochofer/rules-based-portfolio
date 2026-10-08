@@ -6,7 +6,9 @@ Commands:
   status [--date D]  units, values and weights at the last net asset values on or before D
   cycle  [--date D]  the orders rules 4 to 6 produce on the cycle day D (default: this month's); run on
                      the cycle day itself, it also saves them to private/orders/
-Add --refresh to download the net asset values and the exchange rate again first.
+  build  [--date D]  the public files in outputs/ and the dashboard, index.html at the root
+  privacy            check that no figure in outputs/ is a private amount of the ledger
+Add --refresh to download every source again first.
 
 Every command prints euro amounts and units, which are private: the output is for the terminal and for
 files under private/, never for the repository.
@@ -173,17 +175,37 @@ def cmd_cycle(args) -> int:
     return 0
 
 
+def cmd_build(args) -> int:
+    from . import outputs, site
+
+    result = outputs.build(refresh=args.refresh, today=args.date)
+    page = site.build()
+    print(f"Outputs as of {result['as_of']:%Y-%m-%d}: {len(result['files'])} files in outputs/.")
+    print(f"Dashboard written to {page.relative_to(config.ROOT)}.")
+    return 0
+
+
+def cmd_privacy(args) -> int:
+    from . import outputs
+
+    outputs.privacy(ledger_module.read())
+    print("No private figure in outputs/.")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="python3 -m portfolio")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("check", "status", "cycle"):
+    for name in ("check", "status", "cycle", "build", "privacy"):
         p = sub.add_parser(name)
         p.add_argument("--date", type=lambda s: datetime.strptime(s, "%Y-%m-%d").date())
         p.add_argument("--refresh", action="store_true")
     args = parser.parse_args(argv)
     try:
-        return {"check": cmd_check, "status": cmd_status, "cycle": cmd_cycle}[args.command](args)
-    except (ledger_module.LedgerError, rules_engine.BudgetError) as error:
+        commands = {"check": cmd_check, "status": cmd_status, "cycle": cmd_cycle, "build": cmd_build,
+                    "privacy": cmd_privacy}  # fmt: skip
+        return commands[args.command](args)
+    except (ledger_module.LedgerError, rules_engine.BudgetError, RuntimeError, ValueError) as error:
         print(f"Stopped: {error}", file=sys.stderr)
         return 1
 

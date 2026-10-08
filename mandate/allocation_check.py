@@ -19,7 +19,8 @@ Data, downloaded at run time and cached in cache/ (never committed):
     monthly averages (dataset IRS), used before the yield curve starts.
 
 Usage:   python3 mandate/allocation_check.py
-Output:  mandate/allocation_check_results.md, and the same text on screen.
+Output:  mandate/allocation_check_results.md, the same text on screen, and the table of every split in
+         mandate/allocation_check_results.csv.
 Requires Python 3.9 or later, pandas and numpy.
 """
 import io
@@ -37,6 +38,7 @@ import pandas as pd
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE = os.path.join(ROOT, "cache")
 OUT = os.path.join(ROOT, "mandate", "allocation_check_results.md")
+OUT_CSV = os.path.join(ROOT, "mandate", "allocation_check_results.csv")
 
 # The mandate's numbers.
 RISK_LIMIT = 0.35        # worst fall allowed in the test: one third, rounded up to the next 5 points
@@ -286,6 +288,12 @@ def main():
     out.append("")
     for source, note in vintages.items():
         out.append(f"- {source}: {note}")
+    table = pd.DataFrame(rows, columns=["equity_weight", "growth_per_year", "volatility", "worst_fall", "peak", "low",
+                                        "fall_1999_2004", "fall_2007_2010", "fall_2022"])
+    table.insert(0, "split", [f"{round(w * 100)}/{round((1 - w) * 100)}" for w in table["equity_weight"]])
+    table["within_limit"] = ["yes" if f <= RISK_LIMIT else "no" for f in table["worst_fall"]]
+    table["chosen"] = ["yes" if chosen and w == chosen[0] else "no" for w in table["equity_weight"]]
+    table.to_csv(OUT_CSV, index=False, float_format="%.6f", lineterminator="\n")
     text = "\n".join(out) + "\n"
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(text)

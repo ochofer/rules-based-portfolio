@@ -60,7 +60,7 @@ def test_band_below_65():
 
 
 def test_never_more_than_two_orders_and_the_cash_is_never_overspent():
-    for e, b, c in itertools.product(range(400, 1001, 30), range(0, 601, 30), (0, 10, 50, 250)):
+    for e, b, c in itertools.product(range(400, 1001, 30), range(0, 601, 30), (0, 10, 50, 240)):
         if e + b == 0:
             continue
         plan = re_.plan(float(e), float(b), float(c))
@@ -79,7 +79,7 @@ def test_never_more_than_two_orders_and_the_cash_is_never_overspent():
 
 
 def test_nothing_is_sold_inside_the_band():
-    for e, b in itertools.product(range(650, 751, 10), range(250, 351, 10)):
+    for e, b in itertools.product(range(650, 751, 10), range(240, 351, 10)):
         plan = re_.plan(float(e), float(b), 50.0)
         if not plan.band_triggered:
             assert all(o.side == "buy" for o in plan.orders)

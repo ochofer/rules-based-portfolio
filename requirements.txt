@@ -1,2 +1,4 @@
 numpy>=1.22
 pandas>=1.5
+pdfplumber>=0.10
+markdown>=3.4

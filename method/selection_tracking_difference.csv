@@ -1,0 +1,37 @@
+sleeve,rank,fund,isin,ter_per_cent,year,tracking_difference_points,average_points,three_full_years,offered_on_the_account,held,factsheet_date
+equity,1,SPDR MSCI All Country World UCITS ETF (Acc),IE00B44Z5B48,0.120,2023,-0.190,0.050,yes,no,no,2026-08-31
+equity,1,SPDR MSCI All Country World UCITS ETF (Acc),IE00B44Z5B48,0.120,2024,-0.130,0.050,yes,no,no,2026-08-31
+equity,1,SPDR MSCI All Country World UCITS ETF (Acc),IE00B44Z5B48,0.120,2025,0.470,0.050,yes,no,no,2026-08-31
+equity,2,iShares MSCI ACWI UCITS ETF USD (Acc),IE00B6R52259,0.200,2023,0.150,0.027,yes,yes,yes,2026-07-31
+equity,2,iShares MSCI ACWI UCITS ETF USD (Acc),IE00B6R52259,0.200,2024,-0.140,0.027,yes,yes,yes,2026-07-31
+equity,2,iShares MSCI ACWI UCITS ETF USD (Acc),IE00B6R52259,0.200,2025,0.070,0.027,yes,yes,yes,2026-07-31
+equity,3,Vanguard FTSE All-World UCITS ETF (USD) Accumulating,IE00BK5BQT80,0.140,2023,0.030,-0.013,yes,yes,no,2026-08-31
+equity,3,Vanguard FTSE All-World UCITS ETF (USD) Accumulating,IE00BK5BQT80,0.140,2024,-0.010,-0.013,yes,yes,no,2026-08-31
+equity,3,Vanguard FTSE All-World UCITS ETF (USD) Accumulating,IE00BK5BQT80,0.140,2025,-0.060,-0.013,yes,yes,no,2026-08-31
+equity,4,SPDR MSCI ACWI IMI UCITS ETF (Acc),IE00B3YLTY66,0.170,2023,-0.480,-0.193,yes,yes,no,2026-08-31
+equity,4,SPDR MSCI ACWI IMI UCITS ETF (Acc),IE00B3YLTY66,0.170,2024,-0.240,-0.193,yes,yes,no,2026-08-31
+equity,4,SPDR MSCI ACWI IMI UCITS ETF (Acc),IE00B3YLTY66,0.170,2025,0.140,-0.193,yes,yes,no,2026-08-31
+equity,5,Invesco FTSE All-World UCITS ETF Acc,IE000716YHJ7,0.150,2023,,,no,yes,no,2026-08-31
+equity,5,Invesco FTSE All-World UCITS ETF Acc,IE000716YHJ7,0.150,2024,0.400,,no,yes,no,2026-08-31
+equity,5,Invesco FTSE All-World UCITS ETF Acc,IE000716YHJ7,0.150,2025,-0.090,,no,yes,no,2026-08-31
+bonds,1,Vanguard EUR Eurozone Government Bond UCITS ETF (EUR) Accumulating,IE00BH04GL39,0.070,2023,0.020,-0.027,yes,yes,yes,2026-08-31
+bonds,1,Vanguard EUR Eurozone Government Bond UCITS ETF (EUR) Accumulating,IE00BH04GL39,0.070,2024,-0.110,-0.027,yes,yes,yes,2026-08-31
+bonds,1,Vanguard EUR Eurozone Government Bond UCITS ETF (EUR) Accumulating,IE00BH04GL39,0.070,2025,0.010,-0.027,yes,yes,yes,2026-08-31
+bonds,2,Amundi Prime Euro Government Bond UCITS ETF Acc,LU2089238898,0.050,2023,-0.010,-0.030,yes,yes,no,2026-07-31
+bonds,2,Amundi Prime Euro Government Bond UCITS ETF Acc,LU2089238898,0.050,2024,-0.050,-0.030,yes,yes,no,2026-07-31
+bonds,2,Amundi Prime Euro Government Bond UCITS ETF Acc,LU2089238898,0.050,2025,-0.030,-0.030,yes,yes,no,2026-07-31
+bonds,3,SPDR Bloomberg Euro Government Bond UCITS ETF (Acc),IE00BMYHQM42,0.070,2023,-0.100,-0.040,yes,yes,no,2026-09-30
+bonds,3,SPDR Bloomberg Euro Government Bond UCITS ETF (Acc),IE00BMYHQM42,0.070,2024,-0.120,-0.040,yes,yes,no,2026-09-30
+bonds,3,SPDR Bloomberg Euro Government Bond UCITS ETF (Acc),IE00BMYHQM42,0.070,2025,0.100,-0.040,yes,yes,no,2026-09-30
+bonds,4,Xtrackers II Eurozone Government Bond UCITS ETF 1C,LU0290355717,0.070,2023,-0.090,-0.063,yes,yes,no,2026-08-31
+bonds,4,Xtrackers II Eurozone Government Bond UCITS ETF 1C,LU0290355717,0.070,2024,-0.060,-0.063,yes,yes,no,2026-08-31
+bonds,4,Xtrackers II Eurozone Government Bond UCITS ETF 1C,LU0290355717,0.070,2025,-0.040,-0.063,yes,yes,no,2026-08-31
+bonds,5,HSBC Euro Government Bond UCITS ETF,IE00066KZ5B5,0.060,2023,,,no,no,no,2026-08-31
+bonds,5,HSBC Euro Government Bond UCITS ETF,IE00066KZ5B5,0.060,2024,,,no,no,no,2026-08-31
+bonds,5,HSBC Euro Government Bond UCITS ETF,IE00066KZ5B5,0.060,2025,,,no,no,no,2026-08-31
+bonds,6,iShares Core EUR Govt Bond UCITS ETF EUR (Acc),IE0008U15456,0.070,2023,,,no,no,no,2026-08-31
+bonds,6,iShares Core EUR Govt Bond UCITS ETF EUR (Acc),IE0008U15456,0.070,2024,,,no,no,no,2026-08-31
+bonds,6,iShares Core EUR Govt Bond UCITS ETF EUR (Acc),IE0008U15456,0.070,2025,,,no,no,no,2026-08-31
+bonds,7,UBS Core BBG EUR Gov 1-10 UCITS ETF EUR acc,LU0969639474,0.090,2023,,,no,yes,no,2026-08-31
+bonds,7,UBS Core BBG EUR Gov 1-10 UCITS ETF EUR acc,LU0969639474,0.090,2024,,,no,yes,no,2026-08-31
+bonds,7,UBS Core BBG EUR Gov 1-10 UCITS ETF EUR acc,LU0969639474,0.090,2025,,,no,yes,no,2026-08-31
