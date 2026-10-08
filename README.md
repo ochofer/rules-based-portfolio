@@ -4,6 +4,8 @@ I run a real-money portfolio under written rules: 70 per cent in a global equity
 
 Each sleeve is an ETF, and the record looks through both to the companies and bonds inside them.
 
+The dashboard is at https://www.carlohofer.com/rules-based-portfolio/.
+
 ## How the portfolio is run
 
 On the cycle day, the 5th of each month or the first trading day after it when the 5th is not one, the weights are computed from the ledger. The top-up, with any cash left from earlier orders, buys the sleeve furthest below its target weight, up to that target weight, and any remainder buys the other sleeve up to its target weight. If the equity weight is then below 65 or above 75 per cent, the portfolio is brought back to 70/30 the same day. Nothing else triggers an order, and a fall in prices does not pause the cycle. At most five orders are placed in a month, each between 15:45 and 17:00 Amsterdam time on a trading day. A rule changes only by a dated amendment, which applies from the first cycle day at least 30 days after it is committed.
@@ -16,16 +18,18 @@ On the cycle day, the 5th of each month or the first trading day after it when t
 | `mandate/allocation_check.py` | The test that derives the split, with its data sources. |
 | `mandate/allocation_check_results.md` | The output of the test for every split from 40/60 to 100/0. |
 | `rules/RULES.md` | The ten rules, the two ETFs and how they were chosen. |
-| `src/portfolio/` | The program: it checks the ledger, values the holdings at net asset value and computes the orders the rules produce on a cycle day. |
-| `tests/` | The program's tests, run on invented ledgers. |
+| `src/portfolio/` | The program: it checks the ledger, computes the orders the rules produce on a cycle day, and builds the record and the dashboard. |
+| `tests/` | The program's tests, run on invented ledgers and simulated returns. |
+| `outputs/` | The figures the dashboard draws: weights, percentages, basis points, loadings and indices. |
+| `method/` | The fixed tables the program applies: MSCI's regions, the funds the equity ETF holds, share classes of one company, and the ETF selection. |
+| `index.html`, `site/` | The dashboard, and the style, script and colour palette it is built with. |
 
-Returns, costs, the reference portfolios, the look-through and the dashboard are not yet implemented.
 
 ## What the record measures
 
 The record covers the running of the portfolio: the orders and their costs, the drift of the weights away from the target weights, the rebalancing the rules produce, and the look-through of the two ETFs. For equity the look-through gives the weights of regions, countries, sectors, currencies and the largest companies, and for bonds the weights of issuing countries, maturities and credit ratings, and the duration of the bond sleeve. Returns are time-weighted, so contributions do not count as gains.
 
-Two reference portfolios, computed from the same contributions and prices without costs, sit beside the portfolio. The first follows the same rules, so the difference between it and the portfolio is the cost of implementation. The second goes back to its target weights on every cycle day, so the difference between the two reference portfolios is the effect on returns of letting the weights drift inside the band, before costs. A record of five to ten years is too short to show that one set of rules is better than another, so the returns are not offered as evidence for the rules.
+Two reference portfolios, computed from the same contributions and prices without costs, sit beside the portfolio. The first follows the same rules, so the difference between it and the portfolio is the cost of implementation. The second goes back to its target weights on every cycle day, so the difference between the two reference portfolios is the effect on returns of letting the weights drift inside the band, before costs. An index blend, 70 per cent MSCI ACWI net total return and 30 per cent the Bloomberg Euro-Aggregate Treasury index in euro, rebalanced monthly, is shown for information. The equity part is MSCI's published end-of-day levels of the index in euro. Bloomberg publishes no public series of the bond index, so the bond part is the benchmark's one-month return as Vanguard's monthly factsheet reports it, and the blend is a monthly series that starts at the first month end after the first purchase. A record of five to ten years is too short to show that one set of rules is better than another, so the returns are not offered as evidence for the rules.
 
 ## What is published and what is not
 
@@ -41,7 +45,7 @@ python3 mandate/allocation_check.py
 python3 -m pytest tests
 ```
 
-`allocation_check.py` downloads its five source files into `cache/`, which is not committed, and rewrites `mandate/allocation_check_results.md`. Its sample ends in December 2025, so a later run differs only where a source revises its history. The tests run on invented ledgers. The program reads the private ledger: with `PYTHONPATH=src`, `python3 -m portfolio check` checks the ledger against rules 7 and 10, `status` shows the holdings and weights, and `cycle` gives the orders of a cycle day.
+`allocation_check.py` downloads its five source files into `cache/`, which is not committed, and rewrites `mandate/allocation_check_results.md`. Its sample ends in December 2025, so a later run differs only where a source revises its history. The tests run on invented ledgers and simulated returns. The program reads the private ledger: with `PYTHONPATH=src`, `python3 -m portfolio check` checks the ledger against rules 7 and 10, `status` shows the holdings and weights, `cycle` gives the orders of a cycle day, and `build` writes `outputs/` and `index.html`.
 
 ## Terms
 
@@ -58,9 +62,21 @@ python3 -m pytest tests
 - **trading day**: a day on which Xetra, the Frankfurt exchange where both ETFs are listed in euro, is open.
 - **ledger**: the private record of every contribution and every order, kept outside the repository.
 - **record**: what the program computes from the ledger and the prices: holdings, weights, orders and their costs, returns, the look-through and the reference portfolios.
+- **net asset value**: the value of one share of an ETF at the close of a day, as its issuer publishes it.
 - **look-through**: the portfolio's exposure to the securities inside the two ETFs, each ETF's holdings weighted by the ETF's weight in the portfolio.
-- **reference portfolio**: a portfolio computed from the same contributions and prices as the portfolio, without costs.
+- **reference portfolio**: a portfolio computed from the same contributions and prices as the portfolio, without costs. Reference portfolio A follows the same rules, and reference portfolio B goes back to the target weights on every cycle day.
+- **index blend**: 70 per cent MSCI ACWI net total return and 30 per cent the Bloomberg Euro-Aggregate Treasury index, in euro, rebalanced at each month end.
+- **implementation cost**: the portfolio's value relative to reference portfolio A, with contributions removed, in basis points, negative when the portfolio trails.
+- **half-spread**: half the gap between the ask and the bid quoted when an order is placed.
+- **basis point**: one hundredth of a percentage point.
 - **split**: the pair of target weights, written equity/bonds, for example 70/30.
 - **risk limit**: the worst fall the mandate aims to stay within, about one third, tested as 35 per cent.
 - **growth per year**: the compound annual return, with contributions removed.
-- **worst fall**: the largest fall in the portfolio's value from a previous peak to a later low, with contributions removed.
+- **drawdown**: the fall in the portfolio's value below its previous peak on a given day, with contributions removed, in per cent.
+- **worst fall**: the largest drawdown, meaning the largest fall in the portfolio's value from a previous peak to a later low, with contributions removed.
+- **tracking difference**: an ETF's return minus its index's return over a calendar year, in percentage points.
+- **duration**: the approximate percentage change in a bond's price for a change of one percentage point in its yield, in years. For the bond sleeve it is the average duration in the issuer's factsheet.
+- **factor**: the return of one of the developed-market factors in Kenneth French's data library: the market's return minus the risk-free rate, and long-short portfolios for size, value, profitability, investment and momentum.
+- **loading**: the coefficient of the ETF's return minus the risk-free rate on a factor's return.
+- **risk-free rate**: the one-month US Treasury bill return in French's files.
+- **standard error**: the estimated standard deviation of an estimate.

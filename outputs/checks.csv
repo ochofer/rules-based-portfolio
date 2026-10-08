@@ -1,0 +1,11 @@
+as_of,check,result,detail
+2026-10-07,ECB rate carried forward,information,"20 days since 2011, each the last rate before"
+2026-10-07,look-through equity_country sums to the sleeve weight,fail,difference 0.147 points
+2026-10-07,look-through equity_sector sums to the sleeve weight,fail,difference 0.147 points
+2026-10-07,look-through equity_region sums to the sleeve weight,fail,difference 0.147 points
+2026-10-07,look-through bonds_country sums to the sleeve weight,pass,difference 0.000 points
+2026-10-07,look-through bonds_maturity sums to the sleeve weight,pass,difference 0.000 points
+2026-10-07,orders without a recorded bid and ask,information,2
+2026-10-07,orders outside the rule 7 window,information,2
+2026-10-07,factor regression observations,information,"156 weeks, Newey-West lag 4"
+2026-10-07,statement valuation gap,not yet available,from the first month-end statement
