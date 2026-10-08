@@ -10,9 +10,9 @@ The limit sets the target weights and never triggers a sale. In a fall, rule 8 a
 
 ## Constraints
 
-- The portfolio is long-only and holds two exchange-traded funds (ETFs) traded in euro on Xetra, one on a global equity index of developed and emerging markets and one on a euro government bond index. Both are UCITS (Undertakings for Collective Investment in Transferable Securities) funds, the European Union standard for funds sold to the public.
-- Both ETFs are accumulating: they reinvest the income they receive and pay nothing out.
-- At most five orders are placed in a month, the number the account's plan carries without commission.
+- The portfolio is long-only and holds two exchange-traded funds (ETFs) traded in euro on Xetra, one on a global equity index of developed and emerging markets and one on a euro government bond index. Both are UCITS funds.
+- Both ETFs accumulate their income.
+- At most five orders are placed in a month.
 - The rules change only by a dated amendment under rule 9.
 
 ## How the split follows from the risk limit
@@ -20,7 +20,7 @@ The limit sets the target weights and never triggers a sale. In a fall, rule 8 a
 Each sleeve is the part of the portfolio held in one ETF. The test builds monthly euro returns for both sleeves from February 1999, the second month of the euro, to December 2025:
 
 - Equity: Kenneth French's market returns for developed and emerging markets, weighted 90 and 10, close to their shares of a global index, and converted from US dollars to euro at the month-end reference rate of the European Central Bank (ECB).
-- Bonds: a euro area government bond with a duration, the average time to its payments weighted by their present value, of seven years, close to that of a euro government bond index. From October 2004 it is a seven-year zero-coupon bond priced from the ECB's yield curve. Before that date, the change in the ECB's ten-year government bond yield, a monthly average, is applied to a bond of that duration.
+- Bonds: a euro area government bond with a duration of seven years, close to that of a euro government bond index. From October 2004 it is a seven-year zero-coupon bond priced from the ECB's yield curve. Before that date, the change in the ECB's ten-year government bond yield, a monthly average, is applied to a bond of that duration.
 
 For each split from 40/60 to 100/0, in steps of 5 points, the test starts at the target weights and checks the equity weight at each month end. When the equity weight is outside the band, the interval of 5 points either side of the equity target weight that rule 5 uses, the test goes back to the target weights. It then measures the worst fall. Costs and taxes are left out. The portfolio holds the split with the largest equity target weight whose worst fall is within 35 per cent.
 
@@ -41,5 +41,5 @@ The constructed returns are close to those of funds on the same markets. From 20
 - Month-end values miss falls that reverse within a month.
 - Before October 2004 the bond returns rest on monthly average yields, a rougher construction, and the worst fall of 2000 to 2003 lies in that period. The fall of 2007 to 2009 rests on the ECB curve and on its own selects the same split: 70/30 fell 33.4 per cent and 75/25 fell 36.5 per cent.
 - The result depends on bonds rising while equities fell. Bonds rose by 24.6 per cent from the peak of August 2000 to the low of March 2003, and by 9.8 per cent from October 2007 to February 2009. In 2022 bonds fell with equities, and every split fell between 13.3 and 15.9 per cent from its previous peak.
-- The test has no contributions, so it leaves out rule 4, under which each top-up, the fixed monthly contribution, buys the sleeve furthest below its target weight.
+- The test has no contributions, so it leaves out rule 4, under which each monthly top-up buys the sleeve furthest below its target weight.
 - The growth figures describe one history and are not a forecast.

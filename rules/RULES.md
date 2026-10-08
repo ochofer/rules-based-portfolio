@@ -93,8 +93,13 @@ The file holds the starting amount, the top-up and a random line that prevents a
 
 ## Amendments
 
-No rule has been amended. The table also records errata, corrections of wording that change no rule.
+No rule has been amended. An erratum corrects wording and a reading settles a case the text leaves open. Neither changes a rule, so neither waits the 30 days of rule 9.
 
-| Committed | Rule | Change | Applies from cycle day |
+| Committed | Rule | Type | Text |
 |---|---|---|---|
-| 2026-10-07 | 2 | Erratum, no rule changed: in rule 2, "the fingerprint in the last section" should read "the fingerprint under The private values". | not applicable |
+| 2026-10-07 | 2 | Erratum | "the fingerprint in the last section" should read "the fingerprint under The private values". |
+| 2026-10-08 | 4 | Erratum | "Any remainder buys both sleeves in proportion to their target weights" should read "Any remainder buys the other sleeve up to its target weight". With two sleeves the remainder equals the other sleeve's shortfall, so the original wording could not give the outcome the rule states. |
+| 2026-10-08 | 4 | Reading | Rule 4 applies to all cash not yet invested. An order below the broker's minimum of 1 euro is not placed, and its cash waits for the next cycle day. |
+| 2026-10-08 | 6 | Reading | A top-up purchase and a band purchase of the same sleeve on one cycle day are placed as one order, so rules 4 and 5 need at most two orders. |
+| 2026-10-08 | 7 | Reading | The broker shows no bid or ask. The bid and ask recorded are the real-time quotes of Tradegate Exchange, saved just before the order. They are not the quotes of the venue where the order executes, and each order's half-spread is measured against them. |
+| 2026-10-08 | 7 | Reading | On a cycle day when the US equity market is closed, the orders are placed that day between 15:45 and 17:00 Amsterdam time, as rule 3 requires. |
