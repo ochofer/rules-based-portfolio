@@ -141,6 +141,11 @@ def _and(items) -> str:
     return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
 
 
+def _start_label(day, i) -> str:
+    """The first row of a daily series is the starting amount at the close before the first order."""
+    return f"{day}, start" if i == 0 else str(day)
+
+
 def _asof(day, extra="") -> str:
     return f"As of {fmt.day(day)}" + (f". {extra}" if extra else "")
 
@@ -247,8 +252,8 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
         if column == "growth_portfolio":
             end = data.iloc[-1]
             annotations.append(_label(end["date"], fmt.rounded(end[column], 1), fmt.index(end[column])))
-    for _, r in daily.iterrows():
-        rows.append([r["date"]] + [fmt.index(r[c]) for _, c, _, _ in series])
+    for i, (_, r) in enumerate(daily.iterrows()):
+        rows.append([_start_label(r["date"], i)] + [fmt.index(r[c]) for _, c, _, _ in series])
     layout = {"showlegend": True, "legend": {"y": 1.02}, "yaxis": {"title": {"text": "Growth of 100"}},
               "xaxis": {"type": "date", "tickformat": "%Y-%m-%d", "hoverformat": "%Y-%m-%d"},
               "annotations": annotations, "hovermode": "closest", "margin": {"r": 48}}  # fmt: skip
@@ -257,7 +262,7 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
     asof3 = _asof(daily["date"].iloc[-1] if len(daily) else w_now["weights_as_of"],
                   "100 is the starting amount before the first order. The index blend starts at the first month end")  # fmt: skip
     page.add("overview", _card("c3", "Growth of 100: the portfolio, the two reference portfolios and the index blend",
-             asof3, "outputs/portfolio_daily.csv", table=table, height=340, wide=True, empty=empty),
+             asof3, "outputs/portfolio_daily.csv", table=None if empty else table, height=340, wide=True, empty=empty),
              None if empty else {"id": "c3", "traces": traces, "layout": layout,
                                  "layout_narrow": {"annotations": [], "margin": {"r": 12}}})  # fmt: skip
 
@@ -286,12 +291,13 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
     layout = {"showlegend": len(traces) > 1, "yaxis": {"title": {"text": "Per cent below the previous peak"},
               "range": [deepest, -1]}, "xaxis": {"type": "date", "tickformat": "%Y-%m-%d", "hoverformat": "%Y-%m-%d"},
               "shapes": shapes, "annotations": annotations}  # fmt: skip
-    rows = [[r["date"], fmt.pct(-r["drawdown_portfolio"]), fmt.pct(-r["drawdown_index_blend"])] for _, r in daily.iterrows()]
+    rows = [[_start_label(r["date"], i), fmt.pct(-r["drawdown_portfolio"]), fmt.pct(-r["drawdown_index_blend"])]
+            for i, (_, r) in enumerate(daily.iterrows())]  # fmt: skip
     table = _table(["Date", "Portfolio", "Index blend"], rows, numeric=("Portfolio", "Index blend"))
     asof4 = _asof(daily["date"].iloc[-1] if len(daily) else w_now["weights_as_of"],
                   f"Worst fall to date {fmt.pct(worst)}. The mandate's test limit is 35 per cent and its outer bound 40 per cent")  # fmt: skip
     page.add("overview", _card("c4", "Drawdown against the mandate's limit", asof4,
-             "outputs/portfolio_daily.csv", table=table, height=300, wide=True, empty=empty,
+             "outputs/portfolio_daily.csv", table=None if empty else table, height=300, wide=True, empty=empty,
              note="Daily values. The mandate's 35% test used month-end values, which miss falls that reverse within "
                   "a month; the worst daily fall is at least as deep."),
              None if empty else {"id": "c4", "traces": traces, "layout": layout})  # fmt: skip
@@ -509,12 +515,12 @@ def contributions(page, daily, monthly):
         ]  # fmt: skip
     layout = {"showlegend": True, "legend": {"traceorder": "reversed"}, "yaxis": {"title": {"text": "Units of the starting amount"}},
               "xaxis": {"type": "date", "tickformat": "%Y-%m-%d", "hoverformat": "%Y-%m-%d"}}  # fmt: skip
-    rows = [[r["date"], fmt.index(r["contributions_in_units"]), fmt.index(r["value_in_units"])]
-            for _, r in daily.iterrows()]  # fmt: skip
+    rows = [[_start_label(r["date"], i), fmt.index(r["contributions_in_units"]), fmt.index(r["value_in_units"])]
+            for i, (_, r) in enumerate(daily.iterrows())]  # fmt: skip
     table = _table(["Date", "Paid in", "Value"], rows, numeric=("Paid in", "Value"))
     page.add("contributions", _card("c9", "Money paid in and the value of the portfolio, in units of the starting amount",
              _asof(daily["date"].iloc[-1], "The starting amount is 100 units and each top-up is 5"),
-             "outputs/portfolio_daily.csv", table=table, height=320, wide=True, empty=empty),
+             "outputs/portfolio_daily.csv", table=None if empty else table, height=320, wide=True, empty=empty),
              None if empty else {"id": "c9", "traces": traces, "layout": layout})  # fmt: skip
 
     empty = None if len(monthly) else "The first month starts with the first valuation day."
@@ -913,6 +919,21 @@ def terms() -> list:
     return [(m.group(1)[0].upper() + m.group(1)[1:], m.group(2).replace("`", "")) for m in found]
 
 
+DESCRIPTION = ("A real-money portfolio run under written rules, 70/30 equity and euro government bonds: allocation, "
+               "rebalancing, costs, look-through and factor exposures.")  # fmt: skip
+PREVIEW_IMAGE = "og-portfolio.png"
+
+
+def _link_preview() -> str:
+    """The tags that give a link to the page a title, a description and a picture, once the picture is in the root."""
+    if not (config.ROOT / PREVIEW_IMAGE).exists():
+        return ""
+    tags = [("property", "og:type", "website"), ("property", "og:title", "Rules-based portfolio"),
+            ("property", "og:description", DESCRIPTION), ("property", "og:url", config.DASHBOARD_URL),
+            ("property", "og:image", config.DASHBOARD_URL + PREVIEW_IMAGE), ("name", "twitter:card", "summary_large_image")]  # fmt: skip
+    return "".join(f'<meta {kind}="{key}" content="{_esc(value)}">\n' for kind, key, value in tags)
+
+
 def _palette_css(palette: dict) -> str:
     keys = ["plane", "surface", "ink", "ink2", "muted", "grid", "axis", "ring", "accent", "equity", "bonds"]
 
@@ -1002,8 +1023,8 @@ def build(out_dir: Path = None) -> Path:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rules-based portfolio</title>
-<meta name="description" content="A real-money portfolio run under written rules, 70/30 equity and euro government bonds: allocation, rebalancing, costs, look-through and factor exposures.">
-<style>
+<meta name="description" content="{_esc(DESCRIPTION)}">
+{_link_preview()}<style>
 {css}</style>
 <script src="{PLOTLY}" integrity="{PLOTLY_INTEGRITY}" crossorigin="anonymous" defer></script>
 </head>

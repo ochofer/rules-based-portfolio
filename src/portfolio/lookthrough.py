@@ -157,11 +157,11 @@ def parse_vanguard_holdings(path: Path) -> tuple:
 
 
 def _issuer_country(isin, issuer) -> str:
-    if not isin:
+    if not isinstance(isin, str) or not isin:  # cash lines carry no ISIN: None, or NaN from pandas 3
         return CASH_LINE
     if isin[:2] in ISIN_COUNTRY:
         return ISIN_COUNTRY[isin[:2]]
-    m = re.match(r"(\w+) Government", issuer or "")
+    m = re.match(r"(\w+) Government", issuer if isinstance(issuer, str) else "")
     if isin[:2] == "XS" and m:
         return m.group(1)
     raise ValueError(f"no country for bond {isin} ({issuer})")

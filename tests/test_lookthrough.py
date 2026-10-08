@@ -105,3 +105,8 @@ def test_currency_exposure_shows_where_each_currency_comes_from(tables):
     assert parts.values == pytest.approx(currency["share_of_portfolio"].values)
     assert currency["from_bond_sleeve"].sum() == pytest.approx(0.29)
     assert currency.loc["EUR", "from_cash"] == pytest.approx(0.01)
+
+
+def test_a_line_without_an_isin_is_cash_whatever_pandas_reads_it_as():
+    for missing in (None, "", float("nan")):
+        assert lt._issuer_country(missing, float("nan")) == lt.CASH_LINE

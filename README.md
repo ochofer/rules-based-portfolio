@@ -4,7 +4,7 @@ I run a real-money portfolio under written rules: 70 per cent in a global equity
 
 Each sleeve is an ETF, and the record looks through both to the companies and bonds inside them.
 
-The dashboard is at https://www.carlohofer.com/rules-based-portfolio/.
+The dashboard is at https://www.carlohofer.com/rules-based-portfolio/. It is rebuilt every Monday and on each cycle day, and its header gives the dates of its prices and of its holdings.
 
 ## How the portfolio is run
 
