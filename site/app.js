@@ -1,16 +1,9 @@
 // The dashboard's only script. Every figure, label and tooltip arrives formatted from the build; this
-// script maps colour roles to the palette of the current theme and draws each chart with Plotly.
+// script maps colour roles to the palette and draws each chart with Plotly.
 (function () {
   "use strict";
   var DATA = JSON.parse(document.getElementById("dashboard-data").textContent);
   var drawn = {};
-
-  function theme() {
-    var t = document.documentElement.getAttribute("data-theme");
-    if (t === "light" || t === "dark") return t;
-    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
-    return "light";
-  }
 
   function resolve(value, palette) {
     if (typeof value === "string" && value.charAt(0) === "@") {
@@ -63,7 +56,7 @@
   function draw(chart) {
     var el = document.getElementById(chart.id);
     if (!el || !window.Plotly) return;
-    var p = DATA.palette[theme()];
+    var p = DATA.palette.light;
     var narrow = el.clientWidth < 520;
     var layout = merge(baseLayout(p, narrow), resolve(chart.layout || {}, p));
     if (narrow && chart.layout_narrow) layout = merge(layout, resolve(chart.layout_narrow, p));
@@ -112,32 +105,10 @@
     if (active) drawView(active.id.replace("view-", ""));
   }
 
-  var THEMES = ["auto", "light", "dark"];
-  function setTheme(t) {
-    if (t === "auto") document.documentElement.removeAttribute("data-theme");
-    else document.documentElement.setAttribute("data-theme", t);
-    var b = document.getElementById("theme");
-    if (b) b.textContent = "Theme: " + t;
-    try { localStorage.setItem("theme", t); } catch (e) { /* not stored */ }
-    redrawActive();
-  }
-
   document.addEventListener("DOMContentLoaded", function () {
-    var saved = "auto";
-    try { saved = localStorage.getItem("theme") || "auto"; } catch (e) { saved = "auto"; }
-    if (THEMES.indexOf(saved) < 0) saved = "auto";
-    setTheme(saved);
-    document.getElementById("theme").addEventListener("click", function () {
-      var current = document.documentElement.getAttribute("data-theme") || "auto";
-      setTheme(THEMES[(THEMES.indexOf(current) + 1) % THEMES.length]);
-    });
     document.querySelectorAll(".viewtabs button").forEach(function (b) {
       b.addEventListener("click", function () { show(b.getAttribute("data-view"), true); });
     });
-    if (window.matchMedia) {
-      var mq = window.matchMedia("(prefers-color-scheme: dark)");
-      if (mq.addEventListener) mq.addEventListener("change", redrawActive);
-    }
     var resizeTimer = null;
     window.addEventListener("resize", function () {
       clearTimeout(resizeTimer);

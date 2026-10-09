@@ -2,9 +2,8 @@
 
 The page is built from the committed files only (outputs/, method/, mandate/ and rules/RULES.md), so
 every figure on it can be traced to a file. Each figure is formatted once by formatting.py and passed to
-the page as a string; the page's script maps colour roles to the palette of the current theme
-(site/palette.json) and draws each chart with Plotly. A chart that names a colour by anything other
-than a role stops the build.
+the page as a string; the page's script maps colour roles to the palette (site/palette.json) and draws
+each chart with Plotly. A chart that names a colour by anything other than a role stops the build.
 """
 
 from __future__ import annotations
@@ -19,6 +18,9 @@ import pandas as pd
 from . import config
 from . import formatting as fmt
 
+SITE_URL = "https://www.carlohofer.com/"
+PROJECTS_URL = SITE_URL + "projects/"
+PROJECT_PAGE_URL = PROJECTS_URL + "rules-based-portfolio/"
 PLOTLY = "https://cdn.plot.ly/plotly-basic-2.35.2.min.js"
 PLOTLY_INTEGRITY = "sha384-wQ3lfCxuvLfhHGiSdHF5+e3NZ1zNwEMd8/nII+K7VKChF9llO/OwOcn/aVRkB7az"
 VIEWS = [
@@ -440,9 +442,11 @@ def _departures(compliance: pd.DataFrame, orders: pd.DataFrame) -> str:
 
 def costs(page, monthly, implementation, daily):
     traces = []
-    parts = [("Commissions", "commissions_bps", "@cost_1"), ("Half-spread at execution", "half_spread_bps", "@cost_2"),
-             ("Currency conversion", "currency_conversion_bps", "@cost_3"),
-             ("Price paid against net asset value", "execution_against_nav_bps", "@cost_4")]  # fmt: skip
+    # The navy ramp runs from the lightest step to the darkest, so that the part that usually carries the cost,
+    # the price paid against net asset value, is the darkest.
+    parts = [("Commissions", "commissions_bps", "@cost_4"), ("Half-spread at execution", "half_spread_bps", "@cost_3"),
+             ("Currency conversion", "currency_conversion_bps", "@cost_2"),
+             ("Price paid against net asset value", "execution_against_nav_bps", "@cost_1")]  # fmt: skip
     if len(monthly):
         for name, column, role in parts:
             traces.append({"type": "bar", "name": name, "x": list(monthly["month"]), "width": 0.45,
@@ -956,15 +960,9 @@ def _link_preview() -> str:
 
 
 def _palette_css(palette: dict) -> str:
+    """The palette's page colours as CSS variables. The page has one theme, light."""
     keys = ["plane", "surface", "ink", "ink2", "muted", "grid", "axis", "ring", "accent", "equity", "bonds"]
-
-    def block(mode):
-        return " ".join(f"--{k}: {palette[mode][k]};" for k in keys)
-
-    return (f":root {{ color-scheme: light; {block('light')} }}\n"
-            f"@media (prefers-color-scheme: dark) {{ :root:where(:not([data-theme=\"light\"])) {{ color-scheme: dark; "
-            f"{block('dark')} }} }}\n"
-            f":root[data-theme=\"dark\"] {{ color-scheme: dark; {block('dark')} }}\n")  # fmt: skip
+    return ":root { color-scheme: light; " + " ".join(f"--{k}: {palette['light'][k]};" for k in keys) + " }\n"
 
 
 def _check_roles(charts: list, palette: dict) -> None:
@@ -1050,13 +1048,17 @@ def build(out_dir: Path = None) -> Path:
 <script src="{PLOTLY}" integrity="{PLOTLY_INTEGRITY}" crossorigin="anonymous" defer></script>
 </head>
 <body>
+<header class="ch-band"><div class="ch-band__in">
+<a class="ch-word" href="{SITE_URL}">Carlo Hofer</a>
+<div class="ch-menu" role="navigation" aria-label="Site"><a href="{PROJECTS_URL}">Projects</a></div>
+</div></header>
+<p class="ch-back"><a href="{PROJECT_PAGE_URL}">&larr; Rules-based portfolio</a> &middot; <a href="{PROJECTS_URL}">All projects</a></p>
 <header class="top"><div class="wrap">
 <h1>Rules-based portfolio</h1>
 <p>{_esc(intro)}</p>
 <div class="meta"><span>{_esc(_two_dates(out["allocation_now.csv"].iloc[0]))}</span><span>{_esc(started)}</span>
 <a href="{config.REPOSITORY_URL}">Repository</a><a href="{config.REPOSITORY_URL}/blob/main/rules/RULES.md">Rules</a>
-<a href="{config.REPOSITORY_URL}/blob/main/mandate/MANDATE.md">Mandate</a>
-<button type="button" class="theme" id="theme">Theme: auto</button></div>
+<a href="{config.REPOSITORY_URL}/blob/main/mandate/MANDATE.md">Mandate</a></div>
 </div></header>
 <div class="viewtabs" role="navigation" aria-label="Views"><div class="wrap">{tabs}</div></div>
 <main class="wrap">

@@ -1,3 +1,8 @@
+@font-face {
+  font-family: "EB Garamond"; src: url("https://www.carlohofer.com/assets/fonts/EBGaramond-var-latin.woff2") format("woff2");
+  font-weight: 400 800; font-display: swap;
+}
+:root { --navy: #16213a; --tint: #f5f5f5; --rule: #dddddd; --link: #1f3a60; }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body {
@@ -6,15 +11,27 @@ body {
 }
 a { color: var(--ink); text-underline-offset: 2px; }
 .wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
-header.top { padding: 28px 0 8px; }
-header.top h1 { font-size: 1.6rem; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.01em; }
+.ch-band { background: linear-gradient(90deg, #121a2c 0%, #172238 60%, #1a263b 100%); }
+.ch-band__in {
+  max-width: 1180px; margin: 0 auto; padding: 0 16px; height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ch-word {
+  font-family: "EB Garamond", Garamond, Georgia, serif; font-weight: 500; text-transform: uppercase;
+  letter-spacing: .22em; color: #ece6d9; text-decoration: none; font-size: 17px;
+}
+.ch-menu a { color: rgba(236,230,217,.78); text-decoration: none; font-size: 15px; margin-left: 20px; }
+.ch-menu a:hover { color: #ece6d9; }
+.ch-back { max-width: 1180px; margin: 12px auto 0; padding: 0 16px; font-size: 14px; color: var(--ink2); }
+.ch-back a { color: var(--link); }
+header.top { padding: 20px 0 8px; }
+header.top h1 {
+  font-family: "EB Garamond", Garamond, Georgia, serif; font-weight: 500; color: var(--navy);
+  font-size: 2.1rem; line-height: 1.15; margin: 0 0 8px;
+}
 header.top p { margin: 0 0 6px; color: var(--ink2); max-width: 760px; }
 .meta { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; color: var(--muted); font-size: 0.86rem; margin-top: 8px; }
 .meta a { color: var(--ink2); }
-button.theme {
-  font: inherit; font-size: 0.86rem; color: var(--ink2); background: var(--surface);
-  border: 1px solid var(--grid); border-radius: 6px; padding: 3px 10px; cursor: pointer;
-}
 .viewtabs {
   position: sticky; top: 0; z-index: 5; background: var(--plane);
   border-bottom: 1px solid var(--grid); margin: 12px 0 18px;
@@ -73,13 +90,14 @@ td.num, th.num { text-align: right; }
 .rules code { font-size: 0.86em; overflow-wrap: anywhere; }
 dl.terms { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; font-size: 0.88rem; margin: 0; }
 dl.terms dt { font-weight: 600; } dl.terms dd { margin: 0; color: var(--ink2); }
-footer { color: var(--muted); font-size: 0.84rem; padding: 24px 0 48px; border-top: 1px solid var(--grid); }
+footer { color: var(--ink2); background: var(--tint); font-size: 0.84rem; padding: 24px 0 48px; border-top: 1px solid var(--rule); }
 footer p { margin: 0 0 8px; max-width: 860px; }
 @media (max-width: 900px) {
   .grid { grid-template-columns: minmax(0, 1fr); }
   .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .multiples { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+@media (max-width: 600px) { .ch-band__in { height: 48px; } }
 @media (max-width: 480px) {
   .multiples { grid-template-columns: minmax(0, 1fr); }
   dl.terms { grid-template-columns: minmax(0, 1fr); }

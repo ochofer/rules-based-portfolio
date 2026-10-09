@@ -1,8 +1,10 @@
 """One rounding for every display, and colours named by role only."""
 
+import json
+
 import pytest
 
-from portfolio import formatting as fmt, site
+from portfolio import config, formatting as fmt, site
 
 
 def test_rounding_rules():
@@ -16,10 +18,10 @@ def test_rounding_rules():
 
 
 def test_a_chart_with_a_colour_value_stops_the_build():
-    palette = {"light": {"accent": "x"}, "dark": {"accent": "x"}}
+    palette = {"light": {"accent": "x"}}
     site._check_roles([{"traces": [{"marker": {"color": "@accent"}}]}], palette)
     with pytest.raises(ValueError, match="by value"):
-        site._check_roles([{"traces": [{"marker": {"color": "#2a78d6"}}]}], palette)
+        site._check_roles([{"traces": [{"marker": {"color": "#24599e"}}]}], palette)
     with pytest.raises(ValueError, match="does not define"):
         site._check_roles([{"traces": [{"marker": {"color": "@nothing"}}]}], palette)
 
@@ -43,3 +45,11 @@ def test_a_short_date_axis_has_one_tick_per_valuation_day_and_none_twice():
     ticks = site._date_axis(twelve, 5)["tickvals"]
     assert ticks[-1] == "2026-10-12" and len(ticks) <= 5 and len(set(ticks)) == len(ticks)
     assert "tickvals" not in site._date_axis(["2026-06-01", "2026-10-08"])
+
+
+def test_the_page_has_one_theme_light():
+    palette = json.loads((config.SITE_DIR / "palette.json").read_text())
+    assert list(palette) == ["light"]
+    css = site._palette_css(palette)
+    assert "color-scheme: light" in css and "prefers-color-scheme" not in css and "data-theme" not in css
+    assert "theme" not in (config.SITE_DIR / "app.js").read_text()
