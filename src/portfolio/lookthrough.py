@@ -86,7 +86,11 @@ def fetch(refresh: bool, cache_dir: Path = config.CACHE_DIR) -> dict:
 
 
 def parse_ishares_holdings(path: Path) -> tuple:
-    """The holdings rows and their as-of date."""
+    """The holdings rows and their as-of date, each weight its market value over the fund's.
+
+    The file's own percentages are rounded to two decimals: hundreds of lines read 0.00 and together they
+    fall about 0.2 per cent short of the fund.
+    """
     lines = Path(path).read_text(encoding="utf-8-sig").splitlines()
     m = re.match(r'Fund Holdings as of,"(\d{2})/([A-Za-z]+)/(\d{4})"', lines[0])
     if not m:
@@ -100,7 +104,8 @@ def parse_ishares_holdings(path: Path) -> tuple:
         body.append(line)
     rows = list(csv.DictReader(io.StringIO("\n".join(body))))
     frame = pd.DataFrame(rows)
-    frame["weight"] = frame["Weight (%)"].str.replace(",", "").astype(float) / 100
+    value = pd.to_numeric(frame["Market Value"].str.replace(",", ""), errors="coerce").fillna(0.0)
+    frame["weight"] = value / value.sum()
     return frame, as_of
 
 
@@ -249,7 +254,7 @@ def factsheet_history(latest: Path, cache_dir: Path = config.CACHE_DIR) -> pd.Da
 
 def _shares(lines: pd.DataFrame, key: str, sleeve_weight: float) -> pd.DataFrame:
     grouped = lines.groupby(key)["weight"].sum()
-    grouped = grouped[grouped.abs() >= 5e-5]  # lines the issuer reports at 0.00 per cent
+    grouped = grouped[grouped != 0]  # holdings valued at nothing, such as Russian shares written down
     frame = pd.DataFrame({"share_of_sleeve": grouped, "share_of_portfolio": grouped * sleeve_weight})
     return frame.sort_values("share_of_sleeve", ascending=False)
 

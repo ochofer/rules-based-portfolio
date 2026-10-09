@@ -58,7 +58,9 @@ def drawdown(index: pd.Series) -> pd.Series:
 
 def money_weighted(ledger: Ledger, day: pd.Timestamp, value: float) -> float:
     """The internal rate of return of the contributions to day and the value on day, per year."""
-    flows = [(c.moment.date(), -c.amount_eur) for c in ledger.contributions.itertuples() if c.moment <= day]
+    # By date: a contribution made during day is in the value at its close.
+    flows = [(c.moment.date(), -c.amount_eur) for c in ledger.contributions.itertuples()
+             if c.moment.date() <= day.date()]  # fmt: skip
     flows.append((day.date(), value))
     first = flows[0][0]
     t = np.array([(d - first).days / 365.25 for d, _ in flows])
@@ -66,17 +68,37 @@ def money_weighted(ledger: Ledger, day: pd.Timestamp, value: float) -> float:
     if t[-1] <= 0:
         return float("nan")
 
-    def npv(rate):
-        return float(np.sum(a / (1 + rate) ** t))
+    def npv(g):  # g is the rate per year, continuously compounded
+        with np.errstate(over="ignore", invalid="ignore"):
+            return float(np.sum(a * np.exp(-g * t)))
 
-    low, high = -0.99, 10.0
+    # The bracket widens until it holds the root: over the first days a small move is a large rate per year.
+    low, high = -1.0, 1.0
+    while npv(high) > 0 and high < 1e4:
+        high *= 2
+    while npv(low) < 0 and low > -1e4:
+        low *= 2
     for _ in range(200):
         mid = (low + high) / 2
         if npv(mid) > 0:
             low = mid
         else:
             high = mid
-    return mid
+    return float(np.expm1(mid))
+
+
+def money_weighted_cumulative(ledger: Ledger, day: pd.Timestamp, value: float) -> float:
+    """The money-weighted return from the first contribution to day, not per year.
+
+    On the day of the first contribution no time has passed and the rate per year is not defined; the
+    cumulative return is then the value over the contributions, the limit of the rate compounded over the
+    time passed.
+    """
+    paid = sum(c.amount_eur for c in ledger.contributions.itertuples() if c.moment.date() <= day.date())
+    years = _years(ledger, day)
+    if years <= 0:
+        return value / paid - 1
+    return (1 + money_weighted(ledger, day, value)) ** years - 1
 
 
 def _years(ledger: Ledger, day: pd.Timestamp) -> float:
@@ -249,7 +271,6 @@ def monthly(
         fees = sum(f / v for f, v in zip(month_orders["_fee"], value_on)) if len(month_orders) else 0.0
         measured = [h / v for h, v in zip(month_orders["_half_spread"], value_on) if not pd.isna(h)]
         not_measured = int(month_orders["_half_spread"].isna().sum()) if len(month_orders) else 0
-        mwr = money_weighted(ledger, last, value_end)
         years = _years(ledger, last)
         row = {
             "month": str(month),
@@ -258,8 +279,10 @@ def monthly(
             "return_month": table.loc[last, "growth_portfolio"] / table.loc[previous_day, "growth_portfolio"]
             - 1,
             "return_since_start": table.loc[last, "growth_portfolio"] / 100 - 1,
-            "money_weighted_since_start": (1 + mwr) ** years - 1 if years < 1 else np.nan,
-            "money_weighted_per_year": mwr if years >= 1 else np.nan,
+            "money_weighted_since_start": (
+                money_weighted_cumulative(ledger, last, value_end) if years < 1 else np.nan
+            ),
+            "money_weighted_per_year": money_weighted(ledger, last, value_end) if years >= 1 else np.nan,
             "weight_equity": table.loc[last, "weight_equity"],
             "weight_bonds": table.loc[last, "weight_bonds"],
             "weight_cash": table.loc[last, "weight_cash"],

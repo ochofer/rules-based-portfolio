@@ -110,3 +110,25 @@ def test_currency_exposure_shows_where_each_currency_comes_from(tables):
 def test_a_line_without_an_isin_is_cash_whatever_pandas_reads_it_as():
     for missing in (None, "", float("nan")):
         assert lt._issuer_country(missing, float("nan")) == lt.CASH_LINE
+
+
+def test_equity_weights_are_market_values_not_the_rounded_percentages(tmp_path):
+    # The file rounds to two decimals: three small lines read 0.00 and the percentages sum to 99.99.
+    path = tmp_path / "holdings.csv"
+    path.write_text(
+        'Fund Holdings as of,"07/Oct/2026"\n'
+        "Inception Date,\n"
+        "\n"
+        "Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Location,Market Currency\n"
+        'AAA,A,Financials,Equity,"9,997.00",99.97,"9,997.00",United States,USD\n'
+        "BBB,B,Financials,Equity,1.00,0.00,1.00,United States,USD\n"
+        "CCC,C,Financials,Equity,1.00,0.00,1.00,Japan,JPY\n"
+        "USD,USD CASH,Cash and/or Derivatives,Cash,1.00,0.00,1.00,United States,USD\n"
+        'ESZ6,S&P500 EMINI DEC 26,Cash and/or Derivatives,Futures,0.00,0.00,"2,500.00",United States,USD\n'
+        "\n"
+        '"The content contained herein is owned or licensed by BlackRock"\n'
+    )
+    frame, as_of = lt.parse_ishares_holdings(path)
+    assert as_of == pd.Timestamp("2026-10-07")
+    assert frame["weight"].sum() == pytest.approx(1.0)
+    assert frame["weight"].iloc[1] == pytest.approx(1 / 10000)

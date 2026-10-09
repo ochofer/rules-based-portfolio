@@ -35,3 +35,11 @@ def test_the_page_shows_the_readme_terms_once_each():
     names = [name.lower() for name, _ in terms]
     assert len(names) == len(set(names))
     assert {"drawdown", "worst fall", "net asset value", "implementation cost", "basis point"} <= set(names)
+
+
+def test_a_short_date_axis_has_one_tick_per_valuation_day_and_none_twice():
+    assert site._date_axis(["2026-10-07", "2026-10-08"])["tickvals"] == ["2026-10-07", "2026-10-08"]
+    twelve = [f"2026-10-{d:02d}" for d in range(1, 13)]
+    ticks = site._date_axis(twelve, 5)["tickvals"]
+    assert ticks[-1] == "2026-10-12" and len(ticks) <= 5 and len(set(ticks)) == len(ticks)
+    assert "tickvals" not in site._date_axis(["2026-06-01", "2026-10-08"])

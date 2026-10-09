@@ -36,6 +36,28 @@ def test_money_weighted_return_of_a_single_contribution_is_the_simple_return():
     assert rate == pytest.approx(0.10, abs=1e-3)
 
 
+def money_weighted_cumulative(contributions, day, value):
+    records = type("L", (), {})()
+    records.contributions = pd.DataFrame(
+        {"moment": [pd.Timestamp(m) for m, _ in contributions], "amount_eur": [a for _, a in contributions]}
+    )
+    return metrics.money_weighted_cumulative(records, pd.Timestamp(day), value)
+
+
+def test_money_weighted_cumulative_on_the_first_days():
+    # On the day of the first purchase it is the value over the contributions; one day later a 1 per cent
+    # gain is 1 per cent, a rate of about 3,700 per cent a year.
+    start = [("2026-10-08 09:32", 1000.0)]
+    assert money_weighted_cumulative(start, "2026-10-08", 1001.0) == pytest.approx(0.001)
+    assert money_weighted_cumulative(start, "2026-10-09", 1010.0) == pytest.approx(0.01)
+    assert money_weighted_cumulative(start, "2026-10-09", 990.0) == pytest.approx(-0.01)
+
+
+def test_a_contribution_made_on_the_valuation_day_counts():
+    flows = [("2026-10-08 09:32", 1000.0), ("2026-11-02 10:15", 100.0)]
+    assert money_weighted_cumulative(flows, "2026-11-02", 1100.0) == pytest.approx(0.0, abs=1e-9)
+
+
 def test_reference_a_equals_the_portfolio_without_costs(write_ledger):
     # The portfolio buys 70/30 at the net asset value and, on the cycle day of 5 November, places the orders
     # the rules give at the previous day's values, executed at the day's net asset value: no cost at all.

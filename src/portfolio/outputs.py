@@ -34,7 +34,8 @@ def _write(frame: pd.DataFrame, name: str, as_of, out_dir: Path) -> Path:
             frame[column] = frame[column].dt.strftime("%Y-%m-%d")
         elif pd.api.types.is_float_dtype(frame[column]):
             # Ten decimal places: floating-point noise from one machine to another does not reach the file.
-            frame[column] = frame[column].round(10)
+            # Adding zero turns a negative zero into zero.
+            frame[column] = frame[column].round(10) + 0.0
     path = out_dir / name
     frame.to_csv(path, index=False, float_format="%.10g", lineterminator="\n")
     return path

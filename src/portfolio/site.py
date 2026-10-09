@@ -146,6 +146,22 @@ def _start_label(day, i) -> str:
     return f"{day}, start" if i == 0 else str(day)
 
 
+def _date_axis(dates, most: int = 5) -> dict:
+    """A date axis. Over two weeks or less Plotly ticks by the hour and repeats each date, so the ticks are
+    then valuation days, at most `most` of them, the last day always among them."""
+    axis = {"type": "date", "tickformat": "%Y-%m-%d", "hoverformat": "%Y-%m-%d"}
+    days = sorted({str(d)[:10] for d in dates})
+    if days and (pd.Timestamp(days[-1]) - pd.Timestamp(days[0])).days <= 14:
+        step = -(-len(days) // most)
+        axis.update(tickmode="array", tickvals=days[::-1][::step][::-1])
+    return axis
+
+
+def _date_axes(dates) -> tuple:
+    """The date axis for the page at full width and for a narrow screen."""
+    return {"xaxis": _date_axis(dates)}, {"xaxis": _date_axis(dates, 3)}
+
+
 def _asof(day, extra="") -> str:
     return f"As of {fmt.day(day)}" + (f". {extra}" if extra else "")
 
@@ -207,20 +223,22 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
                        "width": 0.32, "marker": {"color": role}, "showlegend": False, **_hover([hover])})  # fmt: skip
         annotations.append(_label(max(w, target) * 100, name, fmt.pct(w), anchor="left", role="@ink", xshift=8))
     traces.append({"type": "scatter", "mode": "markers", "name": "Target weight", "y": [r[0] for r in rows2],
-                   "x": [r[2] * 100 for r in rows2], "showlegend": True,
+                   "x": [r[2] * 100 for r in rows2], "showlegend": False,
                    "marker": {"symbol": "line-ns", "size": 30, "color": "@ink", "line": {"color": "@ink", "width": 3}},
                    **_hover([f"{r[0]} target {fmt.pct(r[2])}" for r in rows2])})  # fmt: skip
-    annotations.append(_label((low + high) / 2 * 100, -0.42, band_text, anchor="center", xshift=0, yshift=2))
-    annotations[-1]["yanchor"] = "bottom"
+    # Each target is labelled above its tick: a legend there would sit over a point of the axis.
+    for row, (name, w, target, role, band) in enumerate(rows2):
+        text = f"Target {fmt.count(round(target * 100))}%" + (f", {band_text[0].lower()}{band_text[1:]}" if row == 0 else "")
+        annotations.append(_label(target * 100, row - 0.42, text, anchor="center", xshift=0, yshift=2))
+        annotations[-1]["yanchor"] = "bottom"
     layout = {
-        "barmode": "overlay", "showlegend": True, "height": 210,
-        "legend": {"x": 1, "xanchor": "right", "y": 1.02, "yanchor": "bottom"},
+        "barmode": "overlay", "showlegend": False, "height": 210,
         "xaxis": {"range": [0, 100], "title": {"text": "Per cent of the portfolio"}, "dtick": 10},
         "yaxis": {"type": "category", "range": [1.55, -0.78], "showline": False, "showgrid": False,
                   "tickfont": {"size": 12}},
         "shapes": [{"type": "rect", "xref": "x", "yref": "y", "x0": low * 100, "x1": high * 100, "y0": -0.4, "y1": 0.4,
                     "fillcolor": "@band", "line": {"width": 0}, "layer": "below"}],
-        "annotations": annotations, "margin": {"t": 28},
+        "annotations": annotations, "margin": {"t": 8},
     }  # fmt: skip
     cash = w_now["weight_cash"]
     table = _table(["Sleeve", "Weight", "Target weight", "Band"],
@@ -254,9 +272,9 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
             annotations.append(_label(end["date"], fmt.rounded(end[column], 1), fmt.index(end[column])))
     for i, (_, r) in enumerate(daily.iterrows()):
         rows.append([_start_label(r["date"], i)] + [fmt.index(r[c]) for _, c, _, _ in series])
+    wide, narrow = _date_axes(daily["date"])
     layout = {"showlegend": True, "legend": {"y": 1.02}, "yaxis": {"title": {"text": "Growth of 100"}},
-              "xaxis": {"type": "date", "tickformat": "%Y-%m-%d", "hoverformat": "%Y-%m-%d"},
-              "annotations": annotations, "hovermode": "closest", "margin": {"r": 48}}  # fmt: skip
+              **wide, "annotations": annotations, "hovermode": "closest", "margin": {"r": 48}}  # fmt: skip
     table = _table(["Date", "Portfolio", "Reference A", "Reference B", "Index blend"], rows,
                    numeric=("Portfolio", "Reference A", "Reference B", "Index blend"))  # fmt: skip
     asof3 = _asof(daily["date"].iloc[-1] if len(daily) else w_now["weights_as_of"],
@@ -264,7 +282,7 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
     page.add("overview", _card("c3", "Growth of 100: the portfolio, the two reference portfolios and the index blend",
              asof3, "outputs/portfolio_daily.csv", table=None if empty else table, height=340, wide=True, empty=empty),
              None if empty else {"id": "c3", "traces": traces, "layout": layout,
-                                 "layout_narrow": {"annotations": [], "margin": {"r": 12}}})  # fmt: skip
+                                 "layout_narrow": {"annotations": [], "margin": {"r": 12}, **narrow}})  # fmt: skip
 
     # Chart 4: drawdown, as a positive fall below the previous peak on a reversed axis scaled to the data.
     traces = []
@@ -288,9 +306,9 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
         if level <= deepest:
             shapes.append(_hline(level))
             annotations.append(_label(0, level, text, xref="paper", yshift=8, xshift=0))
+    wide, narrow = _date_axes(daily["date"])
     layout = {"showlegend": len(traces) > 1, "yaxis": {"title": {"text": "Per cent below the previous peak"},
-              "range": [deepest, -1]}, "xaxis": {"type": "date", "tickformat": "%Y-%m-%d", "hoverformat": "%Y-%m-%d"},
-              "shapes": shapes, "annotations": annotations}  # fmt: skip
+              "range": [deepest, -1]}, **wide, "shapes": shapes, "annotations": annotations}  # fmt: skip
     rows = [[_start_label(r["date"], i), fmt.pct(-r["drawdown_portfolio"]), fmt.pct(-r["drawdown_index_blend"])]
             for i, (_, r) in enumerate(daily.iterrows())]  # fmt: skip
     table = _table(["Date", "Portfolio", "Index blend"], rows, numeric=("Portfolio", "Index blend"))
@@ -300,7 +318,7 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
              "outputs/portfolio_daily.csv", table=None if empty else table, height=300, wide=True, empty=empty,
              note="Daily values. The mandate's 35% test used month-end values, which miss falls that reverse within "
                   "a month; the worst daily fall is at least as deep."),
-             None if empty else {"id": "c4", "traces": traces, "layout": layout})  # fmt: skip
+             None if empty else {"id": "c4", "traces": traces, "layout": layout, "layout_narrow": narrow})  # fmt: skip
 
 
 # Rebalancing ---------------------------------------------------------------------------------------
@@ -318,14 +336,15 @@ def rebalancing(page, daily, orders, band, compliance, monthly):
                        **_hover([f"{d}<br>Equity weight {fmt.pct(v)}" for d, v in
                                  zip(history["date"], history["weight_equity"])])})  # fmt: skip
         weight_on = dict(zip(history["date"], history["weight_equity"]))
-        for sleeve, role, label in (("equity", "@equity", "Purchase of the equity ETF"),
-                                    ("bonds", "@bonds", "Purchase of the bond ETF")):  # fmt: skip
+        # The equity marker is the larger, so that a day with both purchases shows both.
+        for sleeve, role, label, size in (("equity", "@equity", "Purchase of the equity ETF", 14),
+                                          ("bonds", "@bonds", "Purchase of the bond ETF", 8)):  # fmt: skip
             sel = orders[(orders["sleeve"] == sleeve) & (orders["side"] == "buy")] if len(orders) else orders
             pts = [(d, weight_on[d]) for d in sel["date"] if d in weight_on] if len(sel) else []
             if pts:
                 traces.append({"type": "scatter", "mode": "markers", "name": label, "x": [p[0] for p in pts],
                                "y": [fmt.rounded(p[1] * 100, 1) for p in pts],
-                               "marker": {"size": 9, "color": role, "line": {"color": "@surface", "width": 2}},
+                               "marker": {"size": size, "color": role, "line": {"color": "@surface", "width": 2}},
                                **_hover([f"{d}<br>{label}" for d, _ in pts])})  # fmt: skip
         annotations = []
         if len(band):
@@ -344,8 +363,9 @@ def rebalancing(page, daily, orders, band, compliance, monthly):
                                       "line": {"width": 2}},
                            **_hover([f"{d}<br>Order called for by the rules and not placed" for d, _ in pts])})  # fmt: skip
             annotations += [_label(p[0], fmt.rounded(p[1] * 100, 1), "○ Not placed") for p in pts]
+    wide, narrow = _date_axes(history["date"])
     layout = {"showlegend": True, "yaxis": {"title": {"text": "Equity weight, per cent"}, "range": [60, 80], "dtick": 5},
-              "xaxis": {"type": "date", "tickformat": "%Y-%m-%d", "hoverformat": "%Y-%m-%d"},
+              **wide,
               "shapes": [{"type": "rect", "xref": "paper", "yref": "y", "x0": 0, "x1": 1, "y0": low * 100,
                           "y1": high * 100, "fillcolor": "@band", "line": {"width": 0}, "layer": "below"},
                          _hline(70, "@ink")]}  # fmt: skip
@@ -359,7 +379,7 @@ def rebalancing(page, daily, orders, band, compliance, monthly):
     page.add("rebalancing", _card("c5", "Equity weight in its band, with every order",
              _asof(daily["date"].iloc[-1], first_cycle), ["outputs/portfolio_daily.csv", "outputs/orders.csv",
              "outputs/band_events.csv", "outputs/compliance.csv"], table=table, height=320, wide=True, empty=empty),
-             None if empty else {"id": "c5", "traces": traces, "layout": layout})  # fmt: skip
+             None if empty else {"id": "c5", "traces": traces, "layout": layout, "layout_narrow": narrow})  # fmt: skip
 
     # Chart 6: orders against the allowance.
     if len(orders):
@@ -457,31 +477,30 @@ def costs(page, monthly, implementation, daily):
              None if empty else {"id": "c7", "traces": traces, "layout": layout})  # fmt: skip
 
     data = implementation.dropna(subset=["implementation_cost_bps"]) if len(implementation) else implementation
-    data = data[data["date"] != daily["date"].iloc[0]] if len(data) else data
-    empty = None if len(data) else "The comparison starts on the first valuation day."
-    traces, layout = [], {}
-    if len(data):
+    empty = None if len(data) > 1 else "The comparison starts on the first valuation day."
+    traces, layout, narrow = [], {}, {}
+    if not empty:
         traces = [{"type": "scatter", "mode": "lines+markers" if len(data) < 3 else "lines",
                    "name": "Portfolio against reference portfolio A", "x": list(data["date"]),
                    "y": [fmt.rounded(v, 0) for v in data["implementation_cost_bps"]],
                    "line": {"color": "@accent", "width": 2}, "marker": {"size": 8, "color": "@accent"},
                    **_hover([f"{d}<br>{fmt.bps(v)}" for d, v in zip(data["date"], data["implementation_cost_bps"])])}]
         end = data.iloc[-1]
-        layout = {"yaxis": {"title": {"text": "Basis points, cumulative"}},
-                  "xaxis": {"type": "date", "tickformat": "%Y-%m-%d", "hoverformat": "%Y-%m-%d"},
-                  "shapes": [_hline(0, "@ink")],
+        wide, narrow = _date_axes(data["date"])
+        layout = {"yaxis": {"title": {"text": "Basis points, cumulative"}}, **wide, "shapes": [_hline(0, "@ink")],
                   "annotations": [_label(end["date"], fmt.rounded(end["implementation_cost_bps"], 0),
                                          fmt.bps(end["implementation_cost_bps"]))], "margin": {"r": 56}}  # fmt: skip
-    rows = [[r["date"], fmt.bps(r["implementation_cost_bps"])] for _, r in data.iterrows()] if len(data) else []
+    rows = [[_start_label(r["date"], i), fmt.bps(r["implementation_cost_bps"])]
+            for i, (_, r) in enumerate(data.iterrows())]  # fmt: skip
     table = _table(["Date", "Implementation cost"], rows, numeric=("Implementation cost",))
     page.add("costs", _card("c8", "Implementation cost, cumulative: the portfolio against reference portfolio A",
              _asof(daily["date"].iloc[-1], "Negative when the portfolio trails the reference"),
-             "outputs/implementation_cost.csv", table=table, height=280, empty=empty,
+             "outputs/implementation_cost.csv", table=None if empty else table, height=280, empty=empty,
              note="Reference portfolio A applies the same rules at net asset value and without costs, so the gap "
                   "between the portfolio and reference portfolio A is the cumulative cost of running the portfolio. "
                   "A cost of 10 basis points in one month of chart 7 moves this line down by 10 basis points in that "
                   "month."),
-             None if empty else {"id": "c8", "traces": traces, "layout": layout})  # fmt: skip
+             None if empty else {"id": "c8", "traces": traces, "layout": layout, "layout_narrow": narrow})  # fmt: skip
 
 
 # Contributions -------------------------------------------------------------------------------------
@@ -513,15 +532,17 @@ def contributions(page, daily, monthly):
              "x": x, "y": value, "line": {"color": "@accent", "width": 2}, "marker": {"size": 8, "color": "@accent"},
              **_hover([f"{d}<br>Value: {fmt.index(v)}" for d, v in zip(x, daily["value_in_units"])])},
         ]  # fmt: skip
-    layout = {"showlegend": True, "legend": {"traceorder": "reversed"}, "yaxis": {"title": {"text": "Units of the starting amount"}},
-              "xaxis": {"type": "date", "tickformat": "%Y-%m-%d", "hoverformat": "%Y-%m-%d"}}  # fmt: skip
+    wide, narrow = _date_axes(daily["date"])
+    # From zero, so that the gap between the value and the money paid in is drawn to scale.
+    layout = {"showlegend": True, "legend": {"traceorder": "reversed"},
+              "yaxis": {"title": {"text": "Units of the starting amount"}, "rangemode": "tozero"}, **wide}  # fmt: skip
     rows = [[_start_label(r["date"], i), fmt.index(r["contributions_in_units"]), fmt.index(r["value_in_units"])]
             for i, (_, r) in enumerate(daily.iterrows())]  # fmt: skip
     table = _table(["Date", "Paid in", "Value"], rows, numeric=("Paid in", "Value"))
     page.add("contributions", _card("c9", "Money paid in and the value of the portfolio, in units of the starting amount",
              _asof(daily["date"].iloc[-1], "The starting amount is 100 units and each top-up is 5"),
              "outputs/portfolio_daily.csv", table=None if empty else table, height=320, wide=True, empty=empty),
-             None if empty else {"id": "c9", "traces": traces, "layout": layout})  # fmt: skip
+             None if empty else {"id": "c9", "traces": traces, "layout": layout, "layout_narrow": narrow})  # fmt: skip
 
     empty = None if len(monthly) else "The first month starts with the first valuation day."
     rows = [[r["month"] + ("" if r["complete"] == "yes" else " (to date)"), fmt.pct(r["market_effect"], True),
@@ -888,7 +909,7 @@ def log(page, monthly):
          ("Contribution", lambda r: fmt.pct(r["contribution_effect"], True))]),
         ("Costs, in basis points", [month, ("Commissions", lambda r: fmt.bps(r["commissions_bps"], False)),
          ("Half-spread", lambda r: fmt.bps(r["half_spread_bps"], False)),
-         ("Execution against net asset value", lambda r: fmt.bps(r["execution_against_nav_bps"], False)),
+         ("Price paid against net asset value", lambda r: fmt.bps(r["execution_against_nav_bps"], False)),
          ("Implementation cost of the month", lambda r: fmt.bps(r["implementation_cost_month_bps"], False)),
          ("Implementation cost, cumulative", lambda r: fmt.bps(r["implementation_cost_bps"]))]),
     ]  # fmt: skip
