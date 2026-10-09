@@ -1625,7 +1625,7 @@ def _next_cycle_day(now_row) -> str:
     if cycle < day:
         following = pd.Period(day, "M") + 1
         cycle = trading_days.cycle_day(following.year, following.month)
-    return str(cycle)
+    return fmt.day_words(cycle)
 
 TERM_LINE = re.compile(r"^- \*\*(.+?)\*\*: (.+)$")
 

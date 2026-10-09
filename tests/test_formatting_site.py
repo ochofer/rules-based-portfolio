@@ -145,3 +145,11 @@ def test_the_page_numbers_its_exhibits_and_every_reference_finds_one():
     text = html.unescape(re.sub(r"<[^>]+>", " ", visible))
     assert not re.search(r"\bcharts? \d", text, re.I), re.findall(r".{0,40}\bcharts? \d.{0,20}", text, re.I)
     assert "real-time" not in text.lower()
+
+
+def test_the_log_writes_the_next_cycle_day_in_words():
+    # Dates in prose are written in words. Stamps, tables and axes keep the ISO form.
+    assert site._next_cycle_day({"positions_as_of": "2026-10-08"}) == "5 November 2026"
+    assert site._next_cycle_day({"positions_as_of": "2026-11-05"}) == "5 November 2026"
+    assert site._next_cycle_day({"positions_as_of": "2026-12-06"}) == "7 December 2026"
+    assert site._next_cycle_day({"positions_as_of": "2026-12-08"}) == "5 January 2027"
