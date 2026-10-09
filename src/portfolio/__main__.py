@@ -5,13 +5,19 @@ Commands:
                      ask for that are missing or differ from the rule
   status [--date D]  units, values and weights at the last net asset values on or before D
   cycle  [--date D]  the orders rules 4 to 6 produce on the cycle day D (default: this month's); run on
-                     the cycle day itself, it also saves them to private/orders/
+                     the cycle day itself, before any order, it also saves them to private/orders/ and
+                     writes the cycle report, cycles/YYYY-MM.md
+  post   [--date D]  once the orders of the cycle day D are in the ledger, adds the line after the orders
+                     to the cycle report
+  note   [--date D]  a draft of the monthly note for the month of D, private/notes/YYYY-MM.md, with the
+                     cycle day and the month's figures; the words are written by hand
   build  [--date D]  the public files in outputs/ and the dashboard, index.html at the root
   privacy            check that no figure in outputs/ is a private amount of the ledger
 Add --refresh to download every source again first.
 
 Every command prints euro amounts and units, which are private: the output is for the terminal and for
-files under private/, never for the repository.
+files under private/, never for the repository. The cycle report and the monthly note are the exceptions:
+they carry weights, shares and counts only, and they are public.
 """
 
 from __future__ import annotations
@@ -19,10 +25,12 @@ from __future__ import annotations
 import argparse
 import sys
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from . import config, ledger as ledger_module, positions, prices, rules_engine, trading_days, valuations
+from . import config, cycle_report, ledger as ledger_module, notes, positions, prices, rules_engine
+from . import formatting as fmt, trading_days, valuations
 
 
 def _pct(x: float) -> str:
@@ -163,15 +171,106 @@ def cmd_cycle(args) -> int:
             "order listed: a sale comes first and the purchase uses its proceeds.",
         ]
     lines += plan.notes
+    at = _now()
+    values = {s: v[s] for s in (*config.SLEEVES, "cash")}
+    checks = cycle_report.before_orders(records, day, at, values, plan.orders)
+    lines += ["", "Cycle report, before the orders:"]
+    lines += [f"  rule {c.rule}: {'pass' if c.passed else 'FAIL'}. {c.subject}: {c.figure}." for c in checks]
     text = "\n".join(lines)
     print(text)
     if day != today:
-        print(f"\nNot saved: {day} is not today. The file of a cycle day is written only on that day.")
+        print(f"\nNot saved: {day} is not today. The files of a cycle day are written only on that day.")
         return 0
     out = config.PRIVATE_DIR / "orders" / f"ORDERS_{day}.txt"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(text + f"\n\nWritten {datetime.now():%Y-%m-%d %H:%M} by python3 -m portfolio cycle.\n")
+    out.write_text(text + f"\n\nWritten {at:%Y-%m-%d %H:%M} by python3 -m portfolio cycle.\n")
     print(f"\nSaved to {out.relative_to(config.ROOT)}")
+    if (records.orders["moment"].dt.date == day).any():
+        print(
+            "Cycle report not written: the ledger already holds orders of today, and the report comes before them."
+        )
+        return 0
+    report = cycle_report.path_for(day)
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(
+        cycle_report.write_before(records, day, at, values, plan.orders, v["nav_date"]), encoding="utf-8"
+    )
+    print(f"Cycle report written to {report.relative_to(config.ROOT)}. After the orders are in the ledger, run: "
+          "python3 -m portfolio post")  # fmt: skip
+    return 0
+
+
+def _now() -> datetime:
+    """The time in Amsterdam, without the zone, as the ledger records times."""
+    return datetime.now(ZoneInfo(config.TIMEZONE)).replace(tzinfo=None)
+
+
+def _cycle_day_of(args) -> date:
+    day = args.date or date.today()
+    return trading_days.cycle_day(day.year, day.month)
+
+
+def cmd_post(args) -> int:
+    day = _cycle_day_of(args)
+    report = cycle_report.path_for(day)
+    if not report.exists():
+        raise RuntimeError(
+            f"no cycle report at {report.relative_to(config.ROOT)}; run the cycle command on the cycle day"
+        )
+    records, held, navs, series = _load(args.refresh, day)
+    text = report.read_text(encoding="utf-8")
+    values, plan = cycle_report.proposal_on(records, navs, day)
+    line = cycle_report.after_orders(records, day, values, plan.orders, cycle_report.written_at(text))
+    rows = cycle_report.proposal_rows(values, plan.orders)
+    if any("| " + " | ".join(r) + " |" not in text for r in rows):
+        line += " The proposal recomputed from the ledger differs from the one above, so the ledger changed after the report."
+    report.write_text(cycle_report.add_after(text, line), encoding="utf-8")
+    print(line)
+    print(f"Added to {report.relative_to(config.ROOT)}.")
+    return 0
+
+
+def cmd_note(args) -> int:
+    day = _cycle_day_of(args)
+    month = pd.Period(day, "M")
+    records, held, navs, series = _load(args.refresh, day)
+    values, plan = cycle_report.proposal_on(records, navs, day)
+    total = sum(values.values())
+    on_day = records.orders["moment"].dt.date == day
+    placed = records.orders[on_day & records.orders["rule"].isin(["4", "5", "4+5"])]
+    after = values[config.EQUITY] + sum(o.amount_eur if o.side == "buy" else -o.amount_eur
+                                        for o in plan.orders if o.sleeve == config.EQUITY)  # fmt: skip
+    low, high = (round(x * 100) for x in config.BAND)
+    month_top_ups = records.contributions[(records.contributions["kind"] == "top-up")
+                                          & (records.contributions["moment"].dt.to_period("M") == month)]  # fmt: skip
+    top_up = (f"Top-up (the fixed monthly contribution) recorded {month_top_ups['moment'].min().date()}"
+              if len(month_top_ups) else "No top-up (the fixed monthly contribution) recorded this month")  # fmt: skip
+    target = round(config.TARGET[config.EQUITY] * 100)
+    figures = [top_up,
+               f"Equity weight {fmt.pct(values[config.EQUITY] / total)} before the cycle day and {fmt.pct(after / total)} "
+               f"after it, against a target weight (the weight the rules aim for) of {target}%",
+               f"Band ({low} to {high} per cent) {'triggered' if plan.band_triggered else 'not triggered'}",
+               f"{len(placed)} order{'' if len(placed) == 1 else 's'} placed against {len(plan.orders)} proposed"]  # fmt: skip
+    monthly_path = config.OUTPUTS_DIR / "metrics_monthly.csv"
+    monthly = pd.read_csv(monthly_path) if monthly_path.exists() else pd.DataFrame()
+    previous = str(month - 1)
+    if "month" in monthly and (monthly["month"] == previous).any():
+        row = monthly[monthly["month"] == previous].iloc[0]
+        figures.append(f"Implementation cost of {previous}: {fmt.bps(row['implementation_cost_month_bps'])}")
+    register = config.OUTPUTS_DIR / "departures.csv"
+    if register.exists():
+        frame = pd.read_csv(register)
+        n = int((pd.to_datetime(frame["date"]).dt.to_period("M") == month).sum()) if len(frame) else 0
+        figures.append(f"Departures in {month}: {n if n else 'none'}")
+    out = config.PRIVATE_DIR / "notes" / f"{month}.md"
+    if out.exists():
+        raise RuntimeError(f"{out.relative_to(config.ROOT)} exists already, and it is left as it is")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    text = notes.draft(month, day, ". ".join(figures) + ".")
+    out.write_text(text, encoding="utf-8")
+    print(text)
+    print(f"Draft written to {out.relative_to(config.ROOT)}. Write the note in place of its last paragraph, then "
+          f"move the file to notes/{month}.md in the repository.")  # fmt: skip
     return 0
 
 
@@ -196,16 +295,22 @@ def cmd_privacy(args) -> int:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="python3 -m portfolio")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("check", "status", "cycle", "build", "privacy"):
+    for name in ("check", "status", "cycle", "post", "note", "build", "privacy"):
         p = sub.add_parser(name)
         p.add_argument("--date", type=lambda s: datetime.strptime(s, "%Y-%m-%d").date())
         p.add_argument("--refresh", action="store_true")
     args = parser.parse_args(argv)
     try:
-        commands = {"check": cmd_check, "status": cmd_status, "cycle": cmd_cycle, "build": cmd_build,
-                    "privacy": cmd_privacy}  # fmt: skip
+        commands = {"check": cmd_check, "status": cmd_status, "cycle": cmd_cycle, "post": cmd_post, "note": cmd_note,
+                    "build": cmd_build, "privacy": cmd_privacy}  # fmt: skip
         return commands[args.command](args)
-    except (ledger_module.LedgerError, rules_engine.BudgetError, RuntimeError, ValueError) as error:
+    except (
+        ledger_module.LedgerError,
+        rules_engine.BudgetError,
+        notes.NoteError,
+        RuntimeError,
+        ValueError,
+    ) as error:
         print(f"Stopped: {error}", file=sys.stderr)
         return 1
 

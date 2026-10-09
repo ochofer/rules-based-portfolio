@@ -1,0 +1,9 @@
+control,frequency,evidence
+The ledger against the broker's statements,Monthly,"Each month's statement, kept privately. Its result is the statement row of outputs/checks.csv"
+The ledger against rules 7 and 10,Each build,outputs/compliance.csv. python3 -m portfolio check lists the same from the ledger
+"The cycle report, before the orders",Each cycle day,"cycles/YYYY-MM.md, in the Log view"
+The departures register,Each build,"outputs/departures.csv, in the Log view"
+No private value in a public file,Before each push,"tests/test_privacy.py, run with the private values file"
+The fingerprint of the private values,Before each push,The section The private values in rules/RULES.md
+The public-text and style checks,Before each push,Run on every public file. The checking scripts are kept outside the repository
+The build reproduces the page,Before each push,"index.html rebuilt from the committed tables, and mandate/allocation_check.py and mandate/simulations.py rewriting their tables unchanged"

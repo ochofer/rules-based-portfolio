@@ -321,3 +321,76 @@ def monthly(
         r = frame["return_month"]
         frame["volatility_12m"] = r.rolling(12).std(ddof=1) * np.sqrt(12)
     return frame
+
+
+# The departures register: each departure from the rules, one row, with the rule, what happened and what
+# follows. The record keeps every order as it was placed, so the consequence never corrects an order.
+_DEPARTURE = {
+    "outside the rule 7 window": (
+        "7",
+        "{what} was placed outside 15:45 to 17:00 Amsterdam time",
+        "Kept in the record as placed",
+    ),
+    "on a day Xetra is closed": (
+        "7",
+        "{what} was placed on a day Xetra was closed",
+        "Kept in the record as placed",
+    ),
+    "called for by the rules and not placed": (
+        "3",
+        "{what} that the rules called for on this cycle day was not placed",
+        "The next cycle day applies the rules to the weights as they stand",
+    ),
+    "placed without the rules calling for it": (
+        "8",
+        "{what} was placed without the rules calling for it",
+        "Kept in the record as placed. The next cycle day applies the rules to the weights as they stand",
+    ),
+    "placed on a day that is not a cycle day": (
+        "3",
+        "{what} was placed on a day that is not a cycle day",
+        "Kept in the record as placed. The next cycle day applies the rules to the weights as they stand",
+    ),
+}
+
+
+def departures(issues: pd.DataFrame, placed: pd.DataFrame) -> pd.DataFrame:
+    """The departures register from the compliance rows: date, rule, what happened and the consequence."""
+    rows = []
+    kinds = issues.groupby(["date", "sleeve", "side"])["issue"].apply(set).to_dict() if len(issues) else {}
+    for r in issues.itertuples():
+        on_day = placed[
+            (placed["date"] == r.date) & (placed["sleeve"] == r.sleeve) & (placed["side"] == r.side)
+        ]
+        first = len(on_day) and (on_day["rule"] == "start").all()
+        noun = "purchase" if r.side == "buy" else "sale"
+        etf = "equity ETF" if r.sleeve == E else "bond ETF"
+        what = f"The first {noun} of the {etf}" if first else f"A {noun} of the {etf}"
+        rule, happened, consequence = _DEPARTURE.get(
+            r.issue, ("", "{what}: " + r.issue, "Kept in the record")
+        )
+        if r.issue in ("outside the rule 7 window", "on a day Xetra is closed"):
+            alone = kinds.get((r.date, r.sleeve, r.side), set()) <= {r.issue}
+            produced = len(on_day) and (on_day["produced_by_rules"] != "no").all()
+            if alone and produced:
+                consequence += ". The order is the one the rules call for, and only its time departed"
+        rows.append({"date": r.date, "rule": rule, "what_happened": happened.format(what=what) + ".",
+                     "consequence": consequence + "."})  # fmt: skip
+    return pd.DataFrame(rows, columns=["date", "rule", "what_happened", "consequence"])
+
+
+def sleeve_correlation(navs_eur: pd.DataFrame, months: int = 36) -> pd.DataFrame:
+    """The correlation of the two ETFs' monthly returns in euro over rolling windows of 36 months, from the
+    net asset values at each month end. The month of the last net asset value counts only once it is
+    complete."""
+    values = navs_eur[[E, B]].dropna()
+    if not len(values):
+        return pd.DataFrame(columns=["window_end", "correlation"])
+    last = values.index.max()
+    month_end = values.groupby(values.index.to_period("M")).last()
+    later = pd.date_range(last + pd.Timedelta(days=1), last.to_period("M").end_time.normalize(), freq="D")
+    if any(trading_days.is_trading_day(d.date()) for d in later):
+        month_end = month_end.iloc[:-1]
+    returns = month_end.pct_change().iloc[1:]
+    rolling = returns[E].rolling(months).corr(returns[B]).dropna()
+    return pd.DataFrame({"window_end": [str(p) for p in rolling.index], "correlation": rolling.values})

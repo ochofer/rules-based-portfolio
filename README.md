@@ -19,17 +19,21 @@ On the cycle day, the 5th of each month or the first trading day after it when t
 | `mandate/allocation_check_results.md` | The output of the test for every split from 40/60 to 100/0. |
 | `mandate/simulations.py` | The bootstrap of the allocation test, and the rules applied to its returns and to resampled paths. |
 | `mandate/simulation_*.csv` | The three tables of the simulations, which the dashboard draws. |
+| `mandate/sleeve_correlation.csv` | The rolling 36-month correlation of the two sleeves' monthly returns in the allocation test. |
+| `mandate/REVIEW_2027.md` | The agenda of the review of the rules in October 2027: the figures it uses and the questions it answers. |
 | `rules/RULES.md` | The ten rules, the two ETFs and how they were chosen. |
 | `src/portfolio/` | The program: it checks the ledger, computes the orders the rules produce on a cycle day, and builds the record and the dashboard. |
 | `tests/` | The program's tests, run on invented ledgers and simulated returns. |
 | `outputs/` | The figures the dashboard draws: weights, percentages, basis points, loadings and indices. |
-| `method/` | The fixed tables the program applies: MSCI's regions, the funds the equity ETF holds, share classes of one company, and the ETF selection. |
+| `cycles/` | The cycle report of each cycle day, written before the orders, with the line after them. |
+| `notes/` | The monthly note written after each cycle day. |
+| `method/` | The fixed tables the program applies: MSCI's regions, the funds the equity ETF holds, share classes of one company, the ETF selection and the controls. |
 | `index.html`, `site/` | The dashboard, and the style, script and colour palette it is built with. |
 
 
 ## What the record measures
 
-The record covers the running of the portfolio: the orders and their costs, the drift of the weights away from the target weights, the rebalancing the rules produce, and the look-through of the two ETFs. For equity the look-through gives the weights of regions, countries, sectors, currencies and the largest companies, and for bonds the weights of issuing countries, maturities and credit ratings, and the duration of the bond sleeve. Returns are time-weighted, so contributions do not count as gains.
+The record covers the running of the portfolio: the orders and their costs, the drift of the weights away from the target weights, the rebalancing the rules produce, and the look-through of the two ETFs. For equity the look-through gives the weights of regions, countries, sectors, currencies and the largest companies, and for bonds the weights of issuing countries, maturities and credit ratings, and the duration of the bond sleeve. Returns are time-weighted, so contributions do not count as gains. From the first month end the money-weighted return stands beside them, which counts the timing of the contributions.
 
 Two reference portfolios, computed from the same contributions and prices without costs, sit beside the portfolio. The first follows the same rules, so the difference between it and the portfolio is the cost of implementation. The second goes back to its target weights on every cycle day, so the difference between the two reference portfolios is the effect on returns of letting the weights drift inside the band, before costs. An index blend, 70 per cent MSCI ACWI net total return and 30 per cent the Bloomberg Euro-Aggregate Treasury index in euro, rebalanced monthly, is shown for information. The equity part is MSCI's published end-of-day levels of the index in euro. Bloomberg publishes no public series of the bond index, so the bond part is the benchmark's one-month return as Vanguard's monthly factsheet reports it, and the blend is a monthly series that starts at the first month end after the first purchase. A record of five to ten years is too short to show that one set of rules is better than another, so the returns are not offered as evidence for the rules.
 
@@ -48,7 +52,7 @@ python3 mandate/simulations.py
 python3 -m pytest tests
 ```
 
-`allocation_check.py` downloads its five source files into `cache/`, which is not committed, and rewrites `mandate/allocation_check_results.md`. Its sample ends in December 2025, so a later run differs only where a source revises its history. `simulations.py` reads the same files, checks that its code reproduces the allocation test, and rewrites the three simulation tables with one fixed seed, so a run reproduces them. The tests run on invented ledgers and simulated returns. The program reads the private ledger: with `PYTHONPATH=src`, `python3 -m portfolio check` checks the ledger against rules 7 and 10, `status` shows the holdings and weights, `cycle` gives the orders of a cycle day, and `build` writes `outputs/` and `index.html`.
+`allocation_check.py` downloads its five source files into `cache/`, which is not committed, and rewrites `mandate/allocation_check_results.md`. Its sample ends in December 2025, so a later run differs only where a source revises its history. `simulations.py` reads the same files, checks that its code reproduces the allocation test, and rewrites the three simulation tables with one fixed seed, so a run reproduces them, and the table of the rolling correlation. The tests run on invented ledgers and simulated returns. The program reads the private ledger: with `PYTHONPATH=src`, `python3 -m portfolio check` checks the ledger against rules 7 and 10, `status` shows the holdings and weights, `cycle` gives the orders of a cycle day and, on that day, writes the cycle report, `post` adds the line after the orders, `note` drafts the monthly note's figures, and `build` writes `outputs/` and `index.html`.
 
 ## Terms
 
@@ -88,3 +92,9 @@ python3 -m pytest tests
 - **mechanics simulation**: the rules applied to the allocation test's returns, with a starting amount of 100 and a top-up of 5 a month, for the counts of their orders.
 - **resampled paths**: the bootstrap's ten-year paths carried forward from the first purchase with the top-up and the rules, in units of the starting amount.
 - **in-sample**: computed on the data on which a choice was made, here the returns from 1999 to 2025 on which the split was chosen.
+- **time-weighted return**: the return with contributions removed, chained from day to day, so the timing and the size of the contributions do not affect it.
+- **money-weighted return**: the rate at which the contributions, each from its date, grow to the portfolio's value, so the timing of the contributions counts. Cumulative in the first year and per year after it.
+- **cycle report**: the file `cycles/YYYY-MM.md` written on a cycle day before any order, with each rule that bears on the proposed orders, its figure and a pass or a fail, and one line after the orders that compares them with the proposal.
+- **monthly note**: the note of 120 to 200 words, in `notes/YYYY-MM.md`, written by hand after each cycle day.
+- **departure**: an order placed, or left unplaced, other than as the rules require. The departures register lists each one with its rule and its consequence.
+- **rolling correlation**: the correlation of two series of monthly returns over the 36 months to each month end.

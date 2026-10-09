@@ -47,6 +47,7 @@ class Plan:
     band_triggered: bool = False
     top_up_waits: bool = False
     notes: list = field(default_factory=list)
+    below_minimum: list = field(default_factory=list)  # orders the rules gave below one euro, not placed
 
     def weights(self, which: str) -> dict:
         values = self.before if which == "before" else self.after
@@ -157,4 +158,5 @@ def plan(equity_eur: float, bonds_eur: float, cash_eur: float, orders_used_this_
         band_triggered=triggered,
         top_up_waits=top_up_waits,
         notes=notes,
+        below_minimum=small,
     )

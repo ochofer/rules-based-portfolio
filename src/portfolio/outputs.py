@@ -102,6 +102,8 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     written.append(_write(public_orders, "orders.csv", as_of, out_dir))
     written.append(_write(band, "band_events.csv", as_of, out_dir))
     written.append(_write(issues, "compliance.csv", as_of, out_dir))
+    written.append(_write(metrics.departures(issues, placed), "departures.csv", as_of, out_dir))
+    written.append(_write(metrics.sleeve_correlation(navs), "etf_correlation.csv", as_of, out_dir))
     if len(monthly):
         written.append(_write(monthly, "metrics_monthly.csv", as_of, out_dir))
         costs = monthly[list(COST_COLUMNS)]

@@ -12,6 +12,7 @@ The limit sets the target weights and never triggers a sale. In a fall, rule 8 a
 
 - The portfolio is long-only and holds two exchange-traded funds (ETFs) traded in euro on Xetra, one on a global equity index of developed and emerging markets and one on a euro government bond index. Both are UCITS funds.
 - Both ETFs accumulate their income.
+- No currency is hedged. Both ETFs are unhedged share classes, and the look-through, the portfolio's exposure to the securities inside the two ETFs, shows its exposure to each currency, the euro included.
 - At most five orders are placed in a month.
 - The rules change only by a dated amendment under rule 9.
 
@@ -44,4 +45,4 @@ The constructed returns are close to those of funds on the same markets. From 20
 - The test has no contributions, so it leaves out rule 4, under which each monthly top-up buys the sleeve furthest below its target weight.
 - The growth figures describe one history and are not a forecast.
 
-A block bootstrap of the test, in the dashboard's Method view, reports the distribution of the worst fall over resampled paths, and the dashboard's Simulations view shows the rules on the historical sample and on resampled paths, both as inputs to the review of the rules in October 2027.
+A block bootstrap of the test, in the dashboard's Method view, reports the distribution of the worst fall over resampled paths, and the dashboard's Simulations view shows the rules on the historical sample and on resampled paths, both as inputs to the review of the rules in October 2027. The agenda of that review is in `mandate/REVIEW_2027.md`.

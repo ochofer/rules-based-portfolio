@@ -17,6 +17,8 @@ TRANSACTIONS = LEDGER_DIR / "transactions.csv"
 CONTRIBUTIONS = LEDGER_DIR / "contributions.csv"
 OUTPUTS_DIR = ROOT / "outputs"  # public: shares, percentages and basis points only
 METHOD_DIR = ROOT / "method"  # public: the fixed tables the program applies
+CYCLES_DIR = ROOT / "cycles"  # public: the cycle report of each cycle day, shares and counts only
+NOTES_DIR = ROOT / "notes"  # public: the monthly notes, written by hand after each cycle day
 SITE_DIR = ROOT / "site"  # public: the page template, its script and the palette
 REPOSITORY_URL = "https://github.com/ochofer/rules-based-portfolio"
 DASHBOARD_URL = "https://www.carlohofer.com/rules-based-portfolio/"
@@ -69,4 +71,3 @@ FACTOR_NAME = {
     "WML": "Momentum",
 }
 FACTOR_WINDOW_MONTHS = 36
-

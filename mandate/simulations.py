@@ -1,8 +1,8 @@
 """Simulations on the allocation test's returns: the bootstrap of the test, and the rules on the 1999 to
-2025 sample and on resampled paths.
+2025 sample and on resampled paths; and the rolling correlation of the test's two return series.
 
 The returns are those of allocation_check.py: monthly, in euro, February 1999 to December 2025, with no
-costs. The script writes three tables, which the dashboard draws:
+costs. The script writes four tables, which the dashboard draws:
 
   mandate/simulation_bootstrap.csv  the worst fall of every split from 40/60 to 100/0 over resampled paths of
                                     10 and of 5 years, rebalanced by the band, with no contributions
@@ -11,6 +11,8 @@ costs. The script writes three tables, which the dashboard draws:
                                     target weights at each month end
   mandate/simulation_paths.csv      the value of the portfolio over resampled paths of 10 years from the first
                                     purchase, with the top-up and the rules, in units of the starting amount
+  mandate/sleeve_correlation.csv    the correlation of the two sleeves' monthly returns over rolling windows of
+                                    36 months, the co-movement that the block resampling keeps within a block
 
 A resampled path joins blocks of 12 consecutive months of the sample. Each block starts at any month and
 wraps from December 2025 to February 1999, and one fixed seed draws the blocks, so a run gives the same
@@ -46,6 +48,8 @@ START, TOP_UP = 100.0, 5.0  # units of the starting amount; rule 2 sets the top-
 ORDER_BUDGET = 5  # rule 6
 RESULTS = os.path.join(HERE, "allocation_check_results.csv")
 OUT = {name: os.path.join(HERE, f"simulation_{name}.csv") for name in ("bootstrap", "history", "paths")}
+OUT["correlation"] = os.path.join(HERE, "sleeve_correlation.csv")
+CORRELATION_MONTHS = 36
 
 
 def circular_draws(rng, months_in_sample, paths, months, block):
@@ -255,6 +259,13 @@ def paths_table(returns, main_draws):
     )
 
 
+def correlation_table(returns):
+    """The correlation of the two sleeves' monthly returns over rolling windows of 36 months, by the last
+    month of each window."""
+    rolling = returns["equity"].rolling(CORRELATION_MONTHS).corr(returns["bonds"]).dropna()
+    return pd.DataFrame({"window_end": [str(p) for p in rolling.index], "correlation": rolling.values})
+
+
 def write(frame, path, decimals):
     frame = frame.copy()
     for column in frame.columns:
@@ -274,6 +285,7 @@ def main():
     write(bootstrap, OUT["bootstrap"], 6)
     write(history, OUT["history"], 6)
     write(paths, OUT["paths"], 4)
+    write(correlation_table(returns), OUT["correlation"], 6)
     main_row = bootstrap[(bootstrap["horizon_years"] == 10) & (bootstrap["block_months"] == BLOCK_MONTHS)
                          & (bootstrap["split"] == "70/30")].iloc[0]  # fmt: skip
     print(
