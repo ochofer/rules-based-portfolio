@@ -52,7 +52,7 @@ ORDER_WINDOW = (time(15, 45), time(17, 0))
 # euro. A smaller order is not placed, and its cash waits for the next cycle day.
 MIN_ORDER_EUR = 1.00
 
-# Tradegate Exchange's quote page for each ETF: the real-time bid and ask recorded under rule 7.
+# Tradegate Exchange's quote page for each ETF: the bid and ask it shows at the time, recorded under rule 7.
 QUOTE_PAGE = {sleeve: f"https://www.tradegate.de/orderbuch.php?isin={isin}" for sleeve, isin in ISIN.items()}
 
 # The mandate's limits, drawn on chart 4: the test reads "about one third" as 35 per cent, and a worst

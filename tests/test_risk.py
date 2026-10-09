@@ -202,7 +202,7 @@ def test_the_three_parts_sum_to_the_difference_to_the_index_blend():
     out = metrics.attribution(frame).iloc[0]
     assert out["period_start"] == pd.Timestamp("2026-10-30") and out["period_end"] == pd.Timestamp("2027-10-29")
     assert out["months"] == 12
-    parts = out["implementation_cost"] + out["drift_effect"] + out["tracking_difference"]
+    parts = out["portfolio_against_reference_a"] + out["drift_effect"] + out["tracking_difference"]
     assert parts == pytest.approx(out["total"], abs=1e-14)
     rows = frame.set_index("date")
     total = rows.loc["2027-10-29", "growth_portfolio"] / rows.loc["2026-10-30", "growth_portfolio"] - (

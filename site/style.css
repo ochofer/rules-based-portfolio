@@ -72,6 +72,7 @@ section.view > p.lead a { color: var(--link); font-weight: 600; }
 .card .asof { font-size: 0.8rem; color: var(--muted); margin: 0 0 8px; }
 .card .note { font-size: 0.88rem; color: var(--ink2); margin: 8px 0 0; }
 .source { font-size: 0.78rem; color: var(--muted); margin: 8px 0 0; }
+.rounding { font-size: 0.78rem; color: var(--muted); margin: 4px 0 0; }
 .source code { font-size: 0.78rem; overflow-wrap: anywhere; }
 .plot { width: 100%; }
 .empty { padding: 28px 8px; color: var(--ink2); font-size: 0.92rem; text-align: center; border: 1px solid var(--grid); border-radius: 8px; }

@@ -73,6 +73,11 @@ def day(x) -> str:
     return "n/a" if _missing(x) else pd.Timestamp(x).strftime("%Y-%m-%d")
 
 
+def day_words(x) -> str:
+    """A date in prose, as in 8 October 2026. Stamps, tables and axes keep the ISO form of day()."""
+    return "n/a" if _missing(x) else f"{pd.Timestamp(x).day} {pd.Timestamp(x).strftime('%B %Y')}"
+
+
 def month(x) -> str:
     return "n/a" if _missing(x) else pd.Timestamp(x).strftime("%Y-%m")
 

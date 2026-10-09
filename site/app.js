@@ -61,7 +61,7 @@
     var layout = merge(baseLayout(p, narrow), resolve(chart.layout || {}, p));
     if (narrow && chart.layout_narrow) layout = merge(layout, resolve(chart.layout_narrow, p));
     var traces = resolve(chart.traces, p);
-    window.Plotly.react(el, traces, layout, { displayModeBar: false, responsive: true, staticPlot: false });
+    window.Plotly.react(el, traces, layout, { displayModeBar: false, scrollZoom: false, responsive: true, staticPlot: false });
     drawn[chart.id] = true;
   }
 
@@ -156,6 +156,12 @@
     });
     window.addEventListener("hashchange", route);
     route();
+    // A page opened at the address of a part: the browser's own jump to it comes after route() and puts the
+    // part under the tabs, so the part is scrolled into place again once the page has loaded.
+    window.addEventListener("load", function () {
+      var id = (location.hash || "").replace("#", "");
+      if (views.indexOf(id) < 0 && viewOf(id)) setTimeout(function () { scrollToPart(id); }, 0);
+    });
   });
 
   // A table wider than its column scrolls sideways; a fade at the right edge shows while more of it lies there.

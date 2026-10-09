@@ -143,5 +143,6 @@ def test_the_cost_sources_of_a_month_add_up_to_its_implementation_cost(write_led
         month["commissions_bps"] + month["currency_conversion_bps"] + month["execution_against_nav_bps"]
     )
     assert itemised == pytest.approx(month["implementation_cost_month_bps"])
-    assert month["implementation_cost_month_bps"] == pytest.approx(-table["implementation_cost_bps"].iloc[-1])
+    assert month["implementation_cost_month_bps"] == pytest.approx(table["implementation_cost_bps"].iloc[-1])
+    assert table["implementation_cost_bps"].iloc[-1] > 0  # bought above the net asset value: the portfolio trails
     assert month["execution_against_nav_bps"] > 0 and month["orders_without_bid_and_ask"] == 2

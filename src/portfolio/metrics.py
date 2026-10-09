@@ -134,7 +134,8 @@ def daily(
     out["contributions_in_units"] = values["contributions_eur"].reindex(out.index) / start * 100
     out.loc[base, "contributions_in_units"] = 100.0
     ref = out["growth_reference_a"]
-    out["implementation_cost_bps"] = (out["growth_portfolio"] / ref - 1) * 1e4
+    # Reference portfolio A's value relative to the portfolio's, positive when the portfolio trails.
+    out["implementation_cost_bps"] = (ref / out["growth_portfolio"] - 1) * 1e4
     out.index.name = "date"
     return out.sort_index()
 
@@ -300,13 +301,11 @@ def monthly(
             "currency_conversion_bps": 0.0,
             "implementation_cost_bps": table.loc[last, "implementation_cost_bps"],
         }
-        # The month's implementation cost is the fall in the cumulative one over the month. What the
+        # The month's implementation cost is the rise in the cumulative one over the month. What the
         # commissions, the measured half-spread and the conversion leave of it is the execution price
         # against the day's net asset value (an unmeasured half-spread included), so the four sum to it.
         before = table.loc[previous_day, "implementation_cost_bps"]
-        row["implementation_cost_month_bps"] = -(
-            row["implementation_cost_bps"] - (0.0 if pd.isna(before) else before)
-        )
+        row["implementation_cost_month_bps"] = row["implementation_cost_bps"] - (0.0 if pd.isna(before) else before)
         itemised = row["commissions_bps"] + (
             0.0 if pd.isna(row["half_spread_bps"]) else row["half_spread_bps"]
         )
@@ -398,11 +397,13 @@ def sleeve_correlation(navs_eur: pd.DataFrame, months: int = 36) -> pd.DataFrame
 
 def attribution(daily: pd.DataFrame, months: int = 12) -> pd.DataFrame:
     """The difference to the index blend in three parts that sum to it, from the first month end of the index
-    blend to its last, once twelve months lie between: the implementation cost (the portfolio against reference
-    portfolio A), the drift effect (reference A against reference B, the weights left to drift inside the band
-    against restored on every cycle day) and the tracking difference of the two ETFs with the day mismatch
-    (reference B against the index blend). Each is a difference of returns over the period, in shares."""
-    columns = ["period_start", "period_end", "months", "implementation_cost", "drift_effect", "tracking_difference", "total"]
+    blend to its last, once twelve months lie between: the portfolio against reference portfolio A (negative
+    when the portfolio trails, as the implementation cost is then positive), the drift effect (reference A
+    against reference B, the weights left to drift inside the band against restored on every cycle day) and
+    the tracking difference of the two ETFs with the day mismatch (reference B against the index blend). Each
+    is a difference of returns over the period, in shares."""
+    columns = ["period_start", "period_end", "months", "portfolio_against_reference_a", "drift_effect", "tracking_difference",
+               "total"]
     blend = daily[["date", "growth_index_blend"]].dropna() if "growth_index_blend" in daily else pd.DataFrame()
     if len(blend) < 2:
         return pd.DataFrame(columns=columns)
@@ -419,6 +420,6 @@ def attribution(daily: pd.DataFrame, months: int = 12) -> pd.DataFrame:
     growth = {c: rows.loc[last, c] / rows.loc[first, c] - 1 for c in
               ("growth_portfolio", "growth_reference_a", "growth_reference_b", "growth_index_blend")}  # fmt: skip
     p, a, b, i = (growth[c] for c in ("growth_portfolio", "growth_reference_a", "growth_reference_b", "growth_index_blend"))
-    return pd.DataFrame([{"period_start": first, "period_end": last, "months": span, "implementation_cost": p - a,
+    return pd.DataFrame([{"period_start": first, "period_end": last, "months": span, "portfolio_against_reference_a": p - a,
                           "drift_effect": a - b, "tracking_difference": b - i, "total": p - i}], columns=columns)  # fmt: skip
 

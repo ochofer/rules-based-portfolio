@@ -63,20 +63,20 @@ The TER (total expense ratio) is the yearly fee the fund deducts from its assets
 
 | Rank | ETF | ISIN | TER | 2023 | 2024 | 2025 | Average | Offered on the account |
 |---|---|---|---|---|---|---|---|---|
-| 1 | SPDR MSCI All Country World UCITS ETF (Acc) | IE00B44Z5B48 | 0.12% | -0.19 | -0.13 | +0.47 | +0.050 | no |
-| 2 | iShares MSCI ACWI UCITS ETF USD (Acc) | IE00B6R52259 | 0.20% | +0.15 | -0.14 | +0.07 | +0.027 | yes, held |
-| 3 | Vanguard FTSE All-World UCITS ETF (USD) Accumulating | IE00BK5BQT80 | 0.14% | +0.03 | -0.01 | -0.06 | -0.013 | yes |
-| 4 | SPDR MSCI ACWI IMI UCITS ETF (Acc) | IE00B3YLTY66 | 0.17% | -0.48 | -0.24 | +0.14 | -0.193 | yes |
-| 5 | Invesco FTSE All-World UCITS ETF Acc | IE000716YHJ7 | 0.15% | | +0.40 | -0.09 | under three years | yes |
+| 1 | SPDR MSCI All Country World UCITS ETF (Acc) | IE00B44Z5B48 | 0.12% | −0.19 | −0.13 | +0.47 | +0.050 | no |
+| 2 | iShares MSCI ACWI UCITS ETF USD (Acc) | IE00B6R52259 | 0.20% | +0.15 | −0.14 | +0.07 | +0.027 | yes, held |
+| 3 | Vanguard FTSE All-World UCITS ETF (USD) Accumulating | IE00BK5BQT80 | 0.14% | +0.03 | −0.01 | −0.06 | −0.013 | yes |
+| 4 | SPDR MSCI ACWI IMI UCITS ETF (Acc) | IE00B3YLTY66 | 0.17% | −0.48 | −0.24 | +0.14 | −0.193 | yes |
+| 5 | Invesco FTSE All-World UCITS ETF Acc | IE000716YHJ7 | 0.15% | | +0.40 | −0.09 | under three years | yes |
 
 **Bond ETFs that qualify, in rank order.**
 
 | Rank | ETF | ISIN | TER | 2023 | 2024 | 2025 | Average | Offered on the account |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Vanguard EUR Eurozone Government Bond UCITS ETF (EUR) Accumulating | IE00BH04GL39 | 0.07% | +0.02 | -0.11 | +0.01 | -0.027 | yes, held |
-| 2 | Amundi Prime Euro Government Bond UCITS ETF Acc | LU2089238898 | 0.05% | -0.01 | -0.05 | -0.03 | -0.030 | yes |
-| 3 | SPDR Bloomberg Euro Government Bond UCITS ETF (Acc) | IE00BMYHQM42 | 0.07% | -0.10 | -0.12 | +0.10 | -0.040 | yes, as SPF0 |
-| 4 | Xtrackers II Eurozone Government Bond UCITS ETF 1C | LU0290355717 | 0.07% | -0.09 | -0.06 | -0.04 | -0.063 | yes |
+| 1 | Vanguard EUR Eurozone Government Bond UCITS ETF (EUR) Accumulating | IE00BH04GL39 | 0.07% | +0.02 | −0.11 | +0.01 | −0.027 | yes, held |
+| 2 | Amundi Prime Euro Government Bond UCITS ETF Acc | LU2089238898 | 0.05% | −0.01 | −0.05 | −0.03 | −0.030 | yes |
+| 3 | SPDR Bloomberg Euro Government Bond UCITS ETF (Acc) | IE00BMYHQM42 | 0.07% | −0.10 | −0.12 | +0.10 | −0.040 | yes, as SPF0 |
+| 4 | Xtrackers II Eurozone Government Bond UCITS ETF 1C | LU0290355717 | 0.07% | −0.09 | −0.06 | −0.04 | −0.063 | yes |
 | 5 | HSBC Euro Government Bond UCITS ETF | IE00066KZ5B5 | 0.06% | | | | under three years | no |
 | 6 | iShares Core EUR Govt Bond UCITS ETF EUR (Acc) | IE0008U15456 | 0.07% | | | | under three years | no |
 | 7 | UBS Core BBG EUR Gov 1-10 UCITS ETF EUR acc | LU0969639474 | 0.09% | | | | under three years | yes |
@@ -101,5 +101,7 @@ No rule has been amended. An erratum corrects wording and a reading settles a ca
 | 2026-10-08 | 4 | Erratum | "Any remainder buys both sleeves in proportion to their target weights" should read "Any remainder buys the other sleeve up to its target weight". With two sleeves the remainder equals the other sleeve's shortfall, so the original wording could not give the outcome the rule states. |
 | 2026-10-08 | 4 | Reading | Rule 4 applies to all cash not yet invested. An order below the broker's minimum of 1 euro is not placed, and its cash waits for the next cycle day. |
 | 2026-10-08 | 6 | Reading | A top-up purchase and a band purchase of the same sleeve on one cycle day are placed as one order, so rules 4 and 5 need at most two orders. |
-| 2026-10-08 | 7 | Reading | The broker shows no bid or ask. The bid and ask recorded are the real-time quotes of Tradegate Exchange, saved just before the order. They are not the quotes of the venue where the order executes, and each order's half-spread is measured against them. |
+| 2026-10-08 | 7 | Reading | The broker shows no bid or ask. The bid and ask recorded are the quotes Tradegate Exchange showed at the time, saved just before the order. They are not the quotes of the venue where the order executes, and each order's half-spread is measured against them. |
 | 2026-10-08 | 7 | Reading | On a cycle day when the US equity market is closed, the orders are placed that day between 15:45 and 17:00 Amsterdam time, as rule 3 requires. |
+| 2026-10-09 | 7 | Erratum | The reading of 8 October on the bid and ask now calls them the quotes Tradegate Exchange showed at the time, the words of the dashboard. The reading is unchanged. |
+| 2026-10-09 | 1 | Erratum | The two tables of the ETFs that qualify print negative tracking differences with the minus sign. The figures are unchanged. |
