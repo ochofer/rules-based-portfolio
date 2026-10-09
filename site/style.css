@@ -79,6 +79,15 @@ section.view > p.lead a { color: var(--link); font-weight: 600; }
 details.twin { margin-top: 8px; }
 details.twin summary { font-size: 0.82rem; color: var(--ink2); cursor: pointer; }
 .tablewrap { overflow-x: auto; margin-top: 6px; }
+.tw { position: relative; }
+.tablewrap th:first-child, .tablewrap td:first-child { position: sticky; left: 0; background: var(--surface); z-index: 1; }
+@media (max-width: 700px) {
+  .tablewrap table.wrapfirst th:first-child, .tablewrap table.wrapfirst td:first-child { white-space: normal; min-width: 9em; }
+}
+.tw.more::after {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 28px;
+  background: linear-gradient(90deg, rgba(255,255,255,0), #ffffff); pointer-events: none;
+}
 table { border-collapse: collapse; width: 100%; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
 th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
 th { color: var(--ink2); font-weight: 600; }

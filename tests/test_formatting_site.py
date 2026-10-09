@@ -59,3 +59,14 @@ def test_the_footer_ends_with_the_author_the_data_the_code_and_the_build_date():
     line = site._colophon({"positions_as_of": "2026-10-09"})
     assert line.startswith('<p class="colophon">') and line.endswith("Built 2026-10-09</p>")
     assert f'<a href="{config.REPOSITORY_URL}">Code on GitHub</a>' in line
+
+
+def test_every_table_sits_in_a_frame_that_scrolls_with_a_sticky_first_column():
+    table = site._table(["Month", "Return"], [["2026-10", "+0.1%"]], numeric=("Return",))
+    assert table.startswith('<div class="tw"><div class="tablewrap"><table>')
+    assert table.endswith("</table></div></div>")
+    rules = site._rules_html()
+    assert rules.count("<table>") == rules.count('<div class="tw"><div class="tablewrap"><table>') > 0
+    label = "Kenneth French, Developed 5 Factors and Momentum"
+    long_labels = site._table(["Source", "Downloaded"], [[label, "2026-10-09"]])
+    assert '<table class="wrapfirst">' in long_labels and 'class="wrapfirst"' not in table

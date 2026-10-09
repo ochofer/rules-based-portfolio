@@ -22,6 +22,7 @@ SITE_URL = "https://www.carlohofer.com/"
 PROJECTS_URL = SITE_URL + "projects/"
 PROJECT_PAGE_URL = PROJECTS_URL + "rules-based-portfolio/"
 FAVICON_URL = SITE_URL + "images/favicon.svg"
+WRAP_FIRST_ABOVE = 28  # characters: a longer label in a table's first column wraps on a phone
 PLOTLY = "https://cdn.plot.ly/plotly-basic-2.35.2.min.js"
 PLOTLY_INTEGRITY = "sha384-wQ3lfCxuvLfhHGiSdHF5+e3NZ1zNwEMd8/nII+K7VKChF9llO/OwOcn/aVRkB7az"
 VIEWS = [
@@ -85,7 +86,12 @@ def _table(columns, rows, numeric=()) -> str:
             f'<td class="num">{_esc(v)}</td>' if c in numeric else f"<td>{_esc(v)}</td>" for c, v in zip(columns, r)
         )
         body.append(f"<tr>{cells}</tr>")
-    return f'<div class="tablewrap"><table><thead><tr>{head}</tr></thead><tbody>{"".join(body)}</tbody></table></div>'
+    # The first column stays in place while the table scrolls sideways. Long labels wrap on a phone, so that
+    # the column never covers the columns that scroll behind it.
+    longest = max((len(str(r[0])) for r in rows), default=0)
+    wrap = ' class="wrapfirst"' if longest > WRAP_FIRST_ABOVE else ""
+    return (f'<div class="tw"><div class="tablewrap"><table{wrap}><thead><tr>{head}</tr></thead>'
+            f'<tbody>{"".join(body)}</tbody></table></div></div>')
 
 
 def _card(cid, title, asof, source, plot=True, table=None, note=None, wide=False, height=300, empty=None,
@@ -983,7 +989,7 @@ def _rules_html() -> str:
     text = (config.ROOT / "rules" / "RULES.md").read_text()
     body = markdown.markdown(text, extensions=["tables"])
     body = re.sub(r"<h1>.*?</h1>", "", body, count=1)
-    return body.replace("<table>", '<div class="tablewrap"><table>').replace("</table>", "</table></div>")
+    return body.replace("<table>", '<div class="tw"><div class="tablewrap"><table>').replace("</table>", "</table></div></div>")
 
 
 def build(out_dir: Path = None) -> Path:

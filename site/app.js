@@ -137,4 +137,13 @@
     window.addEventListener("hashchange", route);
     route();
   });
+
+  // A table wider than its column scrolls sideways; a fade at the right edge shows while more of it lies there.
+  document.querySelectorAll(".tw").forEach(function (t) {
+    function upd() { var s = t.firstElementChild; t.classList.toggle("more", !!s && s.scrollWidth - s.clientWidth - s.scrollLeft > 1); }
+    if (!("ResizeObserver" in window)) { t.classList.add("more"); return; }
+    t.addEventListener("scroll", upd, true);
+    new ResizeObserver(upd).observe(t);
+    upd();
+  });
 })();
