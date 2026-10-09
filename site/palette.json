@@ -25,6 +25,8 @@
   "status_breach": "#b42318",
   "status_missed": "#b25e00",
   "gap_fill": "#eef2f8",
+  "fan_outer": "#eef2f8",
+  "fan_inner": "#c5d1e6",
   "other": "#bdbdbd",
   "cost_1": "#16213a",
   "cost_2": "#3d5f99",

@@ -43,6 +43,14 @@ header.top p { margin: 0 0 6px; color: var(--ink2); max-width: 760px; font-size:
   border-radius: 6px; padding: 6px 10px; cursor: pointer;
 }
 .viewtabs button[aria-selected="true"] { color: var(--ink); background: var(--surface); box-shadow: inset 0 0 0 1px var(--grid); font-weight: 600; }
+@media (max-width: 700px) {
+  .viewtabs .wrap { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .viewtabs .wrap::-webkit-scrollbar { display: none; }
+  .viewtabs button { flex: 0 0 auto; white-space: nowrap; min-height: 44px; }
+  .viewtabs.more-r::after, .viewtabs.more-l::before { content: ""; position: absolute; top: 0; bottom: 1px; width: 28px; pointer-events: none; }
+  .viewtabs.more-r::after { right: 0; background: linear-gradient(90deg, rgba(255,255,255,0), #ffffff); }
+  .viewtabs.more-l::before { left: 0; background: linear-gradient(270deg, rgba(255,255,255,0), #ffffff); }
+}
 section.view { display: none; padding-bottom: 32px; }
 section.view.active { display: block; }
 section.view > p.lead { color: var(--ink2); margin: 0 0 16px; max-width: 760px; font-size: 16px; }
@@ -64,7 +72,7 @@ section.view > p.lead a { color: var(--link); font-weight: 600; }
 .card .asof { font-size: 0.8rem; color: var(--muted); margin: 0 0 8px; }
 .card .note { font-size: 0.88rem; color: var(--ink2); margin: 8px 0 0; }
 .source { font-size: 0.78rem; color: var(--muted); margin: 8px 0 0; }
-.source code { font-size: 0.78rem; }
+.source code { font-size: 0.78rem; overflow-wrap: anywhere; }
 .plot { width: 100%; }
 .empty { padding: 28px 8px; color: var(--ink2); font-size: 0.92rem; text-align: center; border: 1px solid var(--grid); border-radius: 8px; }
 .multiples { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; }

@@ -43,3 +43,5 @@ The constructed returns are close to those of funds on the same markets. From 20
 - The result depends on bonds rising while equities fell. Bonds rose by 24.6 per cent from the peak of August 2000 to the low of March 2003, and by 9.8 per cent from October 2007 to February 2009. In 2022 bonds fell with equities, and every split fell between 13.3 and 15.9 per cent from its previous peak.
 - The test has no contributions, so it leaves out rule 4, under which each monthly top-up buys the sleeve furthest below its target weight.
 - The growth figures describe one history and are not a forecast.
+
+A block bootstrap of the test, in the dashboard's Method view, reports the distribution of the worst fall over resampled paths, and the dashboard's Simulations view shows the rules on the historical sample and on resampled paths, both as inputs to the review of the rules in October 2027.

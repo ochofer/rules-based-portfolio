@@ -33,6 +33,7 @@ VIEWS = [
     ("lookthrough", "Look-through"),
     ("factors", "Factor exposures"),
     ("method", "Method"),
+    ("simulations", "Simulations"),
     ("log", "Log"),
 ]
 FACTOR_ROLE = {f: f"@factor_{i}" for i, f in enumerate(config.FACTORS, start=1)}
@@ -808,7 +809,8 @@ def factor_view(page, loadings, rolling, as_of):
 # Method --------------------------------------------------------------------------------------------
 
 
-def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: str, sources: pd.DataFrame):
+def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: str, sources: pd.DataFrame,
+           bootstrap: pd.DataFrame):  # fmt: skip
     splits = list(allocation["split"])
     colors = ["@accent" if c == "yes" else "@other" for c in allocation["chosen"]]
     fall = {"id": "c21a", "traces": [{"type": "bar", "x": splits, "y": [fmt.rounded(v * 100, 1) for v in allocation["worst_fall"]],
@@ -833,6 +835,8 @@ def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: 
     page.add("method", block, fall)
     growth["view"] = "method"
     page.charts.append(growth)
+    if len(bootstrap):
+        _bootstrap(page, bootstrap)
 
     blocks = []
     for sleeve, title in (("equity", "Equity ETFs"), ("bonds", "Bond ETFs")):
@@ -897,6 +901,224 @@ def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: 
              "computed from them are published."))  # fmt: skip
     page.add("method", f'<article class="card wide rules" id="method-rules"><h3>The rules</h3><p class="asof">Rendered from '
              f'rules/RULES.md at build time, with the amendments table</p>{rules_html}</article>')
+
+
+# Simulations -----------------------------------------------------------------------------------------
+
+SIMULATION_BASIS = "This is not the portfolio's record, which starts in October 2026."
+SAMPLE = "the allocation test's monthly euro returns from February 1999 to December 2025"
+
+
+def _one_in(share: float) -> str:
+    """A share of paths as "one in N", N in words up to nine."""
+    n = int(round(1 / share)) if share > 0 else 0
+    return NUMBER_WORD.get(n, str(n)).lower() if n else "none"
+
+
+def _month_end(month: str) -> str:
+    return pd.Period(month, freq="M").end_time.strftime("%Y-%m-%d")
+
+
+def _bootstrap(page, boot):
+    """The bootstrap of the allocation test: the worst fall of every split over resampled ten-year paths."""
+    main = boot[(boot["horizon_years"] == 10) & (boot["block_months"] == 12)]
+    five = boot[(boot["horizon_years"] == 5) & (boot["block_months"] == 12)].set_index("split")
+    checks = boot[(boot["horizon_years"] == 10) & (boot["block_months"] != 12)]
+    splits = list(main["split"])
+    held = [s == "70/30" for s in splits]
+    traces = []
+    for chosen, role in ((False, "@other"), (True, "@accent")):
+        xs, ys = [], []
+        for (_, r), h in zip(main.iterrows(), held):
+            if h == chosen:
+                xs += [fmt.rounded(r["median_worst_fall"] * 100, 1), fmt.rounded(r["p95_worst_fall"] * 100, 1), None]
+                ys += [r["split"], r["split"], None]
+        traces.append({"type": "scatter", "mode": "lines", "x": xs, "y": ys, "line": {"color": role, "width": 3},
+                       "hoverinfo": "skip", "showlegend": False})  # fmt: skip
+    marks = ["@accent" if h else "@ink2" for h in held]
+    traces.append({"type": "scatter", "mode": "markers", "name": "Median", "y": splits,
+                   "x": [fmt.rounded(v * 100, 1) for v in main["median_worst_fall"]],
+                   "marker": {"size": 10, "color": marks},
+                   **_hover([f"{s}: median worst fall {fmt.pct(v)}" for s, v in zip(splits, main["median_worst_fall"])])})  # fmt: skip
+    traces.append({"type": "scatter", "mode": "markers", "name": "95th percentile", "y": splits,
+                   "x": [fmt.rounded(v * 100, 1) for v in main["p95_worst_fall"]],
+                   "marker": {"size": 10, "symbol": "circle-open", "color": marks, "line": {"width": 2, "color": marks}},
+                   **_hover([f"{s}: 95th percentile {fmt.pct(v)}" for s, v in zip(splits, main["p95_worst_fall"])])})  # fmt: skip
+    traces.append({"type": "scatter", "mode": "markers", "name": "Allocation test, one path", "y": splits,
+                   "x": [fmt.rounded(v * 100, 1) for v in main["worst_fall_one_path"]],
+                   "marker": {"size": 11, "symbol": "diamond", "color": "@ink"},
+                   **_hover([f"{s}: allocation test {fmt.pct(v)}" for s, v in zip(splits, main["worst_fall_one_path"])])})  # fmt: skip
+    shapes = [_vline(35, "@status_breach"), _vline(40, "@status_breach")]
+    annotations = [_label(35, 1, "35%", yref="paper", anchor="right", role="@status_breach", xshift=-4, yshift=8),
+                   _label(40, 1, "40%", yref="paper", anchor="left", role="@status_breach", xshift=4, yshift=8)]  # fmt: skip
+    layout = {"showlegend": True, "legend": {"orientation": "h", "x": 0, "y": -0.12, "yanchor": "top"},
+              "yaxis": {"type": "category", "categoryorder": "array", "categoryarray": splits, "autorange": "reversed",
+                        "title": {"text": "Split, equity/bonds"}},
+              "xaxis": {"title": {"text": "Worst fall over 10 years, per cent"}, "rangemode": "tozero"},
+              "shapes": shapes, "annotations": annotations, "margin": {"t": 24}}  # fmt: skip
+    rows = [[r["split"], fmt.pct(r["worst_fall_one_path"]), fmt.pct(r["median_worst_fall"]), fmt.pct(r["p95_worst_fall"]),
+             fmt.pct(r["share_above_35"]), fmt.pct(r["share_above_40"]), fmt.pct(five.loc[r["split"], "median_worst_fall"]),
+             fmt.pct(five.loc[r["split"], "share_above_35"]), fmt.pct(five.loc[r["split"], "share_above_40"])]
+            for _, r in main.iterrows()]  # fmt: skip
+    columns = ["Split", "Allocation test", "Median, 10 years", "95th percentile, 10 years", "Above 35%, 10 years",
+               "Above 40%, 10 years", "Median, 5 years", "Above 35%, 5 years", "Above 40%, 5 years"]  # fmt: skip
+    table = _table(columns, rows, numeric=tuple(columns[1:]))
+    check_rows = [[f"{int(r['block_months'])} months", fmt.pct(r["median_worst_fall"]), fmt.pct(r["p95_worst_fall"]),
+                   fmt.pct(r["share_above_35"]), fmt.pct(r["share_above_40"])]
+                  for _, r in pd.concat([main[main["split"] == "70/30"], checks]).sort_values("block_months").iterrows()]  # fmt: skip
+    check_columns = ["Block length", "Median", "95th percentile", "Above 35%", "Above 40%"]
+    table += '<p class="label">70/30 over 10 years, by block length</p>' + _table(check_columns, check_rows,
+                                                                                  numeric=tuple(check_columns[1:]))  # fmt: skip
+    share = main.set_index("split")["share_above_35"]
+    paths = int(main["paths"].iloc[0])
+    note = (f"Simulation on index returns, monthly, in euro, gross of costs and without contributions: {paths:,} paths of ten "
+            f"years, each joining twelve-month blocks of {SAMPLE} that start at random months, with the band of rule 5 "
+            "at each month end. The paths are resampled from the same returns, so they say nothing about years unlike "
+            "those, and the split was chosen on this sample. Over ten years, 70/30 falls more than 35 per cent in about "
+            f"one path in {_one_in(share['70/30'])}, and 60/40 in about one in {_one_in(share['60/40'])}. The table adds "
+            "five years and block lengths of 6, 24 and 36 months. The results are an input to the review of the rules "
+            f"in October 2027 and change no rule. {SIMULATION_BASIS}")  # fmt: skip
+    page.add("method", _card("c25", "Simulated worst fall of each split over resampled ten-year paths",
+             "Bootstrap of the allocation test, 10,000 paths", "mandate/simulation_bootstrap.csv", table=table, note=note,
+             height=480, wide=True, anchor="method-bootstrap"),
+             {"id": "c25", "traces": traces, "layout": layout,
+              "layout_narrow": {"xaxis": {"title": {"text": "Worst fall, per cent"}}}})  # fmt: skip
+
+
+def simulations(page, history, paths, monthly):
+    """The Simulations view: the rules on the allocation test's returns, and the resampled paths."""
+    if not len(history) or not len(paths):
+        page.add("simulations", _card("c26", "Simulations", "", None, plot=False, wide=True,
+                 empty="The simulation tables are not in mandate/."))
+        return
+    data = history.iloc[1:]
+    x = [_month_end(m) for m in data["month"]]
+    low, high = config.BAND
+    band = data[data["band_order"] == "yes"]
+    traces = [{"type": "scatter", "mode": "lines", "name": "Equity weight at the month end, before the top-up", "x": x,
+               "y": [fmt.rounded(v * 100, 1) for v in data["equity_weight_before_top_up"]],
+               "line": {"color": "@equity", "width": 1.5},
+               **_hover([f"{m}: {fmt.pct(v)}" for m, v in zip(data["month"], data["equity_weight_before_top_up"])])},
+              {"type": "scatter", "mode": "markers", "name": "Band order", "x": [_month_end(m) for m in band["month"]],
+               "y": [fmt.rounded(v * 100, 1) for v in band["equity_weight_before_top_up"]],
+               "marker": {"size": 11, "symbol": "diamond", "color": "@status_breach"},
+               **_hover([f"{m}: band order, rule 5" for m in band["month"]])}]  # fmt: skip
+    layout = {"showlegend": True, "yaxis": {"title": {"text": "Equity weight, per cent"}, "range": [60, 80], "dtick": 5},
+              "xaxis": {"type": "date", "tickformat": "%Y", "hoverformat": "%Y-%m"},
+              "shapes": [{"type": "rect", "xref": "paper", "yref": "y", "x0": 0, "x1": 1, "y0": low * 100,
+                          "y1": high * 100, "fillcolor": "@band", "line": {"width": 0}, "layer": "below"},
+                         _hline(70, "@ink")]}  # fmt: skip
+    orders = data["orders"].astype(int)
+    outside = ((data["equity_weight_before_top_up"] < low) | (data["equity_weight_before_top_up"] > high)).sum()
+    rows = [["Cycle days", fmt.count(len(data))],
+            ["Cycle days with one order", fmt.count((orders == 1).sum())],
+            ["Cycle days with two orders", fmt.count((orders == 2).sum())],
+            ["Cycle days with a band order", fmt.count(len(band))],
+            ["Months of the band orders", ", ".join(band["month"])],
+            ["Months with the equity weight outside the band before the top-up", fmt.count(outside)],
+            ["Most orders on a cycle day, against the budget of five", fmt.count(orders.max())]]  # fmt: skip
+    table = _table(["Count", "Value"], rows)
+    note = (f"Simulation on index returns, monthly, in euro, gross of costs, with a starting amount of 100 and a top-up of "
+            f"5 a month: {SAMPLE}, with the cycle at each month end in place of the 5th. Each top-up buys the sleeve "
+            "furthest below its target weight up to that weight, and the remainder buys the other sleeve (rule 4). The band "
+            "of rule 5 then applies. Every purchase counts as an order, whatever its size. The split was chosen on this "
+            f"sample. {SIMULATION_BASIS}")  # fmt: skip
+    page.add("simulations", _section("Mechanics simulation", "simulations-mechanics",
+             sub="The rules applied to the allocation test's returns, for the counts of their orders"))  # fmt: skip
+    page.add("simulations", _card("c26", "Simulation: the equity weight in its band under the rules, 1999 to 2025",
+             "Monthly, February 1999 to December 2025", "mandate/simulation_history.csv", table=table, note=note,
+             height=320, wide=True), {"id": "c26", "traces": traces, "layout": layout})  # fmt: skip
+
+    # The historical line: growth of 100 and the fall from the previous peak, beside the target weights restored each month.
+    series = (("The rules", "growth_rules", "drawdown_rules", "@accent"),
+              ("Back to 70/30 on every cycle day", "growth_every_cycle_day", "drawdown_every_cycle_day", "@reference_b"))
+    xs = [_month_end(m) for m in history["month"]]
+    growth_traces, fall_traces = [], []
+    for name, g, d, role in series:
+        growth_traces.append({"type": "scatter", "mode": "lines", "name": name, "x": xs,
+                              "y": [fmt.rounded(v, 1) for v in history[g]], "line": {"color": role, "width": 2},
+                              **_hover([f"{m}<br>{name}: {fmt.index(v)}" for m, v in zip(history["month"], history[g])])})
+        fall_traces.append({"type": "scatter", "mode": "lines", "name": name, "x": xs,
+                            "y": [fmt.rounded(-v * 100, 1) for v in history[d]], "line": {"color": role, "width": 2},
+                            **_hover([f"{m}<br>{name}: {fmt.pct(-v)} below the previous peak" for m, v in
+                                      zip(history["month"], history[d])])})  # fmt: skip
+    year_axis = {"type": "date", "tickformat": "%Y", "hoverformat": "%Y-%m"}
+    growth_layout = {"showlegend": True, "yaxis": {"title": {"text": "Growth of 100"}}, "xaxis": year_axis}
+    deepest = max(10.0, 1.3 * float(-history[["drawdown_rules", "drawdown_every_cycle_day"]].min().min()) * 100)
+    shapes, annotations = [], []
+    for level, text in ((35, "Test limit of the mandate, 35%"), (40, "Outer bound, 40%")):
+        if level <= deepest:
+            shapes.append(_hline(level))
+            annotations.append(_label(1, level, text, xref="paper", anchor="right", yshift=8, xshift=0))
+    fall_layout = {"showlegend": True, "xaxis": year_axis, "shapes": shapes, "annotations": annotations,
+                   "yaxis": {"title": {"text": "Per cent below the previous peak"}, "range": [deepest, -1]}}  # fmt: skip
+    year_ends = history[(history["month"].str.endswith("-12")) | (history.index == 0) | (history.index == len(history) - 1)]
+    rows = [[r["month"] + (", start" if i == 0 else ""), fmt.index(r["growth_rules"]), fmt.index(r["growth_every_cycle_day"]),
+             fmt.pct(-r["drawdown_rules"]), fmt.pct(-r["drawdown_every_cycle_day"])]
+            for i, (_, r) in enumerate(year_ends.iterrows())]  # fmt: skip
+    columns = ["Month", "The rules", "Every cycle day", "Fall, the rules", "Fall, every cycle day"]
+    table = _table(columns, rows, numeric=tuple(columns[1:]))
+    note = ("A simulation on index returns, and not the portfolio's record, which starts in October 2026. Gross of costs, "
+            "with the starting amount of 100 and the top-up of 5 a month, and the rules applied at each month end. The split "
+            "was chosen on this sample, so the simulation is in-sample. The index series run back before the two ETFs "
+            "existed: the equity share class since 21 October 2011 and the bond share class since 19 February 2019. "
+            "Time-weighted, with contributions removed. The table gives the year ends, and the months are in the source file.")  # fmt: skip
+    page.add("simulations", _section("Historical simulation", "simulations-history",
+             sub="Growth of 100 and the fall from the previous peak on the allocation test's returns"))  # fmt: skip
+    page.add("simulations", _card("c27a", "Simulation: growth of 100 under the rules and with the target weights restored on "
+             "every cycle day, 1999 to 2025", "Monthly, February 1999 to December 2025", "mandate/simulation_history.csv",
+             table=table, note=note, height=320, wide=True), {"id": "c27a", "traces": growth_traces, "layout": growth_layout})  # fmt: skip
+    page.add("simulations", _card("c27b", "Simulation: fall from the previous peak under the rules and with the target "
+             "weights restored on every cycle day, 1999 to 2025", "Monthly, February 1999 to December 2025",
+             "mandate/simulation_history.csv", note="The same simulation as the growth of 100, month by month. " + SIMULATION_BASIS,
+             height=300, wide=True), {"id": "c27b", "traces": fall_traces, "layout": fall_layout})  # fmt: skip
+
+    # The resampled paths, with the record drawn inside them from the first month end.
+    years = [fmt.rounded(v, 4) for v in paths["years"]]
+    band_trace = {"type": "scatter", "mode": "lines", "x": years, "line": {"width": 0}, "hoverinfo": "skip"}
+    traces = [{**band_trace, "y": [fmt.rounded(v, 1) for v in paths["p05"]], "showlegend": False},
+              {**band_trace, "y": [fmt.rounded(v, 1) for v in paths["p95"]], "fill": "tonexty", "fillcolor": "@fan_outer",
+               "name": "5th to 95th percentile"},
+              {**band_trace, "y": [fmt.rounded(v, 1) for v in paths["p25"]], "showlegend": False},
+              {**band_trace, "y": [fmt.rounded(v, 1) for v in paths["p75"]], "fill": "tonexty", "fillcolor": "@fan_inner",
+               "name": "25th to 75th percentile"},
+              {"type": "scatter", "mode": "lines", "name": "Median", "x": years,
+               "y": [fmt.rounded(v, 1) for v in paths["p50"]], "line": {"color": "@reference_a", "width": 2},
+               **_hover([f"Month {int(m)}: median {fmt.index(v)}" for m, v in zip(paths["month"], paths["p50"])])},
+              {"type": "scatter", "mode": "lines", "name": "Money paid in", "x": years,
+               "y": [fmt.rounded(v, 1) for v in paths["paid_in"]], "line": {"color": "@ink2", "width": 1.5, "dash": "dash"},
+               "hoverinfo": "skip"}]  # fmt: skip
+    record = monthly[monthly["complete"] == "yes"] if len(monthly) else monthly
+    if len(record):
+        months = list(range(1, len(record) + 1))
+        traces.append({"type": "scatter", "mode": "lines+markers", "name": "The record", "x": [m / 12 for m in [0] + months],
+                       "y": [100.0] + [fmt.rounded(v, 1) for v in record["value_in_units"]],
+                       "line": {"color": "@accent", "width": 2}, "marker": {"size": 7, "color": "@accent"},
+                       "hoverinfo": "skip"})  # fmt: skip
+        record_text = ("The record's path is drawn against the range the sample implies. Its position inside the range says "
+                       "where the market's draw has taken it and is not evidence about the rules, which a record of this "
+                       "length cannot give.")  # fmt: skip
+    else:
+        record_text = "From the first month end, 31 October 2026, the record's own path is drawn inside the bands."
+    layout = {"showlegend": True, "legend": {"traceorder": "normal"},
+              "xaxis": {"title": {"text": "Years from the first purchase"}, "range": [0, 10], "dtick": 1},
+              "yaxis": {"title": {"text": "Units of the starting amount"}, "rangemode": "tozero"}}  # fmt: skip
+    yearly = paths[paths["month"] % 12 == 0]
+    rows = [[f"{int(r['month']) // 12}", fmt.index(r["paid_in"]), fmt.index(r["p05"]), fmt.index(r["p25"]),
+             fmt.index(r["p50"]), fmt.index(r["p75"]), fmt.index(r["p95"])] for _, r in yearly.iterrows()]  # fmt: skip
+    columns = ["Year", "Paid in", "5th", "25th", "Median", "75th", "95th"]
+    table = _table(columns, rows, numeric=tuple(columns[1:]))
+    note = ("These are resampled paths and not the portfolio's record: 10,000 paths of the portfolio's value over ten years "
+            f"from the first purchase that reuse {SAMPLE} in random twelve-month blocks and assume nothing beyond them, so "
+            "the bands say what that sample implies and not what will happen. Gross of costs, with the top-up of 5 a month and "
+            "the rules applied at each month end, in units of the starting amount, 100. The split was chosen on this sample, so "
+            f"the paths are in-sample. {record_text} A record below the lower band is a question for the review of the rules "
+            "in October 2027.")  # fmt: skip
+    page.add("simulations", _section("Resampled paths", "simulations-paths",
+             sub="The portfolio's value over paths resampled from the allocation test's returns"))  # fmt: skip
+    page.add("simulations", _card("c28", "Resampled paths of the portfolio's value over ten years from the first purchase",
+             "The same 10,000 paths as the bootstrap of the allocation test", "mandate/simulation_paths.csv", table=table,
+             note=note, height=360, wide=True), {"id": "c28", "traces": traces, "layout": layout})  # fmt: skip
 
 
 def log(page, monthly):
@@ -1008,7 +1230,9 @@ def build(out_dir: Path = None) -> Path:
     factor_view(page, out["factor_loadings.csv"], out["factor_rolling.csv"], daily["date"].iloc[-1])
     allocation = pd.read_csv(config.ROOT / "mandate" / "allocation_check_results.csv")
     selection = pd.read_csv(config.METHOD_DIR / "selection_tracking_difference.csv")
-    method(page, allocation, selection, _rules_html(), out["sources.csv"])
+    simulated = {name: _read(f"simulation_{name}.csv", config.ROOT / "mandate") for name in ("bootstrap", "history", "paths")}
+    method(page, allocation, selection, _rules_html(), out["sources.csv"], simulated["bootstrap"])
+    simulations(page, simulated["history"], simulated["paths"], monthly)
     log(page, monthly)
     _check_roles(page.charts, palette)
 
@@ -1024,13 +1248,20 @@ def build(out_dir: Path = None) -> Path:
                        + " and " + _link("lookthrough-portfolio", "the whole portfolio") + ", where currency exposure "
                        "combines both.",
         "factors": "The equity ETF's loadings on Kenneth French's developed-market factors.",
-        "method": "How the split and the two ETFs were chosen, the data behind the charts, and the rules, in four "
+        "method": "How the split and the two ETFs were chosen, the data behind the charts, and the rules, in five "
                   "parts: " + _link("method-allocation", "the allocation test") + ", "
+                  + _link("method-bootstrap", "its bootstrap") + ", "
                   + _link("method-selection", "the ETF selection") + ", " + _link("method-sources", "the data sources")
                   + " and " + _link("method-rules", "the rules") + ".",
+        "simulations": "The rules applied to the allocation test's returns and to paths resampled from them, in three parts: "
+                       + _link("simulations-mechanics", "the mechanics simulation") + ", "
+                       + _link("simulations-history", "the historical simulation") + " and "
+                       + _link("simulations-paths", "the resampled paths")
+                       + ". Every chart here is a simulation on index returns, gross of costs. None is the portfolio's "
+                       "record, which starts in October 2026.",
         "log": "Every figure behind the tiles and charts, by month.",
     }  # fmt: skip
-    leads = {v: (text if v in ("lookthrough", "method") else _esc(text)) for v, text in leads.items()}
+    leads = {v: (text if v in ("lookthrough", "method", "simulations") else _esc(text)) for v, text in leads.items()}
     tabs = "".join(f'<button type="button" data-view="{v}" aria-selected="false">{_esc(t)}</button>' for v, t in VIEWS)
     sections = []
     for v, t in VIEWS:

@@ -17,6 +17,8 @@ On the cycle day, the 5th of each month or the first trading day after it when t
 | `mandate/MANDATE.md` | The objective, the risk limit and how the split follows from the limit. |
 | `mandate/allocation_check.py` | The test that derives the split, with its data sources. |
 | `mandate/allocation_check_results.md` | The output of the test for every split from 40/60 to 100/0. |
+| `mandate/simulations.py` | The bootstrap of the allocation test, and the rules applied to its returns and to resampled paths. |
+| `mandate/simulation_*.csv` | The three tables of the simulations, which the dashboard draws. |
 | `rules/RULES.md` | The ten rules, the two ETFs and how they were chosen. |
 | `src/portfolio/` | The program: it checks the ledger, computes the orders the rules produce on a cycle day, and builds the record and the dashboard. |
 | `tests/` | The program's tests, run on invented ledgers and simulated returns. |
@@ -42,10 +44,11 @@ From the repository root:
 ```
 pip install -r requirements.txt pytest
 python3 mandate/allocation_check.py
+python3 mandate/simulations.py
 python3 -m pytest tests
 ```
 
-`allocation_check.py` downloads its five source files into `cache/`, which is not committed, and rewrites `mandate/allocation_check_results.md`. Its sample ends in December 2025, so a later run differs only where a source revises its history. The tests run on invented ledgers and simulated returns. The program reads the private ledger: with `PYTHONPATH=src`, `python3 -m portfolio check` checks the ledger against rules 7 and 10, `status` shows the holdings and weights, `cycle` gives the orders of a cycle day, and `build` writes `outputs/` and `index.html`.
+`allocation_check.py` downloads its five source files into `cache/`, which is not committed, and rewrites `mandate/allocation_check_results.md`. Its sample ends in December 2025, so a later run differs only where a source revises its history. `simulations.py` reads the same files, checks that its code reproduces the allocation test, and rewrites the three simulation tables with one fixed seed, so a run reproduces them. The tests run on invented ledgers and simulated returns. The program reads the private ledger: with `PYTHONPATH=src`, `python3 -m portfolio check` checks the ledger against rules 7 and 10, `status` shows the holdings and weights, `cycle` gives the orders of a cycle day, and `build` writes `outputs/` and `index.html`.
 
 ## Terms
 
@@ -80,3 +83,8 @@ python3 -m pytest tests
 - **loading**: the coefficient of the ETF's return minus the risk-free rate on a factor's return.
 - **risk-free rate**: the one-month US Treasury bill return in French's files.
 - **standard error**: the estimated standard deviation of an estimate.
+- **allocation test**: the historical test in `mandate/allocation_check.py` that derived the split from the risk limit, on monthly euro returns from February 1999 to December 2025.
+- **bootstrap**: the resampling of the allocation test's returns in blocks of twelve consecutive months, each starting at a random month, into paths of five and ten years, with the worst fall measured on each path.
+- **mechanics simulation**: the rules applied to the allocation test's returns, with a starting amount of 100 and a top-up of 5 a month, for the counts of their orders.
+- **resampled paths**: the bootstrap's ten-year paths carried forward from the first purchase with the top-up and the rules, in units of the starting amount.
+- **in-sample**: computed on the data on which a choice was made, here the returns from 1999 to 2025 on which the split was chosen.

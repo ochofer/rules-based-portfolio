@@ -69,6 +69,23 @@
     DATA.charts.forEach(function (c) { if (c.view === view) draw(c); });
   }
 
+  // On a phone the view bar is one row that scrolls sideways. A fade marks each edge with more tabs,
+  // and the selected tab is brought into view.
+  function barEdges() {
+    var bar = document.querySelector(".viewtabs"), wrap = bar && bar.querySelector(".wrap");
+    if (!wrap) return;
+    bar.classList.toggle("more-r", wrap.scrollWidth - wrap.clientWidth - wrap.scrollLeft > 1);
+    bar.classList.toggle("more-l", wrap.scrollLeft > 1);
+  }
+
+  function centreTab() {
+    var wrap = document.querySelector(".viewtabs .wrap"), sel = wrap && wrap.querySelector('[aria-selected="true"]');
+    if (sel && wrap.scrollWidth > wrap.clientWidth) {
+      wrap.scrollLeft += sel.getBoundingClientRect().left - wrap.getBoundingClientRect().left - (wrap.clientWidth - sel.offsetWidth) / 2;
+    }
+    barEdges();
+  }
+
   function show(view, setHash) {
     document.querySelectorAll("section.view").forEach(function (s) {
       s.classList.toggle("active", s.id === "view-" + view);
@@ -77,6 +94,7 @@
       b.setAttribute("aria-selected", String(b.getAttribute("data-view") === view));
     });
     drawView(view);
+    centreTab();
     if (setHash) {
       try { history.replaceState(null, "", "#" + view); } catch (e) { /* the page works without it */ }
     }
@@ -112,8 +130,10 @@
     var resizeTimer = null;
     window.addEventListener("resize", function () {
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(redrawActive, 150);
+      resizeTimer = setTimeout(function () { redrawActive(); centreTab(); }, 150);
     });
+    var tabWrap = document.querySelector(".viewtabs .wrap");
+    if (tabWrap) tabWrap.addEventListener("scroll", barEdges, { passive: true });
     var views = DATA.views.map(function (v) { return v.id; });
     function route() {
       var wanted = (location.hash || "").replace("#", "");
