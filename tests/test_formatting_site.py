@@ -53,3 +53,9 @@ def test_the_page_has_one_theme_light():
     css = site._palette_css(palette)
     assert "color-scheme: light" in css and "prefers-color-scheme" not in css and "data-theme" not in css
     assert "theme" not in (config.SITE_DIR / "app.js").read_text()
+
+
+def test_the_footer_ends_with_the_author_the_data_the_code_and_the_build_date():
+    line = site._colophon({"positions_as_of": "2026-10-09"})
+    assert line.startswith('<p class="colophon">') and line.endswith("Built 2026-10-09</p>")
+    assert f'<a href="{config.REPOSITORY_URL}">Code on GitHub</a>' in line

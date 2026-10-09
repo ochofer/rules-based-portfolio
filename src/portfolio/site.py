@@ -21,6 +21,7 @@ from . import formatting as fmt
 SITE_URL = "https://www.carlohofer.com/"
 PROJECTS_URL = SITE_URL + "projects/"
 PROJECT_PAGE_URL = PROJECTS_URL + "rules-based-portfolio/"
+FAVICON_URL = SITE_URL + "images/favicon.svg"
 PLOTLY = "https://cdn.plot.ly/plotly-basic-2.35.2.min.js"
 PLOTLY_INTEGRITY = "sha384-wQ3lfCxuvLfhHGiSdHF5+e3NZ1zNwEMd8/nII+K7VKChF9llO/OwOcn/aVRkB7az"
 VIEWS = [
@@ -162,6 +163,14 @@ def _date_axis(dates, most: int = 5) -> dict:
 def _date_axes(dates) -> tuple:
     """The date axis for the page at full width and for a narrow screen."""
     return {"xaxis": _date_axis(dates)}, {"xaxis": _date_axis(dates, 3)}
+
+
+def _colophon(now_row) -> str:
+    """The footer's last line. The record is built on the date of its holdings, so the build date comes
+    from the committed outputs and a rebuild reproduces the page."""
+    built = fmt.day(now_row["positions_as_of"])
+    return (f'<p class="colophon">Carlo Hofer &middot; Data: the issuers\' published data &middot; '
+            f'<a href="{config.REPOSITORY_URL}">Code on GitHub</a> &middot; Built {_esc(built)}</p>')
 
 
 def _asof(day, extra="") -> str:
@@ -518,17 +527,12 @@ def contributions(page, daily, monthly):
         x = list(daily["date"])
         value = [fmt.rounded(v, 1) for v in daily["value_in_units"]]
         paid = [fmt.rounded(v, 1) for v in daily["contributions_in_units"]]
-        upper = [max(v, p) for v, p in zip(value, paid)]
-        lower = [min(v, p) for v, p in zip(value, paid)]
+        # One fill between the two lines: which line is on top shows whether the gap is a gain or a loss.
         traces = [
             {"type": "scatter", "mode": "lines", "x": x, "y": paid, "line": {"width": 0},
              "hoverinfo": "skip", "showlegend": False},
-            {"type": "scatter", "mode": "lines", "x": x, "y": upper, "fill": "tonexty", "fillcolor": "@diverging_positive",
-             "line": {"width": 0}, "opacity": 0.35, "hoverinfo": "skip", "name": "Gain", "showlegend": True},
-            {"type": "scatter", "mode": "lines", "x": x, "y": paid, "line": {"width": 0},
-             "hoverinfo": "skip", "showlegend": False},
-            {"type": "scatter", "mode": "lines", "x": x, "y": lower, "fill": "tonexty", "fillcolor": "@diverging_negative",
-             "line": {"width": 0}, "opacity": 0.35, "hoverinfo": "skip", "name": "Loss", "showlegend": True},
+            {"type": "scatter", "mode": "lines", "x": x, "y": value, "fill": "tonexty", "fillcolor": "@gap_fill",
+             "line": {"width": 0}, "hoverinfo": "skip", "name": "Gap between value and money paid in", "showlegend": True},
             {"type": "scatter", "mode": "lines", "name": "Contributions paid in", "x": x, "y": paid,
              "line": {"color": "@ink2", "width": 2},
              **_hover([f"{d}<br>Paid in: {fmt.index(p)}" for d, p in zip(x, daily["contributions_in_units"])])},
@@ -558,8 +562,7 @@ def contributions(page, daily, monthly):
         months_shown = [-0.5, max(len(m), 6) - 0.5]
         chart_a = {"id": "c10a", "traces": [{"type": "bar", "name": "Market effect", "x": m, "width": 0.45,
                    "y": [fmt.rounded(v * 100, 1) for v in monthly["market_effect"]],
-                   "marker": {"color": ["@diverging_positive" if v >= 0 else "@diverging_negative" for v in
-                                        monthly["market_effect"]]},
+                   "marker": {"color": "@accent"},
                    **_hover([f"{a}<br>Market effect {fmt.pct(v, True)}" for a, v in zip(m, monthly["market_effect"])])}],
                    "layout": {"yaxis": {"title": {"text": "Market effect, per cent"}, "zeroline": True},
                               "xaxis": {"type": "category", "range": months_shown}, "shapes": [_hline(0, "@ink")]}}  # fmt: skip
@@ -1042,6 +1045,7 @@ def build(out_dir: Path = None) -> Path:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rules-based portfolio</title>
+<link rel="icon" href="{FAVICON_URL}" type="image/svg+xml">
 <meta name="description" content="{_esc(DESCRIPTION)}">
 {_link_preview()}<style>
 {css}</style>
@@ -1067,6 +1071,7 @@ def build(out_dir: Path = None) -> Path:
 <footer><div class="wrap">
 <p>Returns are time-weighted and in euro, valued at the issuers' net asset values. A record of five to ten years cannot show that one set of rules is better than another, so the returns are not offered as evidence for the rules.</p>
 <dl class="terms">{glossary}</dl>
+{_colophon(out["allocation_now.csv"].iloc[0])}
 </div></footer>
 <script type="application/json" id="dashboard-data">{payload}</script>
 <script>
