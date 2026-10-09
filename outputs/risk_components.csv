@@ -1,0 +1,9 @@
+as_of,component,sleeve,weight,risk_contribution,estimated_volatility,estimated_return,series,window_start,window_end
+2026-10-08,North America,equity,0.4717497213,0.6654956313,0.1470525413,0.1462308767,"MSCI North America, net total return in euro",2016-10,2026-09
+2026-10-08,Europe and Middle East,equity,0.0920080519,0.1009481481,0.1325026678,0.0956620774,"MSCI Europe, net total return in euro",2016-10,2026-09
+2026-10-08,Pacific,equity,0.0504582214,0.051081419,0.121011091,0.0917580254,"MSCI Pacific, net total return in euro",2016-10,2026-09
+2026-10-08,Emerging markets,equity,0.0824944368,0.0857858087,0.1468045656,0.096959993,"MSCI Emerging Markets, net total return in euro",2016-10,2026-09
+2026-10-08,"Bonds, short",bonds,0.1284453157,0.0119911019,0.0218094754,-0.0014957601,"ECB curve, 3-year zero-coupon bond",2016-10,2026-09
+2026-10-08,"Bonds, medium",bonds,0.0945771668,0.0276401439,0.0557957642,-0.012033951,"ECB curve, 7.5-year zero-coupon bond",2016-10,2026-09
+2026-10-08,"Bonds, long",bonds,0.0765064186,0.0570577472,0.1425557666,-0.0363619431,"ECB curve, 20-year zero-coupon bond",2016-10,2026-09
+2026-10-08,Cash,cash,0.0037605476,0,0,0,no return,2016-10,2026-09

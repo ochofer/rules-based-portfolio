@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import config, factors, ledger as ledger_module, lookthrough, metrics, positions, prices
+from . import config, factors, ledger as ledger_module, lookthrough, metrics, positions, prices, risk
 from . import references, valuations
 
 E, B = config.EQUITY, config.BONDS
@@ -139,9 +139,14 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     written.append(_write(loadings, "factor_loadings.csv", loadings["window_end"].max(), out_dir))
     written.append(_write(rolling, "factor_rolling.csv", rolling["window_end"].max(), out_dir))
 
+    risk_written, risk_sources = _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, records,
+                                       now["nav_date"])  # fmt: skip
+    written += risk_written
+    written.append(_write(metrics.attribution(daily_out), "attribution.csv", as_of, out_dir))
+
     checks = _checks(records, navs, look, weights_now, loadings)
     written.append(_write(checks, "checks.csv", as_of, out_dir))
-    sources = _sources(series, msci, equity_as_of, bonds_as_of, latest_sheet.name, daily_factors, vintage)
+    sources = _sources(series, msci, equity_as_of, bonds_as_of, latest_sheet.name, daily_factors, vintage, risk_sources)
     written.append(_write(sources, "sources.csv", as_of, out_dir))
     privacy(records, out_dir)
     return {"as_of": as_of, "files": written}
@@ -169,7 +174,89 @@ def _checks(records, navs, look, weights_now, loadings) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["check", "result", "detail"])
 
 
-def _sources(series, msci, equity_as_of, bonds_as_of, sheet_as_at, daily_factors, vintage) -> pd.DataFrame:
+def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, records, nav_date) -> tuple:
+    """The look-through's risk (risk.py): components, correlations, risk contributions, the frontier, the
+    estimate and its record, the episodes, and the cost of ownership."""
+    levels = risk.fetch_regions(refresh, today)
+    spot = risk.fetch_curve(refresh)
+    components = risk.component_returns(levels, spot)
+    end = risk.last_complete_month(components, today)
+    current = risk.window(components, end)
+    earlier = risk.window(components, end - risk.WINDOW_MONTHS)
+    mean, cov = risk.moments(current)
+    mean_earlier, cov_earlier = risk.moments(earlier)
+    regions = _lookthrough_frame(look["equity_region"], "region")
+    maturities = _lookthrough_frame(look["bonds_maturity"], "maturity")
+    weights = risk.component_weights(regions, maturities, weights_now["cash"])
+    contributions = risk.risk_contributions(weights, cov)
+    estimate = risk.volatility(weights, cov)
+    full_mean = mean.reindex(weights.index).fillna(0.0)
+    minimum = risk.minimum_variance(cov)
+    israel = float(equity.loc[equity["country"] == "Israel", "weight"].sum()) * weights_now[E]
+    series = {name: f"{index}, net total return in euro" for name, _, index in risk.REGIONS}
+    series.update({name: f"ECB curve, {maturity:g}-year zero-coupon bond" for name, _, _, maturity, _ in risk.MATURITY_GROUPS})
+    rows = [{"component": c, "sleeve": risk.SLEEVE_OF.get(c, "cash"), "weight": weights[c],
+             "risk_contribution": contributions[c],
+             "estimated_volatility": float(np.sqrt(cov.loc[c, c])) if c in cov.index else 0.0,
+             "estimated_return": float(mean[c]) if c in mean.index else 0.0, "series": series.get(c, "no return")}
+            for c in weights.index]  # fmt: skip
+    window_text = {"window_start": str(current.index[0]), "window_end": str(end)}
+    components_table = pd.DataFrame(rows).assign(**window_text)
+    correlation = current.corr()
+    pairs = pd.DataFrame([{"component_a": a, "component_b": b, "correlation": correlation.loc[a, b]}
+                          for a in correlation.index for b in correlation.columns])  # fmt: skip
+    frontiers = pd.concat([risk.frontier(mean, cov).assign(window="current"),
+                           risk.frontier(mean_earlier, cov_earlier).assign(window="earlier")], ignore_index=True)  # fmt: skip
+    history_path = out_dir / "ex_ante_risk.csv"
+    history = pd.read_csv(history_path).drop(columns=["as_of"], errors="ignore") if history_path.exists() else pd.DataFrame()
+    first_purchase = records.orders["moment"].min()
+    history = risk.record_estimate(history, end, estimate, current.index[0], first_purchase)
+    calibration, calibration_months = risk.calibration(history, monthly)
+    complete = monthly[monthly["complete"] == "yes"] if len(monthly) else monthly
+    realised = float(complete["volatility_12m"].iloc[-1]) if len(complete) else float("nan")
+    summary = pd.DataFrame([{**window_text, "earlier_window_start": str(earlier.index[0]),
+                             "earlier_window_end": str(earlier.index[-1]), "weights_as_of": nav_date,
+                             "estimated_volatility": estimate, "estimated_return": float(full_mean @ weights),
+                             "minimum_variance_volatility": float(np.sqrt(minimum @ cov @ minimum)),
+                             "minimum_variance_return": float(mean @ minimum), "israel_share_of_portfolio": israel,
+                             "cash_weight": weights[risk.CASH], "calibration": calibration,
+                             "calibration_months": calibration_months, "realised_volatility_12m": realised}])  # fmt: skip
+    test = risk.allocation_test_returns()
+    episodes = risk.stress(components, test, weights)
+    kids = risk.fetch_kids(refresh)
+    cost_rows = []
+    for sleeve in config.SLEEVES:
+        k = kids[sleeve]
+        cost_rows.append({"sleeve": sleeve, "fund": config.NAME[sleeve], "isin": config.ISIN[sleeve], "weight": weights_now[sleeve],
+                          "management_fees": k["management_fees"], "transaction_costs": k["transaction_costs"],
+                          "ongoing_costs": k["management_fees"] + k["transaction_costs"], "document_date": k["document_date"]})  # fmt: skip
+    costs = pd.DataFrame(cost_rows)
+    costs = pd.concat([costs, pd.DataFrame([{"sleeve": "portfolio", "fund": "Weighted by the sleeve weights",
+                                             "weight": float(costs["weight"].sum()),
+                                             "management_fees": float((costs["weight"] * costs["management_fees"]).sum()),
+                                             "transaction_costs": float((costs["weight"] * costs["transaction_costs"]).sum()),
+                                             "ongoing_costs": float((costs["weight"] * costs["ongoing_costs"]).sum())}])],
+                      ignore_index=True)  # fmt: skip
+    sources = [
+        ("MSCI North America, Europe, Pacific and Emerging Markets, net total return in euro, month-end levels",
+         f"msci/region_{risk.REGIONS[0][1]}_netr_eur_monthly.json", levels.attrs["last_day"]),
+        ("ECB, yield curve of all euro area government bonds, spot rates at 3, 7.5 and 20 years",
+         f"ecb/curve_spot_{risk.MATURITY_GROUPS[0][4]}.csv", spot.attrs["last_day"]),
+        ("iShares, IE00B6R52259, key information document", risk.KIDS[E][0], kids[E]["document_date"]),
+        ("Vanguard, IE00BH04GL39, key information document", risk.KIDS[B][0], kids[B]["document_date"]),
+    ]  # fmt: skip
+    return [
+        _write(components_table, "risk_components.csv", as_of, out_dir),
+        _write(pairs, "risk_correlation.csv", as_of, out_dir),
+        _write(frontiers, "risk_frontier.csv", as_of, out_dir),
+        _write(summary, "risk_summary.csv", as_of, out_dir),
+        _write(history, "ex_ante_risk.csv", as_of, out_dir),
+        _write(episodes, "stress.csv", as_of, out_dir),
+        _write(costs, "cost_of_ownership.csv", as_of, out_dir),
+    ], sources
+
+
+def _sources(series, msci, equity_as_of, bonds_as_of, sheet_as_at, daily_factors, vintage, extra=()) -> pd.DataFrame:
     log_path = config.CACHE_DIR / "sources.json"
     log = json.loads(log_path.read_text()) if log_path.exists() else {}
 
@@ -189,6 +276,7 @@ def _sources(series, msci, equity_as_of, bonds_as_of, sheet_as_at, daily_factors
          + "".join(ch for ch in vintage if ch.isdigit()),
          "french/Developed_5_Factors_Daily_CSV.zip", daily_factors.index.max()),
         ("MSCI ACWI net total return in euro, end-of-day levels", "msci/acwi_netr_eur.json", msci.index.max()),
+        *extra,
     ]  # fmt: skip
     return pd.DataFrame(
         [

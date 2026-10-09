@@ -84,6 +84,7 @@ section.view > p.lead a { color: var(--link); font-weight: 600; }
 .tile .value { font-size: 1.6rem; font-weight: 600; line-height: 1.15; }
 .tile .change { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
 .tilenote { font-size: 0.84rem; color: var(--ink2); margin: 8px 0 0; }
+.tiles.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 4px; }
 details.twin { margin-top: 8px; }
 details.twin summary { font-size: 0.82rem; color: var(--ink2); cursor: pointer; }
@@ -122,6 +123,7 @@ footer p.colophon { max-width: none; margin: 20px 0 0; padding-top: 12px; border
 @media (max-width: 900px) {
   .grid { grid-template-columns: minmax(0, 1fr); }
   .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tiles.three { grid-template-columns: minmax(0, 1fr); }
   .multiples { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) { .ch-band__in { height: 48px; } }

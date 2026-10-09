@@ -1,0 +1,2 @@
+as_of,window_start,window_end,earlier_window_start,earlier_window_end,weights_as_of,estimated_volatility,estimated_return,minimum_variance_volatility,minimum_variance_return,israel_share_of_portfolio,cash_weight,calibration,calibration_months,realised_volatility_12m
+2026-10-08,2016-10,2026-09,2006-10,2016-09,2026-10-08,0.1006629774,0.0863024811,0.0218094754,-0.0014957601,0.0016268472,0.0037605476,,0,

@@ -394,3 +394,31 @@ def sleeve_correlation(navs_eur: pd.DataFrame, months: int = 36) -> pd.DataFrame
     returns = month_end.pct_change().iloc[1:]
     rolling = returns[E].rolling(months).corr(returns[B]).dropna()
     return pd.DataFrame({"window_end": [str(p) for p in rolling.index], "correlation": rolling.values})
+
+
+def attribution(daily: pd.DataFrame, months: int = 12) -> pd.DataFrame:
+    """The difference to the index blend in three parts that sum to it, from the first month end of the index
+    blend to its last, once twelve months lie between: the implementation cost (the portfolio against reference
+    portfolio A), the drift effect (reference A against reference B, the weights left to drift inside the band
+    against restored on every cycle day) and the tracking difference of the two ETFs with the day mismatch
+    (reference B against the index blend). Each is a difference of returns over the period, in shares."""
+    columns = ["period_start", "period_end", "months", "implementation_cost", "drift_effect", "tracking_difference", "total"]
+    blend = daily[["date", "growth_index_blend"]].dropna() if "growth_index_blend" in daily else pd.DataFrame()
+    if len(blend) < 2:
+        return pd.DataFrame(columns=columns)
+    dates = pd.Series(pd.to_datetime(blend["date"]).values)
+    ends = dates.groupby(dates.dt.to_period("M")).max()
+    later = pd.date_range(dates.max() + pd.Timedelta(days=1), dates.max().to_period("M").end_time.normalize(), freq="D")
+    if any(trading_days.is_trading_day(d.date()) for d in later):
+        ends = ends.iloc[:-1]  # the month of the last day is not complete
+    span = len(ends) - 1
+    if span < months:
+        return pd.DataFrame(columns=columns)
+    first, last = ends.iloc[0], ends.iloc[-1]
+    rows = daily.set_index(pd.to_datetime(daily["date"]))
+    growth = {c: rows.loc[last, c] / rows.loc[first, c] - 1 for c in
+              ("growth_portfolio", "growth_reference_a", "growth_reference_b", "growth_index_blend")}  # fmt: skip
+    p, a, b, i = (growth[c] for c in ("growth_portfolio", "growth_reference_a", "growth_reference_b", "growth_index_blend"))
+    return pd.DataFrame([{"period_start": first, "period_end": last, "months": span, "implementation_cost": p - a,
+                          "drift_effect": a - b, "tracking_difference": b - i, "total": p - i}], columns=columns)  # fmt: skip
+

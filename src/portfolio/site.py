@@ -24,8 +24,8 @@ PROJECTS_URL = SITE_URL + "projects/"
 PROJECT_PAGE_URL = PROJECTS_URL + "rules-based-portfolio/"
 FAVICON_URL = SITE_URL + "images/favicon.svg"
 WRAP_FIRST_ABOVE = 28  # characters: a longer label in a table's first column wraps on a phone
-PLOTLY = "https://cdn.plot.ly/plotly-basic-2.35.2.min.js"
-PLOTLY_INTEGRITY = "sha384-wQ3lfCxuvLfhHGiSdHF5+e3NZ1zNwEMd8/nII+K7VKChF9llO/OwOcn/aVRkB7az"
+PLOTLY = "https://cdn.plot.ly/plotly-cartesian-2.35.2.min.js"  # the smallest bundle with the heatmap
+PLOTLY_INTEGRITY = "sha384-gKF7EaMDoWW1zLWkouldmVWF5jqEKrAswAciW73iNzqlomabVVPO60XkJvL5q/Ie"
 VIEWS = [
     ("overview", "Overview"),
     ("rebalancing", "Rebalancing"),
@@ -80,7 +80,7 @@ def _esc(text) -> str:
     return html.escape(str(text), quote=True)
 
 
-def _table(columns, rows, numeric=(), prose=False) -> str:
+def _table(columns, rows, numeric=(), prose=False, wrap_first=None) -> str:
     head = "".join(f'<th class="num">{_esc(c)}</th>' if c in numeric else f"<th>{_esc(c)}</th>" for c in columns)
     body = []
     for r in rows:
@@ -91,7 +91,8 @@ def _table(columns, rows, numeric=(), prose=False) -> str:
     # The first column stays in place while the table scrolls sideways. Long labels wrap on a phone, so that
     # the column never covers the columns that scroll behind it.
     longest = max((len(str(r[0])) for r in rows), default=0)
-    classes = (["wrapfirst"] if longest > WRAP_FIRST_ABOVE else []) + (["prose"] if prose else [])
+    wrap_first = longest > WRAP_FIRST_ABOVE if wrap_first is None else wrap_first
+    classes = (["wrapfirst"] if wrap_first else []) + (["prose"] if prose else [])
     wrap = f' class="{" ".join(classes)}"' if classes else ""
     return (f'<div class="tw"><div class="tablewrap"><table{wrap}><thead><tr>{head}</tr></thead>'
             f'<tbody>{"".join(body)}</tbody></table></div></div>')
@@ -757,6 +758,230 @@ def lookthrough(page, out):
              {"id": "c13", "traces": traces, "layout": layout})  # fmt: skip
 
 
+# Risk of the whole portfolio ------------------------------------------------------------------------
+
+SHORT_COMPONENT = {"North America": "N. America", "Europe and Middle East": "Europe, ME", "Pacific": "Pacific",
+                   "Emerging markets": "Emerging", "Bonds, short": "Short", "Bonds, medium": "Medium",
+                   "Bonds, long": "Long", "Cash": "Cash"}  # fmt: skip
+STUDY_URL = SITE_URL + "optimal-vs-naive-diversification/"
+
+
+def _window_text(summary) -> str:
+    return f"the 120 months from {_month_name(summary['window_start'])} to {_month_name(summary['window_end'])}"
+
+
+def _risk_tiles(page, summary, boot, weight_equity, monthly):
+    """Item 3: the estimated volatility, the estimated worst fall at the nearest split, and from month 12 the
+    forecast's calibration."""
+    split_weight = round(weight_equity * 20) / 20
+    split = f"{round(split_weight * 100)}/{round((1 - split_weight) * 100)}"
+    row = boot[(boot["horizon_years"] == 10) & (boot["block_months"] == 12) & (boot["split"] == split)]
+    fall = (fmt.pct(row["median_worst_fall"].iloc[0]), fmt.pct(row["p95_worst_fall"].iloc[0])) if len(row) else ("n/a", "n/a")
+    months = int(summary["calibration_months"]) if pd.notna(summary["calibration_months"]) else 0
+    if pd.notna(summary["calibration"]):
+        calibration = (f"{summary['calibration']:.2f}",
+                       f"Over {months} months. Realised volatility {fmt.pct(summary['realised_volatility_12m'])} over the last 12")
+    else:
+        calibration = ("n/a", "From the October 2027 month end, when twelve months of returns exist, with the realised volatility")
+    tiles = [("Estimated volatility", fmt.pct(summary["estimated_volatility"]),
+              f"A year, at the look-through weights of {fmt.day(summary['weights_as_of'])}, on {_window_text(summary)}"),
+             ("Estimated worst fall over ten years", fall[0],
+              f"Median of the bootstrap at {split}, the split nearest the equity weight of {fmt.day(summary['weights_as_of'])}, "
+              f"on the returns from February 1999 to December 2025. 95th percentile {fall[1]}"),
+             ("The forecast's calibration", *calibration)]  # fmt: skip
+    tile_html = "".join(f'<div class="tile"><p class="name">{_esc(n)}</p><div class="value">{_esc(v)}</div>'
+                        f'<div class="change">{_esc(c)}</div></div>' for n, v, c in tiles)  # fmt: skip
+    line = ("The forecast's calibration is the standard deviation, over the months, of each month's return divided by the "
+            "monthly volatility estimated at the end of the month before. 1 means the estimates matched the returns, and "
+            "above 1 that they were too low. Every estimate is kept as first written, in outputs/ex_ante_risk.csv.")  # fmt: skip
+    page.add("lookthrough", f'<div class="wide"><div class="tiles three">{tile_html}</div><p class="tilenote">{_esc(line)}</p>'
+             '<p class="source">Estimated on index returns, at today\'s weights, and not the record. Source: '
+             '<code>outputs/risk_summary.csv</code>, <code>mandate/simulation_bootstrap.csv</code></p></div>')  # fmt: skip
+
+
+def _correlation_heatmap(page, components, pairs, summary):
+    names = [c for c in components["component"] if c != "Cash"]
+    matrix = pairs.pivot(index="component_a", columns="component_b", values="correlation").loc[names, names]
+    z = [[fmt.rounded(matrix.loc[a, b], 4) for b in names] for a in names]
+    text = [[fmt.loading(matrix.loc[a, b]) for b in names] for a in names]
+    trace = {"type": "heatmap", "x": names, "y": names, "z": z, "text": text, "texttemplate": "%{text}", "zmin": -1, "zmax": 1,
+             "colorscale": [[0, "@diverging_negative"], [0.5, "@diverging_mid"], [1, "@diverging_positive"]],
+             "colorbar": {"title": {"text": "Correlation", "side": "right"}, "thickness": 12, "len": 0.9, "tickvals": [-1, -0.5, 0, 0.5, 1]},
+             "xgap": 2, "ygap": 2, "customdata": [[f"{a} and {b}: {t}" for b, t in zip(names, r)] for a, r in zip(names, text)],
+             "hovertemplate": "%{customdata}<extra></extra>"}  # fmt: skip
+    layout = {"xaxis": {"type": "category", "showline": False, "ticks": "", "tickangle": -30, "showgrid": False},
+              "yaxis": {"type": "category", "autorange": "reversed", "showline": False, "ticks": "", "showgrid": False},
+              "margin": {"t": 8}}  # fmt: skip
+    short = [SHORT_COMPONENT.get(n, n) for n in names]
+    narrow = {"xaxis": {"tickmode": "array", "tickvals": names, "ticktext": short, "tickangle": -45},
+              "yaxis": {"tickmode": "array", "tickvals": names, "ticktext": short}}  # fmt: skip
+    rows = [[r["component"], fmt.pct(r["weight"]), fmt.pct(r["estimated_volatility"]), r["series"]]
+            for _, r in components.iterrows()]  # fmt: skip
+    table = _table(["Component", "Weight", "Volatility, a year", "Series"], rows, numeric=("Weight", "Volatility, a year"))
+    israel = fmt.pct(summary["israel_share_of_portfolio"])
+    note = (f"Monthly returns in euro over {_window_text(summary)}. The equity regions are MSCI's regional indices, net total "
+            "return. MSCI publishes no series for Europe and the Middle East together, so that region is priced by MSCI Europe, "
+            f"and Israel, {israel} of the portfolio, goes with it. Each maturity group is a zero-coupon euro area government "
+            "bond at the group's midpoint, priced from the ECB's curve as the allocation test prices its seven-year bond: "
+            "short 1 to 5 years at 3, medium 5 to 10 years at 7.5, and long over 10 years at 20. Cash has no return and no "
+            "correlation.")  # fmt: skip
+    block = _card("c30", "Correlation of the components' monthly returns", f"Window {summary['window_start']} to {summary['window_end']}",
+                  ["outputs/risk_correlation.csv", "outputs/risk_components.csv"], note=note, wide=True, height=420,
+                  anchor="lookthrough-risk")  # fmt: skip
+    block = block.replace('<p class="note">', table + '<p class="note">', 1)
+    page.add("lookthrough", block, {"id": "c30", "traces": [trace], "layout": layout, "layout_narrow": narrow})
+
+
+def _risk_contributions(page, components, summary):
+    order = components.sort_values("risk_contribution", ascending=False, kind="stable")
+    order = pd.concat([order[order["component"] != "Cash"], order[order["component"] == "Cash"]])
+    names = list(order["component"])
+    traces = [{"type": "bar", "orientation": "h", "name": "Weight", "y": names, "x": [fmt.rounded(v * 100, 2) for v in order["weight"]],
+               "marker": {"color": "@weight_bar"}, **_hover([f"{n}: weight {fmt.pct(v)}" for n, v in zip(names, order["weight"])])},
+              {"type": "bar", "orientation": "h", "name": "Share of the estimated variance", "y": names,
+               "x": [fmt.rounded(v * 100, 2) for v in order["risk_contribution"]], "marker": {"color": "@accent"},
+               **_hover([f"{n}: {fmt.pct(v)} of the estimated variance" for n, v in zip(names, order["risk_contribution"])])}]  # fmt: skip
+    layout = {"barmode": "group", "showlegend": True, "legend": {"traceorder": "normal"}, "bargap": 0.3,
+              "yaxis": {"autorange": "reversed", "type": "category", "showline": False, "ticks": ""},
+              "xaxis": {"title": {"text": "Per cent, each set summing to 100"}, "zeroline": True},
+              "shapes": [_vline(0, "@ink")]}  # fmt: skip
+    narrow = {"yaxis": {"tickmode": "array", "tickvals": names, "ticktext": [SHORT_COMPONENT.get(n, n) for n in names]}}
+    rows = [[r["component"], fmt.pct(r["weight"]), fmt.pct(r["risk_contribution"])] for _, r in order.iterrows()]
+    rows.append(["Sum", fmt.pct(order["weight"].sum()), fmt.pct(order["risk_contribution"].sum())])
+    table = _table(["Component", "Weight", "Share of the estimated variance"], rows, numeric=("Weight", "Share of the estimated variance"))
+    equity = order[order["sleeve"] == "equity"]
+    bonds = order[order["sleeve"] == "bonds"]
+    note = (f"Each component's share is its weight times its covariance with the portfolio, over the portfolio's estimated "
+            f"variance, on {_window_text(summary)}. The equity regions carry {fmt.pct(equity['risk_contribution'].sum())} of "
+            f"the estimated variance against {fmt.pct(equity['weight'].sum())} of the weight, and the maturity groups "
+            f"{fmt.pct(bonds['risk_contribution'].sum())} against {fmt.pct(bonds['weight'].sum())}.")  # fmt: skip
+    page.add("lookthrough", _card("c31", "Each component's share of the estimated variance, beside its weight",
+             f"Look-through weights of {fmt.day(summary['weights_as_of'])}", "outputs/risk_components.csv", table=table, note=note,
+             wide=True, height=360), {"id": "c31", "traces": traces, "layout": layout, "layout_narrow": narrow})  # fmt: skip
+
+
+def _frontier(page, frontiers, summary, components):
+    traces = []
+    for window, name, role, width in (("earlier", "Frontier of the 120 months before", "@other", 2),
+                                      ("current", "Frontier of the window", "@ink2", 2)):  # fmt: skip
+        f = frontiers[frontiers["window"] == window]
+        traces.append({"type": "scatter", "mode": "lines", "name": name, "x": [fmt.rounded(v * 100, 3) for v in f["estimated_volatility"]],
+                       "y": [fmt.rounded(v * 100, 3) for v in f["estimated_return"]], "line": {"color": role, "width": width},
+                       **_hover([f"{name}<br>volatility {fmt.pct(v)}, return {fmt.pct(r)}" for v, r in
+                                 zip(f["estimated_volatility"], f["estimated_return"])])})  # fmt: skip
+    traces.append({"type": "scatter", "mode": "markers", "name": "Minimum-variance portfolio",
+                   "x": [fmt.rounded(summary["minimum_variance_volatility"] * 100, 3)],
+                   "y": [fmt.rounded(summary["minimum_variance_return"] * 100, 3)],
+                   "marker": {"size": 10, "symbol": "circle-open", "color": "@ink2", "line": {"width": 2, "color": "@ink2"}},
+                   **_hover([f"Minimum-variance portfolio<br>volatility {fmt.pct(summary['minimum_variance_volatility'])}, "
+                             f"return {fmt.pct(summary['minimum_variance_return'])}"])})  # fmt: skip
+    traces.append({"type": "scatter", "mode": "markers", "name": "The portfolio, at its look-through weights",
+                   "x": [fmt.rounded(summary["estimated_volatility"] * 100, 3)], "y": [fmt.rounded(summary["estimated_return"] * 100, 3)],
+                   "marker": {"size": 12, "color": "@accent"},
+                   **_hover([f"The portfolio<br>volatility {fmt.pct(summary['estimated_volatility'])}, "
+                             f"return {fmt.pct(summary['estimated_return'])}"])})  # fmt: skip
+    layout = {"showlegend": True, "legend": {"traceorder": "normal"},
+              "xaxis": {"title": {"text": "Estimated volatility, per cent a year"}, "rangemode": "tozero"},
+              "yaxis": {"title": {"text": "Estimated return, per cent a year"}}}  # fmt: skip
+    current = frontiers[frontiers["window"] == "current"]
+    weight_columns = [c for c in current.columns if c.startswith("weight_")]
+    labels = [c for c in components["component"] if c != "Cash"]
+    rows = [[int(r["point"]) + 1, fmt.pct(r["estimated_return"]), fmt.pct(r["estimated_volatility"])] +
+            [fmt.pct(r[c]) for c in weight_columns] for _, r in current.iterrows()]  # fmt: skip
+    columns = ["Point", "Return", "Volatility"] + labels
+    table = _table(columns, rows, numeric=tuple(columns[1:]))
+    note = (f"Estimated on the past returns of {_window_text(summary)}, of which the means are the least reliable input: "
+            "long-only portfolios of the components, fully invested, at 25 target returns from the minimum-variance portfolio's "
+            "to the highest component mean. The portfolio does not optimise, by its rules, and its point is where its two "
+            "cap-weighted ETFs put it. The distance from the curve is the ex-post cost of holding cap weights on this window, "
+            f"and the grey curve, the 120 months before it, shows how far the frontier moves between windows. The study at "
+            f"{STUDY_URL} finds that sample-based optimisation of this kind does not keep its in-sample advantage out of "
+            "sample. The table gives the weights of each point of the window's frontier.")  # fmt: skip
+    block = _card("c32", "The efficient frontier of the components, and the portfolio's point",
+                  f"The 120 months to {summary['earlier_window_end']}, and to {summary['window_end']}", "outputs/risk_frontier.csv",
+                  table=table, note=note, wide=True, height=380)  # fmt: skip
+    block = block.replace(f"at {STUDY_URL} finds", f'at <a href="{STUDY_URL}">{STUDY_URL}</a> finds', 1)
+    page.add("lookthrough", block, {"id": "c32", "traces": traces, "layout": layout})
+
+
+def _stress(page, episodes):
+    series = {"the components": "Components", "the allocation test's two series": "Allocation test"}
+    rows = [[r["episode"], fmt.pct(r["equity_contribution"], True), fmt.pct(r["bond_contribution"], True),
+             fmt.pct(r["total"], True), f"{r['from_month_end']} to {r['to_month_end']}", series.get(r["series"], r["series"])]
+            for _, r in episodes.iterrows()]  # fmt: skip
+    columns = ["Episode", "Equity", "Bonds", "Total", "Month ends", "Series"]
+    table = _table(columns, rows, numeric=("Equity", "Bonds", "Total"), wrap_first=True)
+    note = ("Estimated, on index returns, at today's weights, and not the record. Each episode holds today's look-through "
+            "weights from the end of its first month to the end of its last, without rebalancing, so the two sleeves' "
+            "contributions add up to the total. Month-end values miss falls that reverse within a month. The components' "
+            "series start in January 2001 (MSCI) and October 2004 (the ECB curve), so the fall of 2000 to 2003 takes the "
+            "allocation test's two series at the sleeve weights.")  # fmt: skip
+    page.add("lookthrough", _card("stress", "Today's portfolio in five historical episodes, estimated", "Per cent of the portfolio, by sleeve",
+             "outputs/stress.csv", plot=False, wide=True, note=note).replace('<p class="note">', table + '<p class="note">', 1))  # fmt: skip
+
+
+def risk_view(page, out, boot, monthly):
+    summary = out.get("risk_summary.csv", pd.DataFrame())
+    if not len(summary):
+        return
+    summary = summary.iloc[0]
+    page.add("lookthrough", _section("Risk of the whole portfolio", "lookthrough-risk-section",
+             sub="Estimated on index returns at the look-through weights"))  # fmt: skip
+    _risk_tiles(page, summary, boot, out["allocation_now.csv"].iloc[0]["weight_equity"], monthly)
+    components = out["risk_components.csv"]
+    _correlation_heatmap(page, components, out["risk_correlation.csv"], summary)
+    _risk_contributions(page, components, summary)
+    _frontier(page, out["risk_frontier.csv"], summary, components)
+    _stress(page, out["stress.csv"])
+
+
+def _cost_of_ownership(page, costs, implementation):
+    if not len(costs):
+        return
+    funds = costs[costs["sleeve"] != "portfolio"]
+    weighted = costs[costs["sleeve"] == "portfolio"].iloc[0]
+    data = implementation.dropna(subset=["implementation_cost_bps"]) if len(implementation) else implementation
+    if len(data):
+        impl = (f"Beside them, chart 8's implementation cost is {fmt.bps(data['implementation_cost_bps'].iloc[-1])}, cumulative "
+                f"since {fmt.day(data['date'].iloc[0])} and negative when the portfolio trails reference portfolio A. ")
+    else:
+        impl = "Beside them, chart 8 gives the implementation cost from the first order. "
+    line = (f"The two ETFs' ongoing costs, from their key information documents, come to "
+            f"{fmt.bps(weighted['ongoing_costs'] * 1e4, False)} a year at the portfolio's weights. {impl}The ongoing costs "
+            "are taken inside the ETFs' net asset values, so chart 8 does not hold them.")  # fmt: skip
+    bp = lambda v: fmt.bps(v * 1e4, False)  # noqa: E731
+    rows = [[SHORT_FUND.get(r["isin"], r["fund"]), bp(r["ongoing_costs"]), bp(r["management_fees"]), bp(r["transaction_costs"]),
+             fmt.pct(r["weight"]), fmt.day(r["document_date"])] for _, r in funds.iterrows()]  # fmt: skip
+    rows.append(["The portfolio", bp(weighted["ongoing_costs"]), bp(weighted["management_fees"]), bp(weighted["transaction_costs"]),
+                 fmt.pct(weighted["weight"]), ""])  # fmt: skip
+    columns = ["Fund", "Ongoing costs", "Management", "Transaction", "Weight", "Document of"]
+    table = _table(columns, rows, numeric=("Ongoing costs", "Management", "Transaction", "Weight"), wrap_first=True)
+    page.add("costs", _card("ownership", "What the portfolio costs a year, in basis points",
+             "Ongoing costs of the two ETFs, management and transaction", ["outputs/cost_of_ownership.csv",
+             "outputs/implementation_cost.csv"], plot=False, wide=True, note=line).replace('<p class="note">', table +
+             '<p class="note">', 1))  # fmt: skip
+
+
+def _attribution(page, attribution, as_of):
+    if not len(attribution):
+        page.add("factors", _card("attribution", "The difference to the index blend in three parts", _asof(as_of), None,
+                 plot=False, wide=True, empty="From the October 2027 month end, when twelve months exist, this table splits the "
+                 "difference to the index blend into the implementation cost, the drift effect and the tracking difference "
+                 "of the two ETFs, which sum to it, over the period of chart 20."))  # fmt: skip
+        return
+    r = attribution.iloc[0]
+    rows = [["Implementation cost", "The portfolio against reference portfolio A", fmt.pct(r["implementation_cost"], True)],
+            ["Drift effect", "Reference portfolio A against reference portfolio B", fmt.pct(r["drift_effect"], True)],
+            ["Tracking difference, with the day mismatch", "Reference portfolio B against the index blend",
+             fmt.pct(r["tracking_difference"], True)],
+            ["The difference to the index blend", "The portfolio against the index blend", fmt.pct(r["total"], True)]]  # fmt: skip
+    table = _table(["Part", "Measured as", "Return, percentage of the start"], rows, numeric=("Return, percentage of the start",))
+    page.add("factors", _card("attribution", "The difference to the index blend in three parts",
+             f"{fmt.day(r['period_start'])} to {fmt.day(r['period_end'])}, {int(r['months'])} months", "outputs/attribution.csv",
+             plot=False, wide=True, note="Differences of the returns over the period, so the three parts sum to the total.")
+             .replace('<p class="note">', table + '<p class="note">', 1))  # fmt: skip
+
+
 # Factor exposures ----------------------------------------------------------------------------------
 
 
@@ -1395,9 +1620,12 @@ def build(out_dir: Path = None) -> Path:
     overview(page, daily, monthly, out["allocation_now.csv"], orders)
     rebalancing(page, daily, orders, out["band_events.csv"], out["compliance.csv"], monthly)
     costs(page, monthly, out["implementation_cost.csv"], daily)
+    _cost_of_ownership(page, out.get("cost_of_ownership.csv", pd.DataFrame()), out["implementation_cost.csv"])
     contributions(page, daily, monthly)
     lookthrough(page, out)
+    risk_view(page, out, _read("simulation_bootstrap.csv", config.ROOT / "mandate"), monthly)
     factor_view(page, out["factor_loadings.csv"], out["factor_rolling.csv"], daily["date"].iloc[-1])
+    _attribution(page, out.get("attribution.csv", pd.DataFrame()), daily["date"].iloc[-1])
     allocation = pd.read_csv(config.ROOT / "mandate" / "allocation_check_results.csv")
     selection = pd.read_csv(config.METHOD_DIR / "selection_tracking_difference.csv")
     simulated = {name: _read(f"simulation_{name}.csv", config.ROOT / "mandate") for name in ("bootstrap", "history", "paths")}
@@ -1417,10 +1645,11 @@ def build(out_dir: Path = None) -> Path:
         "costs": "What running the portfolio costs, measured against reference portfolio A, which follows the same rules "
                  "at net asset value without costs.",
         "contributions": "Money paid in against gains and losses, in units of the starting amount.",
-        "lookthrough": "The holdings of the two ETFs, weighted by each sleeve's weight in the portfolio, in three parts: "
+        "lookthrough": "The holdings of the two ETFs, weighted by each sleeve's weight in the portfolio, in four parts: "
                        + _link("lookthrough-equity", "the equity sleeve") + ", " + _link("lookthrough-bonds", "the bond sleeve")
-                       + " and " + _link("lookthrough-portfolio", "the whole portfolio") + ", where currency exposure "
-                       "combines both.",
+                       + ", " + _link("lookthrough-portfolio", "the whole portfolio") + ", where currency exposure "
+                       "combines both, and " + _link("lookthrough-risk-section", "the risk of the whole portfolio")
+                       + ", estimated on index returns.",
         "factors": "The equity ETF's loadings on Kenneth French's developed-market factors.",
         "method": "How the split and the two ETFs were chosen, the data behind the charts, the controls and the rules, in "
                   "seven parts: " + _link("method-allocation", "the allocation test") + ", "
