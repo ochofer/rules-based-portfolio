@@ -25,3 +25,5 @@ An answer that changes a rule is a dated amendment under rule 9, and it applies 
 ## Additions
 
 Each addition is dated, and the first is listed first.
+
+- 9 October 2026. Figure 4 compares two different things, so it is read as two. (a) The implementation cost of the twelve months, in `outputs/implementation_cost.csv`, and its sources by month, in `outputs/costs_monthly.csv`, against what the half-spreads measured at the orders, the broker's commission schedule and the currency conversion lead one to expect. (b) The two ETFs' tracking difference against their TERs, which is the cost of owning them.

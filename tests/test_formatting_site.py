@@ -70,3 +70,33 @@ def test_every_table_sits_in_a_frame_that_scrolls_with_a_sticky_first_column():
     label = "Kenneth French, Developed 5 Factors and Momentum"
     long_labels = site._table(["Source", "Downloaded"], [[label, "2026-10-09"]])
     assert '<table class="wrapfirst">' in long_labels and 'class="wrapfirst"' not in table
+
+
+def _simulations_page(monthly):
+    mandate = config.ROOT / "mandate"
+    history = site._read("simulation_history.csv", mandate)
+    paths = site._read("simulation_paths.csv", mandate)
+    page = site.Page()
+    site.simulations(page, history, paths, monthly)
+    return " ".join(page.sections["simulations"])
+
+
+def test_the_record_joins_the_resampled_paths_with_the_ruled_sentence():
+    import pandas as pd
+
+    waiting = _simulations_page(pd.DataFrame({"month": ["2026-10"], "complete": ["to date"], "value_in_units": [100.4]}))
+    assert "From the first month end, 31 October 2026, the record&#x27;s own path is drawn inside the bands." in waiting
+    drawn = _simulations_page(pd.DataFrame({"month": ["2026-10"], "complete": ["yes"], "value_in_units": [100.4]}))
+    assert "where the market&#x27;s draw has taken it and is not evidence about the rules" in drawn
+
+
+def test_the_visible_text_of_the_page_has_no_semicolon():
+    # W6 of the house standard. The rules card quotes rules/RULES.md as fixed, which keeps its own wording.
+    import html
+    import re
+
+    page = (config.ROOT / "index.html").read_text(encoding="utf-8")
+    page = re.sub(r"<script.*?</script>|<style.*?</style>", " ", page, flags=re.S)
+    page = re.sub(r'<article class="card wide rules" id="method-rules">.*?</article>', " ", page, flags=re.S)
+    text = html.unescape(re.sub(r"<[^>]+>", " ", page))
+    assert ";" not in text, re.findall(r".{0,60};.{0,60}", text)

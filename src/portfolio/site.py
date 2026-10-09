@@ -138,6 +138,22 @@ def _label(x, y, text, xref="x", yref="y", anchor="left", role="@ink2", xshift=6
             "xanchor": anchor, "xshift": xshift, "yshift": yshift, "font": {"color": role, "size": 11}}  # fmt: skip
 
 
+# The mandate's two limits on a chart of falls: the full label at width, a short one on a phone.
+LIMIT_LABELS = ((35, "Test limit of the mandate, 35%", "Test limit, 35%"), (40, "Outer bound, 40%", "Outer bound, 40%"))
+FALL_AXIS_ROOM = 1.08  # the axis runs a little past its deepest tick, so the tick's label clears the dates
+
+
+def _limit_lines(deepest: float, x: float = 0, anchor: str = "left") -> tuple:
+    """The limit lines within the range, and their labels at width and on a phone."""
+    shapes, wide, narrow = [], [], []
+    for level, long_text, short_text in LIMIT_LABELS:
+        if level <= deepest:
+            shapes.append(_hline(level))
+            wide.append(_label(x, level, long_text, xref="paper", anchor=anchor, yshift=8, xshift=0))
+            narrow.append(_label(x, level, short_text, xref="paper", anchor=anchor, yshift=8, xshift=0))
+    return shapes, wide, narrow
+
+
 def _section(title: str, anchor: str, sub: str = "", tone: str = "") -> str:
     """A heading that groups the cards after it, across the whole width of the view, with an anchor for links."""
     line = f'<p class="sub">{_esc(sub)}</p>' if sub else ""
@@ -335,14 +351,11 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
                                      zip(blend["date"], blend["drawdown_index_blend"])])})  # fmt: skip
     worst = -daily["drawdown_portfolio"].min() if len(daily) else 0.0
     deepest = max(10.0, 1.3 * worst * 100)
-    shapes, annotations = [], []
-    for level, text in ((35, "Test limit of the mandate, 35%"), (40, "Outer bound, 40%")):
-        if level <= deepest:
-            shapes.append(_hline(level))
-            annotations.append(_label(0, level, text, xref="paper", yshift=8, xshift=0))
+    shapes, annotations, short_labels = _limit_lines(deepest)
     wide, narrow = _date_axes(daily["date"])
+    narrow = {**narrow, "annotations": short_labels}
     layout = {"showlegend": len(traces) > 1, "yaxis": {"title": {"text": "Per cent below the previous peak"},
-              "range": [deepest, -1]}, **wide, "shapes": shapes, "annotations": annotations}  # fmt: skip
+              "range": [deepest * FALL_AXIS_ROOM, -1]}, **wide, "shapes": shapes, "annotations": annotations}  # fmt: skip
     rows = [[_start_label(r["date"], i), fmt.pct(-r["drawdown_portfolio"]), fmt.pct(-r["drawdown_index_blend"])]
             for i, (_, r) in enumerate(daily.iterrows())]  # fmt: skip
     table = _table(["Date", "Portfolio", "Index blend"], rows, numeric=("Portfolio", "Index blend"))
@@ -351,7 +364,7 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
     page.add("overview", _card("c4", "Drawdown against the mandate's limit", asof4,
              "outputs/portfolio_daily.csv", table=None if empty else table, height=300, wide=True, empty=empty,
              note="Daily values. The mandate's 35% test used month-end values, which miss falls that reverse within "
-                  "a month; the worst daily fall is at least as deep."),
+                  "a month. The worst daily fall is at least as deep."),
              None if empty else {"id": "c4", "traces": traces, "layout": layout, "layout_narrow": narrow})  # fmt: skip
 
 
@@ -994,6 +1007,17 @@ def _month_end(month: str) -> str:
     return pd.Period(month, freq="M").end_time.strftime("%Y-%m-%d")
 
 
+def _longer_blocks(checks: pd.DataFrame) -> str:
+    """The sentence on block lengths of more than a year, from the check rows of 70/30 over ten years."""
+    longer = checks[(checks["split"] == "70/30") & (checks["block_months"] > 12)].sort_values("block_months")
+    if not len(longer):
+        return ""
+    months = _and([str(int(m)) for m in longer["block_months"]])
+    shares = _and([f"{v * 100:.1f}" for v in longer["share_above_35"]])
+    return (f"Blocks of {months} months, which keep the long falls whole, give {shares} per cent, so among blocks of a "
+            "year or more the twelve-month figure is the low side. ")  # fmt: skip
+
+
 def _bootstrap(page, boot):
     """The bootstrap of the allocation test: the worst fall of every split over resampled ten-year paths."""
     main = boot[(boot["horizon_years"] == 10) & (boot["block_months"] == 12)]
@@ -1051,7 +1075,7 @@ def _bootstrap(page, boot):
             "at each month end. The paths are resampled from the same returns, so they say nothing about years unlike "
             "those, and the split was chosen on this sample. Over ten years, 70/30 falls more than 35 per cent in about "
             f"one path in {_one_in(share['70/30'])}, and 60/40 in about one in {_one_in(share['60/40'])}. The table adds "
-            "five years and block lengths of 6, 24 and 36 months. The results are an input to the review of the rules "
+            f"five years and block lengths of 6, 24 and 36 months. {_longer_blocks(checks)}The results are an input to the review of the rules "
             f"in October 2027 and change no rule. {SIMULATION_BASIS}")  # fmt: skip
     page.add("method", _card("c25", "Simulated worst fall of each split over resampled ten-year paths",
              "Bootstrap of the allocation test, 10,000 paths", "mandate/simulation_bootstrap.csv", table=table, note=note,
@@ -1070,7 +1094,7 @@ def simulations(page, history, paths, monthly):
     x = [_month_end(m) for m in data["month"]]
     low, high = config.BAND
     band = data[data["band_order"] == "yes"]
-    traces = [{"type": "scatter", "mode": "lines", "name": "Equity weight at the month end, before the top-up", "x": x,
+    traces = [{"type": "scatter", "mode": "lines", "name": "Equity weight at the month end", "x": x,
                "y": [fmt.rounded(v * 100, 1) for v in data["equity_weight_before_top_up"]],
                "line": {"color": "@equity", "width": 1.5},
                **_hover([f"{m}: {fmt.pct(v)}" for m, v in zip(data["month"], data["equity_weight_before_top_up"])])},
@@ -1094,7 +1118,8 @@ def simulations(page, history, paths, monthly):
             ["Most orders on a cycle day, against the budget of five", fmt.count(orders.max())]]  # fmt: skip
     table = _table(["Count", "Value"], rows)
     note = (f"Simulation on index returns, monthly, in euro, gross of costs, with a starting amount of 100 and a top-up of "
-            f"5 a month: {SAMPLE}, with the cycle at each month end in place of the 5th. Each top-up buys the sleeve "
+            f"5 a month: {SAMPLE}, with the cycle at each month end in place of the 5th. The line is the equity weight at "
+            "each month end, before the top-up. Each top-up buys the sleeve "
             "furthest below its target weight up to that weight, and the remainder buys the other sleeve (rule 4). The band "
             "of rule 5 then applies. Every purchase counts as an order, whatever its size. The split was chosen on this "
             f"sample. {SIMULATION_BASIS}")  # fmt: skip
@@ -1120,13 +1145,9 @@ def simulations(page, history, paths, monthly):
     year_axis = {"type": "date", "tickformat": "%Y", "hoverformat": "%Y-%m"}
     growth_layout = {"showlegend": True, "yaxis": {"title": {"text": "Growth of 100"}}, "xaxis": year_axis}
     deepest = max(10.0, 1.3 * float(-history[["drawdown_rules", "drawdown_every_cycle_day"]].min().min()) * 100)
-    shapes, annotations = [], []
-    for level, text in ((35, "Test limit of the mandate, 35%"), (40, "Outer bound, 40%")):
-        if level <= deepest:
-            shapes.append(_hline(level))
-            annotations.append(_label(1, level, text, xref="paper", anchor="right", yshift=8, xshift=0))
+    shapes, annotations, short_labels = _limit_lines(deepest, x=1, anchor="right")
     fall_layout = {"showlegend": True, "xaxis": year_axis, "shapes": shapes, "annotations": annotations,
-                   "yaxis": {"title": {"text": "Per cent below the previous peak"}, "range": [deepest, -1]}}  # fmt: skip
+                   "yaxis": {"title": {"text": "Per cent below the previous peak"}, "range": [deepest * FALL_AXIS_ROOM, -1]}}  # fmt: skip
     year_ends = history[(history["month"].str.endswith("-12")) | (history.index == 0) | (history.index == len(history) - 1)]
     rows = [[r["month"] + (", start" if i == 0 else ""), fmt.index(r["growth_rules"]), fmt.index(r["growth_every_cycle_day"]),
              fmt.pct(-r["drawdown_rules"]), fmt.pct(-r["drawdown_every_cycle_day"])]
@@ -1146,7 +1167,8 @@ def simulations(page, history, paths, monthly):
     page.add("simulations", _card("c27b", "Simulation: fall from the previous peak under the rules and with the target "
              "weights restored on every cycle day, 1999 to 2025", "Monthly, February 1999 to December 2025",
              "mandate/simulation_history.csv", note="The same simulation as the growth of 100, month by month. " + SIMULATION_BASIS,
-             height=300, wide=True), {"id": "c27b", "traces": fall_traces, "layout": fall_layout})  # fmt: skip
+             height=300, wide=True), {"id": "c27b", "traces": fall_traces, "layout": fall_layout,
+                                      "layout_narrow": {"annotations": short_labels}})  # fmt: skip
 
     # The resampled paths, with the record drawn inside them from the first month end.
     years = [fmt.rounded(v, 4) for v in paths["years"]]
