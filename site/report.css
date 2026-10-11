@@ -1,0 +1,92 @@
+/* House tokens (standard, V3) */
+@font-face { font-family: "EB Garamond"; src: url("https://www.carlohofer.com/assets/fonts/EBGaramond-var-latin.woff2") format("woff2"); font-weight: 400 800; font-display: swap; }
+:root { color-scheme: light; --ground: #ffffff; --tint: #f5f5f5; --rule: #dddddd; --frame: #cfcfcf; --grid: #e5e5e5;
+  --ink: #262b33; --navy: #16213a; --ink2: #5d6470; --meta: #6b7280; --link: #1f3a60; --warn: #b25e00;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --serif: "EB Garamond", Garamond, Georgia, serif; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 16px/1.5 var(--sans); }
+h1, h2 { font-family: var(--serif); font-weight: 500; color: var(--navy); }
+a { color: var(--link); text-underline-offset: .18em; text-decoration-color: rgba(31,58,96,.35); }
+.ch-band { background: linear-gradient(90deg, #121a2c 0%, #172238 60%, #1a263b 100%); }
+.ch-band__in { max-width: 820px; margin: 0 auto; padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+.ch-word { font-family: var(--serif); font-weight: 500; text-transform: uppercase; letter-spacing: .22em; color: #ece6d9; text-decoration: none; font-size: 17px; }
+.ch-menu a { color: rgba(236,230,217,.78); text-decoration: none; font-size: 15px; margin-left: 20px; }
+.ch-back { max-width: 820px; margin: 12px auto 0; padding: 0 16px; font-size: 14px; color: var(--ink2); }
+.ch-foot { background: var(--tint); border-top: 1px solid var(--rule); color: var(--ink2); font-size: 14px; margin-top: 40px; }
+.ch-foot > div { max-width: 820px; margin: 0 auto; padding: 20px 16px 32px; }
+
+/* The report page (standard, section 11) */
+.rp { max-width: 820px; margin: 0 auto; padding: 0 16px; }
+.rp-kicker { font-size: 14px; color: var(--ink2); margin: 28px 0 4px; }
+.rp h1 { font-size: 2rem; line-height: 1.15; margin: 0 0 8px; }
+.rp-stamp { font-size: 13px; color: var(--meta); margin: 0 0 18px; font-variant-numeric: tabular-nums; }
+.rp-basis { background: var(--tint); margin: 0 0 18px; padding: 12px 16px; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; font-size: 14px; }
+.rp-basis dt { color: var(--ink2); font-weight: 600; }
+.rp-basis dd { margin: 0; }
+.rp-errata { border-left: 3px solid var(--warn); padding: 6px 0 6px 14px; margin: 0 0 18px; font-size: 14px; }
+.rp-errata strong { color: var(--warn); }
+.rp h2 { font-size: 1.5rem; margin: 36px 0 8px; }
+.rp p.prose, .rp-note p { max-width: 75ch; }
+.rp-ex { margin: 22px 0 30px; }
+.rp-ex h3 { font-size: 1rem; font-weight: 600; color: var(--ink); margin: 0 0 2px; }
+.rp-ex .cap { font-size: 14px; color: var(--ink2); margin: 0 0 8px; max-width: 75ch; }
+.rp-ex svg { display: block; width: 100%; height: auto; }
+.rp-narrow { display: none; }
+.rp-ex .basis { font-size: 13px; color: var(--ink2); margin: 6px 0 0; }
+.rp-ex .src { font-size: 12px; color: var(--meta); margin: 4px 0 0; }
+.rp-ex .src code { font-size: 11px; }
+.rp-tw { position: relative; }
+.rp-scroll { overflow-x: auto; }
+.rp table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+.rp th, .rp td { padding: 5px 8px; border-bottom: 1px solid var(--rule); text-align: left; white-space: nowrap; }
+.rp thead th { color: var(--ink2); font-weight: 600; border-bottom: 1px solid var(--frame); vertical-align: bottom; white-space: normal; }
+.rp th.num, .rp td.num { text-align: right; }
+.rp tbody th { font-weight: 400; }
+.rp-sign { color: var(--ink2); margin-top: 12px; }
+.rp-note h3 { font-size: 1rem; font-weight: 600; margin: 18px 0 4px; }
+.rp-close { border-top: 1px solid var(--rule); margin-top: 36px; padding-top: 12px; color: var(--ink2); max-width: 75ch; }
+.rp-terms { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; font-size: 14px; }
+.rp-terms dt { font-weight: 600; } .rp-terms dd { margin: 0; color: var(--ink2); }
+@media (max-width: 700px) {
+  .rp-wide { display: none; }
+  .rp-narrow { display: block; }
+  .rp h1 { font-size: 1.7rem; }
+  .rp-basis, .rp-terms { grid-template-columns: minmax(0, 1fr); gap: 0 0; }
+  .rp-basis dd, .rp-terms dd { margin-bottom: 6px; }
+  .rp-tw.more::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 28px; background: linear-gradient(90deg, rgba(255,255,255,0), #ffffff); pointer-events: none; }
+  .rp tbody th, .rp thead th:first-child { position: sticky; left: 0; background: var(--ground); }
+  .ch-menu a:not(:first-child) { display: none; }
+  .ch-band__in { height: 48px; }
+}
+
+/* Print: the archival PDF (standard, section 11 and Appendix D) */
+@page { size: A4; margin: 18mm 18mm 20mm;
+  @bottom-left { content: "Carlo Hofer \00B7  Rules-based portfolio \00B7  Quarterly report, ISSUE"; font: 8pt/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #6b7280; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #6b7280; } }
+@page :first { margin-top: 12mm; }
+@media print {
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-size: 10.5pt; line-height: 1.45; }
+  .ch-band__in { height: 11mm; padding: 0 5mm; max-width: none; }
+  .ch-word { font-size: 12pt; }
+  .ch-menu, .ch-back, .rp-noprint { display: none; }
+  .rp, .ch-foot > div { max-width: none; padding-left: 0; padding-right: 0; }
+  .rp-kicker { font-size: 10pt; margin-top: 8mm; }
+  .rp h1 { font-size: 22pt; }
+  .rp-stamp { font-size: 8.5pt; }
+  .rp-basis, .rp-errata, .rp-terms { font-size: 9pt; }
+  .rp h2 { font-size: 14pt; margin-top: 8mm; break-after: avoid; }
+  .rp-ex h3, .rp-note h3 { font-size: 10.5pt; break-after: avoid; }
+  .rp-ex .cap, .rp-ex .basis { font-size: 9pt; }
+  .rp-ex .src { font-size: 8pt; }
+  .rp-ex .src code { font-size: 8pt; }
+  .rp table { font-size: 9pt; }
+  .rp-ex, .rp-basis, .rp-errata, .rp-sign, tr { break-inside: avoid; }
+  p { orphans: 3; widows: 3; }
+  .rp-scroll { overflow: visible; }
+  .rp-wide { display: block; }
+  .rp-narrow { display: none; }
+  .rp-tw::after { display: none; }
+  .ch-foot { background: none; border-top: 1px solid var(--rule); font-size: 8pt; margin-top: 8mm; }
+  .ch-foot > div { padding: 3mm 0 0; }
+}

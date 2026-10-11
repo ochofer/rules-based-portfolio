@@ -111,6 +111,7 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
         costs = pd.DataFrame(columns=list(COST_COLUMNS))
         written.append(_write(pd.DataFrame(columns=["month"]), "metrics_monthly.csv", as_of, out_dir))
     written.append(_write(costs, "costs_monthly.csv", as_of, out_dir))
+    written.append(_write(metrics.quarters(records, table, values, placed, today), "quarters.csv", as_of, out_dir))
     impl = table[["implementation_cost_bps"]].dropna().reset_index()
     written.append(_write(impl, "implementation_cost.csv", as_of, out_dir))
     now_frame = pd.DataFrame(

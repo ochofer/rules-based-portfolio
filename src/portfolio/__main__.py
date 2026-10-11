@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import sys
 from datetime import date, datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -292,6 +293,40 @@ def cmd_privacy(args) -> int:
     return 0
 
 
+def cmd_quarterly(args) -> int:
+    from . import quarterly
+
+    if args.check:
+        if not quarterly.issues():
+            print(f"No issue in {quarterly.FOLDER}/ yet.")
+            return 0
+        faults = quarterly.check()
+        for fault in faults:
+            print(fault)
+        print("Every issue rebuilds from its commit, and each PDF carries its page's words, title and author."
+              if not faults else f"{len(faults)} fault(s) in the quarterly reports.")  # fmt: skip
+        return 1 if faults else 0
+    if not args.quarter:
+        raise ValueError("name the quarter, for example 2026-Q4")
+    quarter = quarterly.parse_quarter(args.quarter)
+    root = Path(args.root) if args.root else config.ROOT
+    if args.print:
+        page = root / quarterly.FOLDER / f"{quarterly.label(quarter)}.html"
+        printed = args.printed or date.today()
+        out = quarterly.print_pdf(page, printed, Path(args.font) if args.font else None)
+        print(f"Printed {quarterly.FOLDER}/{out.name}.")
+        return 0
+    if not args.commit:
+        raise ValueError("name the commit whose tables the issue is built from, with --commit")
+    if args.stdout:
+        sys.stdout.write(quarterly.build(root, quarter, args.commit))
+        return 0
+    # The page is built from the commit's own tree, so the working tree cannot slip into it.
+    path = quarterly.write(root, quarter, args.commit, quarterly.build_at(root, quarter, args.commit))
+    print(f"Issue written to {quarterly.FOLDER}/{path.name}, from the tables of commit {args.commit}.")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="python3 -m portfolio")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -299,10 +334,19 @@ def main(argv=None) -> int:
         p = sub.add_parser(name)
         p.add_argument("--date", type=lambda s: datetime.strptime(s, "%Y-%m-%d").date())
         p.add_argument("--refresh", action="store_true")
+    q = sub.add_parser("quarterly")
+    q.add_argument("quarter", nargs="?")
+    q.add_argument("--commit")
+    q.add_argument("--root")
+    q.add_argument("--stdout", action="store_true")
+    q.add_argument("--check", action="store_true")
+    q.add_argument("--print", action="store_true")
+    q.add_argument("--printed", type=lambda s: datetime.strptime(s, "%Y-%m-%d").date())
+    q.add_argument("--font")
     args = parser.parse_args(argv)
     try:
         commands = {"check": cmd_check, "status": cmd_status, "cycle": cmd_cycle, "post": cmd_post, "note": cmd_note,
-                    "build": cmd_build, "privacy": cmd_privacy}  # fmt: skip
+                    "build": cmd_build, "privacy": cmd_privacy, "quarterly": cmd_quarterly}  # fmt: skip
         return commands[args.command](args)
     except (
         ledger_module.LedgerError,

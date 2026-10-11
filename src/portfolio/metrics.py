@@ -101,6 +101,40 @@ def money_weighted_cumulative(ledger: Ledger, day: pd.Timestamp, value: float) -
     return (1 + money_weighted(ledger, day, value)) ** years - 1
 
 
+def money_weighted_between(ledger: Ledger, start_day, start_value: float, end_day: pd.Timestamp, end_value: float) -> float:
+    """The money-weighted return over a period, not per year: the value at the start of the period as the first
+    flow, the contributions made after its close, and the value at the end. With no start day the period opens
+    with the first contribution, and the figure is money_weighted_cumulative's."""
+    if start_day is None:
+        return money_weighted_cumulative(ledger, end_day, end_value)
+    flows = [(pd.Timestamp(start_day).date(), -float(start_value))]
+    flows += [(c.moment.date(), -c.amount_eur) for c in ledger.contributions.itertuples()
+              if pd.Timestamp(start_day).date() < c.moment.date() <= end_day.date()]  # fmt: skip
+    flows.append((end_day.date(), float(end_value)))
+    years = (flows[-1][0] - flows[0][0]).days / 365.25
+    if years <= 0:
+        return float("nan")
+    t = np.array([(d - flows[0][0]).days / 365.25 for d, _ in flows])
+    a = np.array([x for _, x in flows])
+
+    def npv(g):  # g is the rate per year, continuously compounded
+        with np.errstate(over="ignore", invalid="ignore"):
+            return float(np.sum(a * np.exp(-g * t)))
+
+    low, high = -1.0, 1.0
+    while npv(high) > 0 and high < 1e4:
+        high *= 2
+    while npv(low) < 0 and low > -1e4:
+        low *= 2
+    for _ in range(200):
+        mid = (low + high) / 2
+        if npv(mid) > 0:
+            low = mid
+        else:
+            high = mid
+    return float(np.expm1(mid * years))
+
+
 def _years(ledger: Ledger, day: pd.Timestamp) -> float:
     return (day.date() - ledger.contributions.iloc[0]["moment"].date()).days / 365.25
 
@@ -320,6 +354,63 @@ def monthly(
         r = frame["return_month"]
         frame["volatility_12m"] = r.rolling(12).std(ddof=1) * np.sqrt(12)
     return frame
+
+
+def quarters(ledger: Ledger, table: pd.DataFrame, values: pd.DataFrame, placed: pd.DataFrame, today: date) -> pd.DataFrame:
+    """One row per calendar quarter since the first purchase, the figures of the quarterly report: the
+    quarter's returns from the last valuation day of the quarter before (or the base) to its own last one, and
+    the record since the first purchase to the same day. Shares, basis points and counts only."""
+    days = table.index[1:]
+    if not len(days):
+        return pd.DataFrame()
+    base = table.index[0]
+    first_month = pd.Period(ledger.contributions.iloc[0]["moment"].date(), "M")
+    blend = table["growth_index_blend"]
+    rows = []
+    for quarter in pd.period_range(pd.Period(days[0], "Q"), pd.Period(days[-1], "Q"), freq="Q"):
+        in_quarter = days[days.to_period("Q") == quarter]
+        if not len(in_quarter):
+            continue
+        end = in_quarter.max()
+        before = days[days < in_quarter.min()]
+        start = before.max() if len(before) else base
+
+        def ret(column, a=start, b=end):
+            return table.loc[b, column] / table.loc[a, column] - 1
+
+        quarter_blend = blend.loc[start:end].dropna()
+        to_date_blend = blend.loc[:end].dropna()
+        months = [m for m in pd.period_range(quarter.asfreq("M", "s"), quarter.asfreq("M", "e"), freq="M") if m >= first_month]
+        since_months = len(pd.period_range(first_month, quarter.asfreq("M", "e"), freq="M"))
+        value_end = float(values.loc[end, "value_eur"])
+        start_value = None if start == base else float(values.loc[start, "value_eur"])
+        dated = placed["date"] if len(placed) else pd.Series(dtype="datetime64[ns]")
+        years = _years(ledger, end)
+        rows.append({
+            "quarter": str(quarter), "first_day": in_quarter.min(), "last_day": end,
+            "complete": "yes" if quarter.end_time.date() < today else "to date", "months": len(months),
+            "return_time_weighted": ret("growth_portfolio"),
+            "return_money_weighted": money_weighted_between(ledger, None if start == base else start, start_value, end, value_end),
+            "return_reference_a": ret("growth_reference_a"), "return_reference_b": ret("growth_reference_b"),
+            "return_index_blend": quarter_blend.iloc[-1] / quarter_blend.iloc[0] - 1 if len(quarter_blend) > 1 else np.nan,
+            "index_blend_from": quarter_blend.index[0] if len(quarter_blend) > 1 else pd.NaT,
+            "worst_fall": -float(table.loc[in_quarter, "drawdown_portfolio"].min()),
+            "implementation_cost_bps": table.loc[end, "implementation_cost_bps"] - table.loc[start, "implementation_cost_bps"],
+            "orders": int(((dated >= quarter.start_time) & (dated <= quarter.end_time)).sum()),
+            "allowance": config.ORDERS_PER_MONTH * len(months),
+            "return_time_weighted_since_start": table.loc[end, "growth_portfolio"] / 100 - 1,
+            "return_money_weighted_since_start": money_weighted_cumulative(ledger, end, value_end),
+            "money_weighted_per_year_since_start": money_weighted(ledger, end, value_end) if years >= 1 else np.nan,
+            "return_reference_a_since_start": table.loc[end, "growth_reference_a"] / 100 - 1,
+            "return_reference_b_since_start": table.loc[end, "growth_reference_b"] / 100 - 1,
+            "return_index_blend_since_start": to_date_blend.iloc[-1] / to_date_blend.iloc[0] - 1 if len(to_date_blend) > 1 else np.nan,
+            "index_blend_since": to_date_blend.index[0] if len(to_date_blend) > 1 else pd.NaT,
+            "worst_fall_to_date": -float(table.loc[:end, "drawdown_portfolio"].min()),
+            "implementation_cost_since_start_bps": table.loc[end, "implementation_cost_bps"],
+            "orders_since_start": int((dated <= quarter.end_time).sum()),
+            "allowance_since_start": config.ORDERS_PER_MONTH * since_months,
+        })  # fmt: skip
+    return pd.DataFrame(rows)
 
 
 # The departures register: each departure from the rules, one row, with the rule, what happened and what

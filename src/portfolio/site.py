@@ -19,6 +19,7 @@ from . import config, trading_days
 from . import risk as risk_module
 from . import formatting as fmt
 from . import notes as notes_module
+from . import quarterly as quarterly_module
 
 SITE_URL = "https://www.carlohofer.com/"
 PROJECTS_URL = SITE_URL + "projects/"
@@ -1556,6 +1557,46 @@ def _report_html(text: str) -> tuple:
     return title.lstrip("# ").strip(), html_body
 
 
+def _quarterly_issues(root: Path = None) -> list:
+    """The issues of the quarterly report under quarterly/, newest first, each as (issue number, period in
+    words, figures as of, commit, page path, [(print date, pdf path)])."""
+    root = Path(root or config.ROOT)
+    found = []
+    for name, path, pdfs in quarterly_module.issues(root):
+        text = path.read_text(encoding="utf-8")
+        number = re.search(r"Issue (\d+) &middot; Figures as of (\d{4}-\d\d-\d\d)", text)
+        period = re.search(r"<h1>(.*?)</h1>", text)
+        commit = re.search(r'<meta name="commit" content="([0-9a-f]+)">', text)
+        prints = [(pdf.stem.split("_", 1)[1], pdf.relative_to(root).as_posix()) for pdf in pdfs]
+        found.append((int(number.group(1)), html.unescape(period.group(1)), number.group(2), commit.group(1),
+                      path.relative_to(root).as_posix(), prints))  # fmt: skip
+    return found
+
+
+def _log_quarterly(page, issues, orders):
+    page.add("log", _section("Quarterly reports", "log-quarterly",
+             sub="One report a quarter, kept as issued, with the PDF printed from it"))  # fmt: skip
+    if not issues:
+        empty = "The first report follows the first quarter end after the first purchase."
+        if len(orders):
+            first = pd.Timestamp(orders["date"].min())
+            end = pd.Period(first, "Q").end_time.normalize()
+            after = end + pd.Timedelta(days=1)
+            day = trading_days.cycle_day(after.year, after.month)
+            empty = (f"The first report covers {quarterly_module._period_words(first, end)} and is published after the "
+                     f"cycle day of {fmt.day_words(day)}.")  # fmt: skip
+        page.add("log", _card("quarterly", "Quarterly reports", "", None, plot=False, wide=True, empty=empty))
+        return
+    items = []
+    for number, period, as_of, commit, path, prints in issues:
+        pdfs = "".join(f' &middot; <a href="{_esc(pdf)}">PDF, printed {_esc(day)}</a>' for day, pdf in prints)
+        items.append(f'<li><a href="{_esc(path)}">Issue {number}, {_esc(period)}</a>{pdfs}'
+                     f'<span class="asof">Figures as of {_esc(as_of)}, from commit {_esc(commit)}</span></li>')  # fmt: skip
+    page.add("log", '<article class="card wide quarterly"><h3>Quarterly reports</h3><p class="note">Each issue is built '
+             "once from the tables at the commit it names and is never rebuilt. A correction goes in the next issue as "
+             f'an erratum.</p><ul class="issues">{"".join(items)}</ul><p class="source">Source: <code>quarterly/</code></p></article>')  # fmt: skip
+
+
 def _log_notes(page, notes_list, next_cycle):
     page.add("log", _section("Monthly notes", "log-notes", sub="Written after each cycle day, newest first"))
     if not notes_list:
@@ -1600,7 +1641,9 @@ def _log_register(page, register):
              empty=None if rows else "No departure from the rules so far.").replace('<p class="source">', (table if rows else "") + '<p class="source">', 1))  # fmt: skip
 
 
-def log(page, monthly, notes_list=(), reports=None, orders=pd.DataFrame(), register=pd.DataFrame(), next_cycle=""):
+def log(page, monthly, notes_list=(), reports=None, orders=pd.DataFrame(), register=pd.DataFrame(), next_cycle="",
+        issues=()):  # fmt: skip
+    _log_quarterly(page, list(issues), orders)
     _log_notes(page, list(notes_list), next_cycle)
     _log_reports(page, reports or {}, orders, next_cycle)
     _log_register(page, register)
@@ -1735,7 +1778,7 @@ def build(out_dir: Path = None) -> Path:
     simulations(page, simulated["history"], simulated["paths"], monthly)
     reports = {p.stem: p.read_text(encoding="utf-8") for p in sorted(config.CYCLES_DIR.glob("*.md"))} if config.CYCLES_DIR.exists() else {}
     log(page, monthly, notes_module.read(), reports, orders, out.get("departures.csv", pd.DataFrame()),
-        _next_cycle_day(out["allocation_now.csv"].iloc[0]))  # fmt: skip
+        _next_cycle_day(out["allocation_now.csv"].iloc[0]), _quarterly_issues())  # fmt: skip
     _check_roles(page.charts, palette)
     _number(page.sections)
 
@@ -1764,7 +1807,8 @@ def build(out_dir: Path = None) -> Path:
                        + _link("simulations-paths", "the resampled paths")
                        + ". Every chart here is a simulation on index returns, gross of costs. None is the portfolio's "
                        "record, which starts in October 2026.",
-        "log": "The record of each month, in four parts: " + _link("log-notes", "the monthly notes") + ", "
+        "log": "The record of each quarter and month, in five parts: " + _link("log-quarterly", "the quarterly reports")
+               + ", " + _link("log-notes", "the monthly notes") + ", "
                + _link("log-cycles", "the cycle reports") + ", " + _link("log-departures", "the departures register")
                + " and " + _link("log-table", "the monthly table") + ", which holds every figure behind the tiles and charts.",
     }  # fmt: skip
