@@ -16,6 +16,7 @@ from pathlib import Path
 import pandas as pd
 
 from . import config, trading_days
+from . import risk as risk_module
 from . import formatting as fmt
 from . import notes as notes_module
 
@@ -854,6 +855,34 @@ def _risk_tiles(page, summary, boot, weight_equity, monthly):
              '<code>outputs/risk_summary.csv</code>, <code>mandate/simulation_bootstrap.csv</code></p></div>')  # fmt: skip
 
 
+def _tail_tiles(page, summary):
+    """One-month value at risk and expected shortfall at 95 per cent, historical beside normal, and from month 12
+    the months beyond the value at risk set at the month end before."""
+    months = int(summary["months_with_value_at_risk"]) if pd.notna(summary.get("months_with_value_at_risk")) else 0
+    if months >= risk_module.CALIBRATION_FROM:
+        beyond = int(summary["months_beyond_value_at_risk"])
+        count = f"{beyond} of {months} months beyond it, against {months * risk_module.TAIL:.1f} expected"
+    else:
+        count = "Months beyond it counted from October 2027"
+    monthly = fmt.pct(summary["estimated_volatility"] / 12**0.5)
+    tiles = [("Value at risk, historical", fmt.pct(summary["value_at_risk_historical"]), f"The sixth worst of 120 months. {count}"),
+             ("Expected shortfall, historical", fmt.pct(summary["expected_shortfall_historical"]), "The mean loss of those six months"),
+             ("Value at risk, normal", fmt.pct(summary["value_at_risk_normal"]), f"1.645 times the monthly volatility of {monthly}"),
+             ("Expected shortfall, normal", fmt.pct(summary["expected_shortfall_normal"]), "The normal mean loss beyond that point")]  # fmt: skip
+    tile_html = "".join(f'<div class="tile"><p class="name">{_esc(n)}</p><div class="value">{_esc(v)}</div>'
+                        f'<div class="change">{_esc(c)}</div></div>' for n, v, c in tiles)  # fmt: skip
+    line = (f"Losses over one month at 95 per cent, at the look-through weights of {fmt.day_words(summary['weights_as_of'])}, "
+            f"on {_window_text(summary)}. The historical value at risk is the sixth worst of the 120 months and the expected "
+            "shortfall the mean of those six. The normal figures, with zero mean, are 1.645 times the monthly volatility and "
+            f"the normal tail mean. The window holds 2020 and 2022 and neither 2008 nor 2000 to 2003, which {_ref('stress')} "
+            "holds. Not a limit, and never a reason to sell, under rule 8, since the mandate binds on the worst fall over "
+            "years. Each month end's value at risk is kept as first written, in outputs/ex_ante_risk.csv, and twelve months "
+            "give the count of months beyond it almost no power. It starts to say something at about sixty.")  # fmt: skip
+    page.add("lookthrough", f'<div class="wide"><div class="tiles four">{tile_html}</div><p class="tilenote">{_esc(line)}</p>'
+             '<p class="source">Estimated on index returns, at today\'s weights, and not the record. Source: '
+             '<code>outputs/risk_summary.csv</code>, <code>outputs/ex_ante_risk.csv</code></p></div>')  # fmt: skip
+
+
 def _correlation_heatmap(page, components, pairs, summary):
     names = [c for c in components["component"] if c != "Cash"]
     matrix = pairs.pivot(index="component_a", columns="component_b", values="correlation").loc[names, names]
@@ -986,6 +1015,7 @@ def risk_view(page, out, boot, monthly):
     page.add("lookthrough", _section("Risk of the whole portfolio", "lookthrough-risk-section",
              sub="Estimated on index returns at the look-through weights"))  # fmt: skip
     _risk_tiles(page, summary, boot, out["allocation_now.csv"].iloc[0]["weight_equity"], monthly)
+    _tail_tiles(page, summary)
     components = out["risk_components.csv"]
     _correlation_heatmap(page, components, out["risk_correlation.csv"], summary)
     _risk_contributions(page, components, summary)

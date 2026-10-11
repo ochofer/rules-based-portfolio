@@ -69,6 +69,8 @@ EPISODES = (
     ("2022", "2021-12", "2022-12"),
 )
 CALIBRATION_FROM = 12  # months of the record before the forecast's calibration is shown
+TAIL = 0.05  # value at risk and expected shortfall at 95 per cent, over one month
+Z95 = 1.6448536269514722  # the normal quantile at 95 per cent
 
 
 # Sources -------------------------------------------------------------------------------------------
@@ -351,19 +353,49 @@ def _series_text(from_test: list) -> str:
     return f"the components, and the allocation test's series for the {'equity' if from_test[0] == config.EQUITY else 'bond'} sleeve"
 
 
-def record_estimate(history: pd.DataFrame, month_end: pd.Period, value: float, start: pd.Period, first_purchase) -> pd.DataFrame:
-    """The record of the estimated volatility at each month end, kept as it was first written: a month end is
-    added once, at the first build after it, and never rewritten."""
-    columns = ["month_end", "estimated_volatility", "window_start", "window_end"]
-    history = history[columns] if len(history) else pd.DataFrame(columns=columns)
+def tail(window_returns: pd.DataFrame, weights: pd.Series, volatility_a_year: float) -> dict:
+    """One-month value at risk and expected shortfall at 95 per cent, at the given weights (cash earns nothing).
+    Historical: the portfolio's return in each month of the window at today's weights, the value at risk the
+    loss of the sixth worst of 120 months and the expected shortfall the mean loss of those six. Normal: from the
+    covariance's monthly volatility with zero mean, 1.645 times it and the normal mean beyond that point."""
+    names = [c for c in window_returns.columns if c in weights.index]
+    returns = (window_returns[names] * weights[names]).sum(axis=1).sort_values()
+    worst = max(int(round(TAIL * len(returns))), 1)
+    monthly = volatility_a_year / np.sqrt(12)
+    density = np.exp(-Z95 * Z95 / 2) / np.sqrt(2 * np.pi)
+    return {"value_at_risk_historical": float(-returns.iloc[worst - 1]),
+            "expected_shortfall_historical": float(-returns.iloc[:worst].mean()),
+            "value_at_risk_normal": float(Z95 * monthly), "expected_shortfall_normal": float(monthly * density / TAIL),
+            "tail_months": worst}  # fmt: skip
+
+
+def record_estimate(history: pd.DataFrame, month_end: pd.Period, value: float, start: pd.Period, first_purchase,
+                    value_at_risk: float = float("nan")) -> pd.DataFrame:  # fmt: skip
+    """The record of the estimated volatility and the historical value at risk at each month end, kept as they
+    were first written: a month end is added once, at the first build after it, and never rewritten."""
+    columns = ["month_end", "estimated_volatility", "value_at_risk", "window_start", "window_end"]
+    history = history.reindex(columns=columns) if len(history) else pd.DataFrame(columns=columns)
     if month_end >= pd.Period(pd.Timestamp(first_purchase), "M") and str(month_end) not in set(history["month_end"].astype(str)):
-        row = {"month_end": str(month_end), "estimated_volatility": value, "window_start": str(start), "window_end": str(month_end)}
+        row = {"month_end": str(month_end), "estimated_volatility": value, "value_at_risk": value_at_risk,
+               "window_start": str(start), "window_end": str(month_end)}  # fmt: skip
         history = pd.concat([history, pd.DataFrame([row])], ignore_index=True) if len(history) else pd.DataFrame([row])
     history = history.reset_index(drop=True)
-    history["estimated_volatility"] = history["estimated_volatility"].astype(float)
+    for column in ("estimated_volatility", "value_at_risk"):
+        history[column] = history[column].astype(float)
     for column in ("month_end", "window_start", "window_end"):
         history[column] = history[column].astype(str)
-    return history
+    return history[columns]
+
+
+def exceedances(history: pd.DataFrame, monthly: pd.DataFrame) -> tuple:
+    """The months whose loss exceeded the value at risk set at the month end before, and the months that had
+    one: a count, with no test."""
+    if not len(history) or not len(monthly):
+        return 0, 0
+    limit = {pd.Period(m, "M") + 1: v for m, v in zip(history["month_end"], history["value_at_risk"]) if pd.notna(v)}
+    done = monthly[monthly["complete"] == "yes"]
+    pairs = [(r, limit[pd.Period(m, "M")]) for m, r in zip(done["month"], done["return_month"]) if pd.Period(m, "M") in limit]
+    return sum(1 for r, v in pairs if -r > v), len(pairs)
 
 
 def calibration(history: pd.DataFrame, monthly: pd.DataFrame) -> tuple:

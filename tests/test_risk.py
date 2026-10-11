@@ -149,6 +149,30 @@ def test_the_record_of_the_estimate_is_written_once_and_never_rewritten():
     assert list(later["month_end"]) == ["2026-10", "2026-11"] and list(later["estimated_volatility"]) == [0.10, 0.11]
 
 
+def test_the_tail_figures_are_the_sixth_worst_month_and_the_normal_quantile():
+    window = sample()
+    weights = pd.Series([0.47, 0.09, 0.05, 0.08, 0.13, 0.09, 0.08, 0.01], index=NAMES + [risk.CASH])
+    t = risk.tail(window, weights, 0.1008)
+    returns = np.sort((window[NAMES] * weights[NAMES]).sum(axis=1).values)
+    assert t["tail_months"] == 6
+    assert t["value_at_risk_historical"] == pytest.approx(-returns[5])
+    assert t["expected_shortfall_historical"] == pytest.approx(-returns[:6].mean())
+    monthly = 0.1008 / np.sqrt(12)
+    assert t["value_at_risk_normal"] == pytest.approx(1.6448536 * monthly)
+    assert t["expected_shortfall_normal"] == pytest.approx(monthly * 2.0627128)  # the normal density at 1.645, over 0.05
+    assert round(t["value_at_risk_normal"] * 100, 1) == 4.8 and round(t["expected_shortfall_normal"] * 100, 1) == 6.0
+
+
+def test_the_months_beyond_the_value_at_risk_are_counted_against_the_value_set_the_month_before():
+    history = pd.DataFrame({"month_end": ["2026-10", "2026-11", "2026-12"], "value_at_risk": [0.05, 0.05, np.nan]})
+    monthly = pd.DataFrame({"month": ["2026-11", "2026-12", "2027-01"], "complete": "yes",
+                            "return_month": [-0.06, -0.04, -0.09]})  # fmt: skip
+    assert risk.exceedances(history, monthly) == (1, 2)  # January has no value at risk set before it
+    record = risk.record_estimate(pd.DataFrame(), pd.Period("2026-10", "M"), 0.10, pd.Period("2016-11", "M"), "2026-10-08", 0.05)
+    again = risk.record_estimate(record, pd.Period("2026-10", "M"), 0.20, pd.Period("2016-11", "M"), "2026-10-08", 0.09)
+    assert list(again["value_at_risk"]) == [0.05]
+
+
 def test_the_forecasts_calibration_is_the_spread_of_returns_over_their_forecasts():
     history = pd.DataFrame({"month_end": [str(p) for p in pd.period_range("2026-10", periods=14, freq="M")],
                             "estimated_volatility": np.linspace(0.08, 0.12, 14)})  # fmt: skip
@@ -242,6 +266,9 @@ def test_the_committed_portfolio_point_reproduces_from_the_look_through_weights(
     w = components.loc[names, "weight"].values
     assert np.sqrt(w @ (rho * np.outer(vol, vol)) @ w) == pytest.approx(summary["estimated_volatility"], abs=1e-8)
     assert w @ components.loc[names, "estimated_return"].values == pytest.approx(summary["estimated_return"], abs=1e-8)
+    monthly = summary["estimated_volatility"] / np.sqrt(12)
+    assert summary["value_at_risk_normal"] == pytest.approx(risk.Z95 * monthly, abs=1e-9)
+    assert summary["expected_shortfall_historical"] >= summary["value_at_risk_historical"] > 0
     frontier = committed("risk_frontier.csv")
     current = frontier[frontier["window"] == "current"]
     assert current["estimated_volatility"].iloc[0] == pytest.approx(summary["minimum_variance_volatility"], abs=1e-8)

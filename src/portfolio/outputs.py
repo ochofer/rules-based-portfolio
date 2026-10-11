@@ -210,8 +210,11 @@ def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, re
     history_path = out_dir / "ex_ante_risk.csv"
     history = pd.read_csv(history_path).drop(columns=["as_of"], errors="ignore") if history_path.exists() else pd.DataFrame()
     first_purchase = records.orders["moment"].min()
-    history = risk.record_estimate(history, end, estimate, current.index[0], first_purchase)
+    tails = risk.tail(current, weights, estimate)
+    history = risk.record_estimate(history, end, estimate, current.index[0], first_purchase,
+                                   tails["value_at_risk_historical"])
     calibration, calibration_months = risk.calibration(history, monthly)
+    beyond, beyond_months = risk.exceedances(history, monthly)
     complete = monthly[monthly["complete"] == "yes"] if len(monthly) else monthly
     realised = float(complete["volatility_12m"].iloc[-1]) if len(complete) else float("nan")
     summary = pd.DataFrame([{**window_text, "earlier_window_start": str(earlier.index[0]),
@@ -220,7 +223,8 @@ def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, re
                              "minimum_variance_volatility": float(np.sqrt(minimum @ cov @ minimum)),
                              "minimum_variance_return": float(mean @ minimum), "israel_share_of_portfolio": israel,
                              "cash_weight": weights[risk.CASH], "calibration": calibration,
-                             "calibration_months": calibration_months, "realised_volatility_12m": realised}])  # fmt: skip
+                             "calibration_months": calibration_months, "realised_volatility_12m": realised,
+                             **tails, "months_beyond_value_at_risk": beyond, "months_with_value_at_risk": beyond_months}])  # fmt: skip
     test = risk.allocation_test_returns()
     episodes = risk.stress(components, test, weights)
     kids = risk.fetch_kids(refresh)
