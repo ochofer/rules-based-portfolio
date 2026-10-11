@@ -100,6 +100,10 @@ section.view > p.lead a { color: var(--link); font-weight: 600; }
 .tile .name { font-size: 0.8rem; color: var(--ink2); margin: 0 0 4px; }
 .tile .value { font-size: 1.6rem; font-weight: 600; line-height: 1.15; }
 .tile .change { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+/* The name, the value and the note line up across the tiles of a row, whichever label wraps. */
+@supports (grid-template-rows: subgrid) {
+  .tile { display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 0; }
+}
 .tilenote { font-size: 0.84rem; color: var(--ink2); margin: 8px 0 0; }
 .tiles.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .tiles.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
