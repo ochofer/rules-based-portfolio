@@ -36,6 +36,7 @@ def test_a_note_in_the_form_reads(tmp_path):
         ("2026-11.md", note_text(title="# Note for November"), "first line"),
         ("2026-11.md", note_text(cycle=notes.CYCLE_DAY + ": 2026-12-07."), "is not in"),
         ("2026-11.md", note_text(body=BODY + " The band will hold."), "looks forward"),
+        ("2026-11.md", note_text(body=BODY + " Each order was placed as the rules require."), "claims more than the record"),
         (
             "2026-11.md",
             notes.draft(pd.Period("2026-11", "M"), "2026-11-05", "Band not triggered."),

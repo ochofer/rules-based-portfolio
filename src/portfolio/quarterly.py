@@ -28,6 +28,7 @@ import tempfile
 import unicodedata
 from collections import Counter
 from dataclasses import dataclass
+from decimal import Decimal
 from datetime import date
 from html.parser import HTMLParser
 from pathlib import Path
@@ -45,6 +46,7 @@ WORDS = (150, 300)
 AUTHOR = "Carlo Hofer"
 PROJECT_URL = "https://www.carlohofer.com/projects/rules-based-portfolio/"
 SITE_URL = "https://www.carlohofer.com/"
+FAVICON_URL = SITE_URL + "images/favicon.svg"
 CLOSING = ("A record of five to ten years cannot show that one set of rules is better than another, so the returns "
            "are not offered as evidence for the rules.")  # fmt: skip
 SANS = "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif"
@@ -56,6 +58,7 @@ WIDE, NARROW = 658, 340
 # The fields of the PDF's document information: the title and dates, the author, and the printing tool.
 INFO_FIELDS = {"Title", "Author", "Creator", "Producer", "CreationDate", "ModDate"}
 DATED = re.compile(r"^Dated: (\d{4}-\d{2}-\d{2})$")
+COMPLIANCE = notes_module.COMPLIANCE  # the record shows each order and the departures register, no more
 
 
 class ReportError(ValueError):
@@ -127,14 +130,39 @@ def parse_commentary(path: Path, quarter: pd.Period) -> Commentary:
     forward = notes_module.FORWARD.search(body)
     if forward:
         raise ReportError(f"{name}: '{forward.group(0)}' looks forward, and the commentary looks back")
+    claim = COMPLIANCE.search(body)
+    if claim:
+        raise ReportError(f"{name}: '{claim.group(0)}' claims more than the record shows, which is each order and the "
+                          "departures register. Write what the register holds")  # fmt: skip
     if notes_module.DRAFT_MARK in body:
         raise ReportError(f"{name}: the draft's placeholder is still in the commentary")
     return Commentary(day, tuple(blocks))
 
 
+# A figure is a number with its sign and its unit. "N per cent" and "N%" are one unit, and so are
+# "N basis points" and "N bp". A bare whole number, with no unit after it, is a year, a day or a count of
+# months and is not checked.
+_UNITS = (("%", r"\s?%|\s+per\s?cent\b|\s+percent\b"), ("bp", r"\s?bps?\b|\s+basis\s+points?\b"))
+_FIGURE = re.compile(r"(?<![\w.,])([+−-]?)(\d+(?:,\d{3})*(?:\.\d+)?)(" + "|".join(f"(?:{rx})" for _, rx in _UNITS) + r")?",
+                     re.I)  # fmt: skip
+
+
+@dataclass(frozen=True)
+class Figure:
+    written: str
+    sign: str  # "+", "-" or ""
+    value: Decimal
+    unit: str  # "%", "bp" or ""
+
+
 def _figures_in(text: str) -> list:
-    """The figures of a text: numbers with their sign and per cent sign, as written."""
-    return re.findall(r"[+−-]?\d+(?:[.,]\d+)?%?", text)
+    """The figures of a text, each with its sign, its value and its unit, as in 1.2%, "1.2 per cent", "−4 bp"."""
+    found = []
+    for m in _FIGURE.finditer(text):
+        sign, number, unit_text = m.group(1).replace("−", "-"), m.group(2), m.group(3) or ""
+        unit = next((name for name, rx in _UNITS if unit_text and re.fullmatch(rx, unit_text, re.I)), "")
+        found.append(Figure(m.group(0).strip(), sign, Decimal(number.replace(",", "")), unit))
+    return found
 
 
 # Charts ----------------------------------------------------------------------------------------------
@@ -452,9 +480,9 @@ class Issue:
             departures["date"] = pd.to_datetime(departures["date"])
             departures = departures[(departures["date"] >= self.quarter.start_time) & (departures["date"] <= self.quarter.end_time)]
         if len(departures):
-            gone = "The departures from the rules in the quarter are in the table after this one."
+            gone = "The departures register's entries for the quarter are in the table after this one."
         else:
-            gone = "No order departed from the rules in the quarter."
+            gone = "The departures register has no entry for the quarter."
         caption = (f"Every order of the quarter, {len(rows)} against the allowance of {int(self.row['allowance'])}, "
                    f"with the rule that produced it and the checks of rule 7. {gone}")  # fmt: skip
         body = _table(["Date", "Sleeve", "Side", "Rule", "Inside 15:45 to 17:00", "Bid and ask recorded"], rows, numeric_from=9)
@@ -614,6 +642,32 @@ def _errata(root: Path, quarter: pd.Period) -> str:
     return f'<div class="rp-errata"><strong>Errata</strong> {items}</div>'
 
 
+def image_size(path: Path) -> tuple:
+    """The width and height of a PNG picture, read from its header."""
+    data = Path(path).read_bytes()[:24]
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ReportError(f"{Path(path).name} is not a PNG picture")
+    return int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
+
+
+def _preview(root: Path, quarter: pd.Period, period: str) -> str:
+    """The issue's own preview tags and favicon link, written once, since the page is never rebuilt."""
+    picture = Path(root) / config.PREVIEW_IMAGE
+    if not picture.exists():
+        raise ReportError(f"{label(quarter)}: the preview picture {config.PREVIEW_IMAGE} is not in the tree")
+    width, height = image_size(picture)
+    description = (f"Quarterly report of a personal portfolio run under written rules, {period}: returns, allocation, "
+                   "orders, costs, look-through and risk.")  # fmt: skip
+    tags = [("name", "description", description), ("property", "og:type", "website"),
+            ("property", "og:title", f"Quarterly report, {quarter_name(quarter)} \u00b7 Rules-based portfolio"),
+            ("property", "og:description", description),
+            ("property", "og:url", f"{config.DASHBOARD_URL}{FOLDER}/{label(quarter)}.html"),
+            ("property", "og:image", config.DASHBOARD_URL + config.PREVIEW_IMAGE), ("property", "og:image:width", str(width)),
+            ("property", "og:image:height", str(height)), ("name", "twitter:card", "summary_large_image")]  # fmt: skip
+    return (f'<link rel="icon" href="{FAVICON_URL}" type="image/svg+xml">\n'
+            + "".join(f'<meta {kind}="{key}" content="{html.escape(value)}">\n' for kind, key, value in tags))
+
+
 def build(root: Path, quarter: pd.Period, commit: str) -> str:
     """The page of one issue, from the tables, notes and commentary under root."""
     root = Path(root)
@@ -670,7 +724,7 @@ def build(root: Path, quarter: pd.Period, commit: str) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)}</title>
 <meta name="author" content="{AUTHOR}">
-<meta name="issue" content="{q_label}">
+{_preview(root, quarter, issue.period_words())}<meta name="issue" content="{q_label}">
 <meta name="commit" content="{html.escape(commit)}">
 <style>{css}</style>
 </head>
@@ -700,12 +754,17 @@ document.querySelectorAll(".rp-tw").forEach(function (t) {{
 
 
 def _figures_check(issue: Issue, exhibits_text: str) -> None:
-    """The commentary shows no figure that the issue does not."""
-    shown = set(_figures_in(exhibits_text))
-    shown |= {f.replace("−", "-") for f in shown} | {f.lstrip("+") for f in shown}
-    missing = [f for f in _figures_in(" ".join(issue.commentary.paragraphs)) if f not in shown and f.lstrip("+") not in shown]
-    years_and_days = [f for f in missing if re.fullmatch(r"\d{1,4}", f)]
-    missing = [f for f in missing if f not in years_and_days]
+    """The commentary shows no figure that the issue does not. A figure matches one of the issue's when its value
+    and unit are the same, written either way. A figure written without a sign matches either sign, as in "fell
+    0.1 per cent" against −0.1%, and one written with a sign matches only that sign."""
+    shown = _figures_in(exhibits_text)
+
+    def matches(f: Figure) -> bool:
+        return any(s.value == f.value and s.unit == f.unit and (not f.sign or f.sign == s.sign or (f.sign == "+" and not s.sign))
+                   for s in shown)  # fmt: skip
+
+    checked = [f for f in _figures_in(" ".join(issue.commentary.paragraphs)) if f.unit or f.value != f.value.to_integral_value()]
+    missing = [f.written for f in checked if not matches(f)]
     if missing:
         raise ReportError(f"{label(issue.quarter)}: the commentary shows {', '.join(missing)}, which the issue does not")
 

@@ -29,6 +29,13 @@ WORDS = (120, 200)
 # A note looks back. These words look forward, and a note that holds one stops the build.
 FORWARD = re.compile(r"\b(will|shall|expects?|expected|expecting|forecasts?|going to|next month|next year|"
                      r"outlook|predicts?|anticipates?)\b", re.I)  # fmt: skip
+# A note or a quarterly commentary cannot claim more than the record shows, which is each order and the
+# departures register. It says what the register holds.
+COMPLIANCE = re.compile(r"\bas the rules (?:are written|require|say)\b"
+                        r"|\b(?:followed|obeyed|kept to|complied with|respected) (?:the|its|all the|all) rules\b"
+                        r"|\b(?:every|each|all)\b[^.]{0,40}?\borders?(?:\s+[\w'’]+){0,3}?\s+(?:was|were) placed (?:as|inside|within|under|in line with|according to)\b"
+                        r"|\bno (?:order )?depart(?:ed|ures?) from (?:the )?rules?\b|\bwithout (?:a |any )?(?:departure|breach)\b|\bno breach(?:es)?\b",
+                        re.I)  # fmt: skip
 
 
 class NoteError(ValueError):
@@ -85,6 +92,10 @@ def parse(path: Path) -> Note:
     forward = FORWARD.search(body)
     if forward:
         raise NoteError(f"notes/{name}: '{forward.group(0)}' looks forward, and a note looks back")
+    claim = COMPLIANCE.search(body)
+    if claim:
+        raise NoteError(f"notes/{name}: '{claim.group(0)}' claims more than the record shows, which is each order and the "
+                        "departures register. Write what the register holds")  # fmt: skip
     return Note(str(month), day, blocks[1][len(FIGURES) :], body, Path(path))
 
 

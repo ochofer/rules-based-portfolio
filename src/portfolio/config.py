@@ -22,6 +22,7 @@ NOTES_DIR = ROOT / "notes"  # public: the monthly notes, written by hand after e
 SITE_DIR = ROOT / "site"  # public: the page template, its script and the palette
 REPOSITORY_URL = "https://github.com/ochofer/rules-based-portfolio"
 DASHBOARD_URL = "https://www.carlohofer.com/rules-based-portfolio/"
+PREVIEW_IMAGE = "og-portfolio.png"  # the link-preview picture at the root, for the dashboard and each quarterly issue
 
 EQUITY, BONDS = "equity", "bonds"
 SLEEVES = (EQUITY, BONDS)

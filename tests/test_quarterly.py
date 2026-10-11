@@ -14,8 +14,8 @@ from portfolio import config, metrics, quarterly, site
 
 Q4 = pd.Period("2026Q4", "Q")
 WORDS_160 = " ".join(
-    ["The portfolio ran under its rules through the quarter, and the record shows each order beside the rule that "
-     "produced it. The top-up bought the sleeve furthest below its target weight on each cycle day, and the band "
+    ["The top-up was invested on each cycle day of the quarter, and the record shows each order beside the rule "
+     "it was placed under. The top-up bought the sleeve furthest below its target weight on each cycle day, and the band "
      "was not reached, so no rebalancing was due. Prices moved within the range the mandate allows for, and the "
      "worst fall stayed far from the test limit. Costs came from the spread and the commissions, as the table of "
      "costs shows by month and source. The look-through moved with the markets, and the shares of the regions and "
@@ -111,6 +111,9 @@ def test_a_commentary_in_the_form_reads(tmp_path):
     ("Dated: 2027-01-05\n\nThe quarter was quiet.", "a commentary has 150 to 300 words"),
     (f"Dated: 2027-01-05\n\n{WORDS_160} The next quarter will be the same.", "looks forward"),
     (f"Dated: 2027-01-05\n\nWrite the note here. {WORDS_160}", "placeholder"),
+    (f"Dated: 2027-01-05\n\nThe quarter ran as the rules are written. {WORDS_160}", "claims more than the record shows"),
+    (f"Dated: 2027-01-05\n\n{WORDS_160} Every order was placed inside the window of rule 7.", "claims more than the record"),
+    (f"Dated: 2027-01-05\n\n{WORDS_160} No order departed from the rules.", "Write what the register holds"),
 ])  # fmt: skip
 def test_a_commentary_out_of_form_stops_the_issue(tmp_path, text, fault):
     with pytest.raises(quarterly.ReportError, match=fault):
@@ -122,14 +125,38 @@ def test_a_missing_commentary_stops_the_issue(tmp_path):
         quarterly.parse_commentary(tmp_path / "2026-Q4-commentary.txt", Q4)
 
 
-def test_the_commentary_shows_no_figure_the_issue_does_not():
+def figures_check(commentary, exhibits):
     issue = type("Issue", (), {})()
     issue.quarter = Q4
-    issue.commentary = quarterly.Commentary(pd.Timestamp("2027-01-05").date(), ("The equity weight ended at 70.4%.",))
-    quarterly._figures_check(issue, "Equity weight 70.4% at the end")
-    issue.commentary = quarterly.Commentary(pd.Timestamp("2027-01-05").date(), ("The equity weight ended at 71.2%.",))
-    with pytest.raises(quarterly.ReportError, match="71.2%"):
-        quarterly._figures_check(issue, "Equity weight 70.4% at the end")
+    issue.commentary = quarterly.Commentary(pd.Timestamp("2027-01-05").date(), (commentary,))
+    quarterly._figures_check(issue, exhibits)
+
+
+EXHIBITS = "Equity weight 70.4% at the end. Return, time-weighted −0.1%. Target 70.0%. Implementation cost +11 bp."
+
+
+@pytest.mark.parametrize("commentary", [
+    "The equity weight ended at 70.4%.",
+    "The equity weight ended at 70.4 per cent, against a target of 70 per cent.",
+    "The time-weighted return was −0.1 per cent, and the portfolio fell 0.1 per cent.",
+    "The implementation cost came to 11 basis points, or +11 bp.",
+    "The first cycle day of the quarter was 5 November 2026, and the record covers 3 months.",
+])  # fmt: skip
+def test_a_figure_the_issue_shows_passes_written_either_way(commentary):
+    figures_check(commentary, EXHIBITS)
+
+
+@pytest.mark.parametrize("commentary, figure", [
+    ("The equity weight ended at 71.2%.", "71.2%"),
+    ("The equity weight ended at 71.2 per cent.", "71.2 per cent"),
+    ("The bond weight was 7 per cent below its target.", "7 per cent"),
+    ("The return was +0.1 per cent.", "+0.1 per cent"),
+    ("Costs came to 12 basis points.", "12 basis points"),
+    ("A ratio of 0.45 was estimated.", "0.45"),
+])  # fmt: skip
+def test_a_figure_the_issue_does_not_show_stops_the_issue(commentary, figure):
+    with pytest.raises(quarterly.ReportError, match=re.escape(figure)):
+        figures_check(commentary, EXHIBITS)
 
 
 def test_quarters_are_named_in_files_and_in_words():
@@ -199,28 +226,36 @@ def test_a_print_with_the_page_words_passes_and_one_without_them_does_not(monkey
     assert any("another order" in f for f in quarterly.compare_words(PAGE, "x.pdf"))
 
 
+def write_pdf(path, info, metadata=False):
+    """A one-page PDF with the given document information, and a metadata stream if asked, written by hand."""
+    def text(value):
+        return "(" + value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)") + ")"
+
+    objects = ["<< /Type /Catalog /Pages 2 0 R" + (" /Metadata 5 0 R" if metadata else "") + " >>",
+               "<< /Type /Pages /Kids [3 0 R] /Count 1 >>", "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] >>",
+               "<< " + " ".join(f"/{key} {text(value)}" for key, value in info.items()) + " >>"]  # fmt: skip
+    if metadata:
+        xmp = '<x:xmpmeta xmlns:x="adobe:ns:meta/"></x:xmpmeta>'
+        objects.append(f"<< /Type /Metadata /Subtype /XML /Length {len(xmp)} >>\nstream\n{xmp}\nendstream")
+    data, offsets = b"%PDF-1.7\n", []
+    for number, body in enumerate(objects, 1):
+        offsets.append(len(data))
+        data += f"{number} 0 obj\n{body}\nendobj\n".encode("latin-1")
+    table = len(data)
+    data += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode() + "".join(f"{o:010d} 00000 n \n" for o in offsets).encode()
+    data += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R /Info 4 0 R >>\nstartxref\n{table}\n%%EOF\n".encode()
+    path.write_bytes(data)
+    return path
+
+
 def test_the_metadata_holds_the_title_the_author_and_the_printing_tool_only(tmp_path):
-    pikepdf = pytest.importorskip("pikepdf")
-    pytest.importorskip("pdfplumber")
-
-    def pdf(name, xmp=False, **info):
-        path = tmp_path / name
-        with pikepdf.new() as doc:
-            doc.add_blank_page()
-            for key, value in info.items():
-                doc.docinfo[f"/{key}"] = value
-            if xmp:
-                with doc.open_metadata(set_pikepdf_as_editor=False, update_docinfo=False) as meta:
-                    meta["dc:title"] = "Quarterly report"
-            doc.save(path)
-        return path
-
+    pytest.importorskip("pdfplumber")  # in requirements.txt: the build reads the issuers' factsheets with it
     printed = dict(Title="Quarterly report", Author=quarterly.AUTHOR, Creator="Chromium", Producer="Skia/PDF m141")
-    assert quarterly.pdf_metadata_faults(pdf("good.pdf", **printed), "Quarterly report") == []
-    faults = quarterly.pdf_metadata_faults(pdf("bad.pdf", Title="Quarterly report", Author="Someone else",
-                                               Producer="Another tool", Keywords="x"), "Quarterly report")  # fmt: skip
+    assert quarterly.pdf_metadata_faults(write_pdf(tmp_path / "good.pdf", printed), "Quarterly report") == []
+    bad = dict(Title="Quarterly report", Author="Someone else", Producer="Another tool", Keywords="x")
+    faults = quarterly.pdf_metadata_faults(write_pdf(tmp_path / "bad.pdf", bad), "Quarterly report")
     assert len(faults) == 3 and "author" in faults[0] and "producer" in faults[1] and "Keywords" in faults[2]
-    faults = quarterly.pdf_metadata_faults(pdf("xmp.pdf", xmp=True, **printed), "Quarterly report")
+    faults = quarterly.pdf_metadata_faults(write_pdf(tmp_path / "xmp.pdf", printed, metadata=True), "Quarterly report")
     assert faults and "Metadata" in faults[0]
 
 
@@ -238,6 +273,7 @@ def tree(tmp_path):
     (root / "mandate").mkdir()
     shutil.copy(config.ROOT / "mandate" / "simulation_bootstrap.csv", root / "mandate")
     shutil.copy(config.ROOT / "README.md", root)
+    shutil.copy(config.ROOT / config.PREVIEW_IMAGE, root)
     frame = pd.read_csv(root / "outputs" / "quarters.csv")
     last = frame.index[-1]
     frame.loc[last, "complete"] = "yes"
@@ -282,6 +318,30 @@ def test_no_issue_before_the_record_runs_past_the_quarter_end(tree):
     daily = pd.read_csv(root / "outputs" / "portfolio_daily.csv")
     daily.iloc[:-1].to_csv(root / "outputs" / "portfolio_daily.csv", index=False)
     with pytest.raises(quarterly.ReportError, match="does not run past the quarter's end"):
+        quarterly.build(root, quarter, "abc1234")
+
+
+def test_an_issue_carries_its_own_preview_tags_and_the_favicon(tree):
+    root, quarter = tree
+    head = quarterly.build(root, quarter, "abc1234").split("</head>")[0]
+    address = f"{config.DASHBOARD_URL}quarterly/{quarterly.label(quarter)}.html"
+    for tag in ('<link rel="icon" href="https://www.carlohofer.com/images/favicon.svg" type="image/svg+xml">',
+                '<meta property="og:type" content="website">', f'<meta property="og:url" content="{address}">',
+                f'<meta property="og:image" content="{config.DASHBOARD_URL}og-portfolio.png">',
+                '<meta name="twitter:card" content="summary_large_image">'):  # fmt: skip
+        assert tag in head, tag
+    width, height = quarterly.image_size(root / config.PREVIEW_IMAGE)
+    assert f'content="{width}"' in head and f'content="{height}"' in head
+    description = re.search(r'<meta name="description" content="([^"]+)">', head).group(1)
+    assert description == re.search(r'<meta property="og:description" content="([^"]+)">', head).group(1)
+    assert len(html_module.unescape(description)) <= 155
+    assert f"Quarterly report, {quarterly.quarter_name(quarter)}" in re.search(r'og:title" content="([^"]+)"', head).group(1)
+
+
+def test_no_issue_without_its_preview_picture(tree):
+    root, quarter = tree
+    (root / config.PREVIEW_IMAGE).rename(root / "elsewhere.png")
+    with pytest.raises(quarterly.ReportError, match="preview picture"):
         quarterly.build(root, quarter, "abc1234")
 
 
@@ -332,6 +392,25 @@ def test_the_log_lists_each_issue_with_its_pdf(tmp_path):
     issues = site._quarterly_issues(tmp_path)
     assert issues == [(1, "8 October to 31 December 2026", "2026-12-31", "abc1234", "quarterly/2026-Q4.html",
                        [("2027-01-05", "quarterly/2026-Q4_2027-01-05.pdf")])]  # fmt: skip
+
+
+# The generators' own strings -----------------------------------------------------------------------
+
+
+def test_no_generator_writes_that_the_orders_followed_the_rules():
+    # A sentence written only under a condition, such as a quarter with no departure, never reaches the page a
+    # read-back checks, so the strings of every program that writes public text are searched here.
+    import io
+    import tokenize
+
+    found = []
+    for name in ("site.py", "quarterly.py", "cycle_report.py", "notes.py"):
+        source = (config.ROOT / "src" / "portfolio" / name).read_text(encoding="utf-8")
+        for token in tokenize.generate_tokens(io.StringIO(source).readline):
+            if token.type == tokenize.STRING and quarterly.COMPLIANCE.search(token.string):
+                found.append(f"{name}:{token.start[0]}: {token.string[:80]}")
+    assert not found, found
+    assert site._departures(pd.DataFrame(), pd.DataFrame()) == "The departures register has no entry so far."
 
 
 # The committed tables -----------------------------------------------------------------------------

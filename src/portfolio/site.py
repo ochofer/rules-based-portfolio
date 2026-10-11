@@ -513,7 +513,7 @@ def _orders_named(group: pd.DataFrame, orders: pd.DataFrame) -> str:
 def _departures(compliance: pd.DataFrame, orders: pd.DataFrame) -> str:
     """One plain sentence per kind of departure from the rules, with the orders it concerns."""
     if not len(compliance):
-        return "Every order so far was placed as the rules require."
+        return "The departures register has no entry so far."
     start, end = (t.strftime("%H:%M") for t in config.ORDER_WINDOW)
     rule = {"outside the rule 7 window": (f"Rule 7 allows orders between {start} and {end} Amsterdam time.",
                                           "{} placed outside that window."),
@@ -1638,7 +1638,7 @@ def _log_register(page, register):
     table = _table(["Date", "Rule", "What happened", "Consequence"], rows, prose=True)
     page.add("log", _card("departures", "Departures register", "Every departure since the first purchase",
              "outputs/departures.csv", plot=False, wide=True, kind="table",
-             empty=None if rows else "No departure from the rules so far.").replace('<p class="source">', (table if rows else "") + '<p class="source">', 1))  # fmt: skip
+             empty=None if rows else "The register has no entry so far.").replace('<p class="source">', (table if rows else "") + '<p class="source">', 1))  # fmt: skip
 
 
 def log(page, monthly, notes_list=(), reports=None, orders=pd.DataFrame(), register=pd.DataFrame(), next_cycle="",
@@ -1715,16 +1715,18 @@ def terms() -> list:
 
 DESCRIPTION = ("A real-money portfolio run under written rules, 70/30 equity and euro government bonds: allocation, "
                "rebalancing, costs, look-through and factor exposures.")  # fmt: skip
-PREVIEW_IMAGE = "og-portfolio.png"
+PREVIEW_IMAGE = config.PREVIEW_IMAGE
 
 
 def _link_preview() -> str:
     """The tags that give a link to the page a title, a description and a picture, once the picture is in the root."""
     if not (config.ROOT / PREVIEW_IMAGE).exists():
         return ""
+    width, height = quarterly_module.image_size(config.ROOT / PREVIEW_IMAGE)
     tags = [("property", "og:type", "website"), ("property", "og:title", "Rules-based portfolio"),
             ("property", "og:description", DESCRIPTION), ("property", "og:url", config.DASHBOARD_URL),
-            ("property", "og:image", config.DASHBOARD_URL + PREVIEW_IMAGE), ("name", "twitter:card", "summary_large_image")]  # fmt: skip
+            ("property", "og:image", config.DASHBOARD_URL + PREVIEW_IMAGE), ("property", "og:image:width", str(width)),
+            ("property", "og:image:height", str(height)), ("name", "twitter:card", "summary_large_image")]  # fmt: skip
     return "".join(f'<meta {kind}="{key}" content="{_esc(value)}">\n' for kind, key, value in tags)
 
 
