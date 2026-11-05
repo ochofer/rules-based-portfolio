@@ -1091,7 +1091,8 @@ def _cost_of_ownership(page, costs, implementation, monthly, orders, now=None):
         if round(latest) < 0 and count and below == count:
             which = (f"each of the {NUMBER_WORD.get(count, str(count)).lower()} orders valued so far was" if count > 1
                      else "the one order valued so far was")  # fmt: skip
-            impl += f"It is negative because {which} executed below its day's net asset value ({_ref('c7')}). "
+            impl += (f"It is negative because {which} executed below its day's net asset value ({_ref('c7')}). An order "
+                     "fills at a price during the day and the net asset value is set at the close, so the gap can go either way. ")
         elif round(latest) < 0:
             impl += "It is negative while the portfolio is ahead of reference portfolio A. "
         pending = _after_record(orders, now)

@@ -167,3 +167,19 @@ def test_an_order_after_the_last_valuation_day_waits_for_its_net_asset_value(wri
     month = metrics.monthly(records, table, values, placed, date(2026, 10, 12)).iloc[0]
     assert month["orders"] == 2 and month["last_day"] == pd.Timestamp("2026-10-09")
 
+
+def test_a_cycle_day_order_is_produced_by_the_rules_when_it_matches_the_proposal(write_ledger):
+    # 1,000 bought at 70/30 on the first day and a top-up of 50 before the cycle day of 5 November: with the prices
+    # unchanged, rule 4 buys 35 of equity and 15 of bonds. The equity order is 5 short, the bond order matches, and
+    # an order on the day after the cycle day is not one the rules give.
+    days = ["2026-10-07", "2026-10-08", "2026-11-02", "2026-11-03", "2026-11-04"]
+    frame = navs(days, [10.0] * 5, [3.0] * 5)
+    rows = [order("2026-10-08", "16:00:00", EQ, "buy", "70", "10.0"),
+            order("2026-10-08", "16:01:00", BD, "buy", "100", "3.0"),
+            order("2026-11-05", "16:30:00", EQ, "buy", "3", "10.0", rule="4"),
+            order("2026-11-05", "16:31:00", BD, "buy", "5", "3.0", rule="4"),
+            order("2026-11-06", "16:30:00", EQ, "buy", "0.2", "10.0", rule="4")]  # fmt: skip
+    t, c = write_ledger(rows, [contribution("2026-10-08", "before 15:59:00", 1000, "start"),
+                               contribution("2026-11-02", "10:00:00", 50, "top-up")])  # fmt: skip
+    placed = metrics.orders(ledger.read(t, c), frame)
+    assert list(placed["produced_by_rules"]) == ["yes", "yes", "no", "yes", "no"]

@@ -174,11 +174,32 @@ def daily(
     return out.sort_index()
 
 
+def _produced_on_cycle_day(ledger: Ledger, navs_eur: pd.DataFrame, o, plans: dict) -> str:
+    """yes when a cycle-day order is one the rules give on its day: the same sleeve and side, at the proposed
+    amount within one euro, the proposal recomputed as the cycle command computed it. no otherwise, and empty
+    while no net asset value before the day exists."""
+    from . import cycle_report
+
+    day = o.moment.date()
+    if trading_days.cycle_day(day.year, day.month) != day:
+        return "no"
+    if not len(navs_eur.loc[: pd.Timestamp(trading_days.previous_trading_day(day))]):
+        return ""
+    if day not in plans:
+        plans[day] = cycle_report.proposal_on(ledger, navs_eur, day)[1]
+    amount = {(p.sleeve, p.side): p.amount_eur for p in plans[day].orders}
+    if (o.sleeve, o.side) not in amount:
+        return "no"
+    paid = o.gross + o.fee if o.side == "buy" else o.gross
+    return "yes" if abs(paid - amount[(o.sleeve, o.side)]) <= 1.0 else "no"
+
+
 def orders(ledger: Ledger, navs_eur: pd.DataFrame = None) -> pd.DataFrame:
     """The portfolio's orders with what the public record shows of them: no amount and no units. Each order's
     price against the net asset value of its day is below, above or at it, and empty until that value is
     published."""
     rows = []
+    plans = {}
     start = start_amount(ledger)
     for o in ledger.orders.itertuples():
         parts = ""
@@ -189,6 +210,8 @@ def orders(ledger: Ledger, navs_eur: pd.DataFrame = None) -> pd.DataFrame:
         if o.rule == "start":
             gross = o.gross + o.fee
             produced = "yes" if abs(gross - config.TARGET[o.sleeve] * start) <= 1.0 else "no"
+        elif o.rule in ("4", "5", "4+5") and navs_eur is not None:
+            produced = _produced_on_cycle_day(ledger, navs_eur, o, plans)
         else:
             produced = ""
         day = o.moment.date()

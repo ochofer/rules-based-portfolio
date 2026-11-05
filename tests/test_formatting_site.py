@@ -195,6 +195,7 @@ def test_the_cost_sentence_reads_each_order_against_its_own_day_and_names_the_la
     assert "each of the two orders valued so far was executed below its day&#x27;s net asset value" in text or \
         "each of the two orders valued so far was executed below its day's net asset value" in text
     assert "The order of 5 November 2026 came after the last net asset values" in text
+    assert "the net asset value is set at the close, so the gap can go either way" in text
     text = _ownership_text(["below", "above", ""], now)
     assert "It is negative while the portfolio is ahead of reference portfolio A." in text and "valued so far" not in text
     assert ">Cash<" not in text
