@@ -108,6 +108,7 @@ table { border-collapse: collapse; width: 100%; font-size: 0.82rem; font-variant
 th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
 th { color: var(--ink2); font-weight: 600; }
 td.num, th.num { text-align: right; }
+table.headwrap th { white-space: normal; vertical-align: bottom; }
 .rules { max-width: 860px; }
 .rules h1 { font-size: 1.3rem; } .rules h2 { font-size: 1.35rem; margin-top: 1.4em; }
 .rules { overflow-wrap: anywhere; }

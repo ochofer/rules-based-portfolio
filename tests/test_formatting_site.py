@@ -2,6 +2,7 @@
 
 import json
 
+import pandas as pd
 import pytest
 
 from portfolio import config, formatting as fmt, site
@@ -153,3 +154,51 @@ def test_the_log_writes_the_next_cycle_day_in_words():
     assert site._next_cycle_day({"positions_as_of": "2026-11-05"}) == "5 November 2026"
     assert site._next_cycle_day({"positions_as_of": "2026-12-06"}) == "7 December 2026"
     assert site._next_cycle_day({"positions_as_of": "2026-12-08"}) == "5 January 2027"
+
+
+def test_the_record_has_one_date_and_names_what_came_after_it():
+    now = {"weights_as_of": "2026-11-04", "positions_as_of": "2026-11-04", "built": "2026-11-05", "contributions_after": ""}
+    assert site._two_dates(now) == "As of 2026-11-04"
+    assert site._two_dates({"weights_as_of": "2026-11-04", "positions_as_of": "2026-11-05"}).startswith("Prices as of")
+    assert site._colophon(now).endswith("Built 2026-11-05</p>")
+    assert site._next_cycle_day(now) == "5 November 2026"
+    orders = pd.DataFrame({"date": ["2026-10-08", "2026-10-08", "2026-11-05", "2026-11-05"]})
+    assert site._after_record(orders, now) == ("The two orders of 5 November 2026 came after the last net asset values, "
+                                               "of 4 November 2026, and enter the record with the next ones.")
+    assert site._after_record(orders, now, counted=True) == ("The count includes the two orders of 5 November 2026, "
+                                                             "placed after the last net asset values, of 4 November 2026.")
+    top_up = dict(now, weights_as_of="2026-12-01", positions_as_of="2026-12-01", contributions_after="2026-12-02")
+    assert site._after_record(orders, top_up) == ("The top-up of 2 December 2026 came after the last net asset values, "
+                                                  "of 1 December 2026, and enters the record with the next ones.")
+    assert site._after_record(orders.iloc[:2], now) == "" and site._after_record(orders, now, counted=True).count("orders") == 1
+
+
+def _ownership_text(against, now, invested=1.0):
+    costs = pd.DataFrame([
+        {"sleeve": "equity", "fund": "E", "isin": config.ISIN[config.EQUITY], "weight": 0.7, "management_fees": 0.002,
+         "transaction_costs": 0.0001, "ongoing_costs": 0.0021, "document_date": "2026-09-03"},
+        {"sleeve": "bonds", "fund": "B", "isin": config.ISIN[config.BONDS], "weight": 0.3, "management_fees": 0.0007,
+         "transaction_costs": 0.0, "ongoing_costs": 0.0007, "document_date": "2026-09-29"},
+        {"sleeve": "portfolio", "fund": "W", "isin": "", "weight": invested, "management_fees": 0.0016,
+         "transaction_costs": 0.00007, "ongoing_costs": 0.00168, "document_date": ""},
+    ])  # fmt: skip
+    implementation = pd.DataFrame({"date": ["2026-10-07", "2026-10-08"], "implementation_cost_bps": [0.0, -9.6]})
+    orders = pd.DataFrame({"date": ["2026-10-08", "2026-10-08", "2026-11-05"], "price_against_nav": against})
+    page = site.Page()
+    site._cost_of_ownership(page, costs, implementation, pd.DataFrame(), orders, now)
+    return " ".join(page.sections["costs"])
+
+
+def test_the_cost_sentence_reads_each_order_against_its_own_day_and_names_the_later_ones():
+    now = {"weights_as_of": "2026-11-04", "positions_as_of": "2026-11-04", "built": "2026-11-05", "contributions_after": ""}
+    text = _ownership_text(["below", "below", ""], now)
+    assert "each of the two orders valued so far was executed below its day&#x27;s net asset value" in text or \
+        "each of the two orders valued so far was executed below its day's net asset value" in text
+    assert "The order of 5 November 2026 came after the last net asset values" in text
+    text = _ownership_text(["below", "above", ""], now)
+    assert "It is negative while the portfolio is ahead of reference portfolio A." in text and "valued so far" not in text
+    assert ">Cash<" not in text
+    # Cash not yet invested has its own row, so the weights add up to the portfolio.
+    text = _ownership_text(["below", "below", ""], now, invested=0.952)
+    assert ">Cash<" in text and ">4.8%<" in text and ">100.0%<" in text
+

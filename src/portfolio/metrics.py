@@ -174,8 +174,10 @@ def daily(
     return out.sort_index()
 
 
-def orders(ledger: Ledger) -> pd.DataFrame:
-    """The portfolio's orders with what the public record shows of them: no amount and no units."""
+def orders(ledger: Ledger, navs_eur: pd.DataFrame = None) -> pd.DataFrame:
+    """The portfolio's orders with what the public record shows of them: no amount and no units. Each order's
+    price against the net asset value of its day is below, above or at it, and empty until that value is
+    published."""
     rows = []
     start = start_amount(ledger)
     for o in ledger.orders.itertuples():
@@ -191,6 +193,10 @@ def orders(ledger: Ledger) -> pd.DataFrame:
             produced = ""
         day = o.moment.date()
         start_w, end_w = config.ORDER_WINDOW
+        against = ""
+        if navs_eur is not None and pd.Timestamp(day) in navs_eur.index:
+            close = float(navs_eur.loc[pd.Timestamp(day), o.sleeve])
+            against = "below" if o.price < close else ("above" if o.price > close else "at")
         rows.append(
             {
                 "date": pd.Timestamp(day),
@@ -202,6 +208,7 @@ def orders(ledger: Ledger) -> pd.DataFrame:
                 "inside_rule_7_window": "yes" if start_w <= o.moment.time() <= end_w else "no",
                 "on_a_trading_day": "yes" if trading_days.is_trading_day(day) else "no",
                 "bid_and_ask_recorded": "no" if (pd.isna(o.bid) or pd.isna(o.ask)) else "yes",
+                "price_against_nav": against,
                 "_fee": o.fee,
                 "_half_spread": (
                     np.nan if pd.isna(o.bid) or pd.isna(o.ask) else abs(o.units) * (o.ask - o.bid) / 2
@@ -299,7 +306,10 @@ def monthly(
         value_end = float(values.loc[last, "value_eur"])
         value_start = start if previous_day == base else float(values.loc[previous_day, "value_eur"])
         flow = float(flows.loc[in_month].sum())
-        month_orders = placed[placed["date"].dt.to_period("M") == month] if len(placed) else placed
+        # An order enters the record with the net asset values of its day: one placed after the last valuation
+        # day is left out of the month until they are published.
+        month_orders = (placed[(placed["date"].dt.to_period("M") == month) & (placed["date"] <= days.max())]
+                        if len(placed) else placed)  # fmt: skip
         # Costs in basis points of the portfolio's value at the close of each order's day, the unit of the
         # implementation cost, so that the sources of a month add up to the month's implementation cost.
         value_on = [_value_on(values, d) for d in month_orders["date"]] if len(month_orders) else []
@@ -384,7 +394,7 @@ def quarters(ledger: Ledger, table: pd.DataFrame, values: pd.DataFrame, placed: 
         since_months = len(pd.period_range(first_month, quarter.asfreq("M", "e"), freq="M"))
         value_end = float(values.loc[end, "value_eur"])
         start_value = None if start == base else float(values.loc[start, "value_eur"])
-        dated = placed["date"] if len(placed) else pd.Series(dtype="datetime64[ns]")
+        dated = placed["date"][placed["date"] <= days.max()] if len(placed) else pd.Series(dtype="datetime64[ns]")
         years = _years(ledger, end)
         rows.append({
             "quarter": str(quarter), "first_day": in_quarter.min(), "last_day": end,

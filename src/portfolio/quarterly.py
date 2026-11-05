@@ -338,7 +338,8 @@ class Issue:
         self.attribution = read("attribution.csv")
         self.now = read("allocation_now.csv")
         self.bootstrap = read("simulation_bootstrap.csv", self.root / "mandate")
-        self.built = pd.Timestamp(self.now.iloc[0]["positions_as_of"])
+        row = self.now.iloc[0]
+        self.built = pd.Timestamp(row["built"] if "built" in row and pd.notna(row["built"]) else row["positions_as_of"])
         self.notes = [n for n in notes_module.read(self.root / "notes") if pd.Period(n.month, "M").asfreq("Q") == quarter]
         self._require_notes()
         self.commentary = parse_commentary(self.root / FOLDER / f"{label(quarter)}-commentary.txt", quarter)

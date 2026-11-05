@@ -146,3 +146,24 @@ def test_the_cost_sources_of_a_month_add_up_to_its_implementation_cost(write_led
     assert month["implementation_cost_month_bps"] == pytest.approx(table["implementation_cost_bps"].iloc[-1])
     assert table["implementation_cost_bps"].iloc[-1] > 0  # bought above the net asset value: the portfolio trails
     assert month["execution_against_nav_bps"] > 0 and month["orders_without_bid_and_ask"] == 2
+
+
+def test_an_order_after_the_last_valuation_day_waits_for_its_net_asset_value(write_ledger):
+    # Equity bought below its net asset value, bonds above it, and a third order on a day not valued yet: the
+    # month counts the first two, and the third has no comparison until its day's net asset value is published.
+    days = ["2026-10-07", "2026-10-08", "2026-10-09"]
+    frame = navs(days, [10.0, 10.0, 10.1], [3.0, 3.0, 3.0])
+    rows = [order("2026-10-08", "16:00:00", EQ, "buy", "60", "9.9"),
+            order("2026-10-08", "16:01:00", BD, "buy", "100", "3.01"),
+            order("2026-10-12", "16:00:00", EQ, "buy", "5", "10.2", rule="4")]  # fmt: skip
+    t, c = write_ledger(rows, [contribution("2026-10-08", "before 15:59:00", 1000, "start")])
+    records = ledger.read(t, c)
+    placed = metrics.orders(records, frame)
+    assert list(placed["price_against_nav"]) == ["below", "above", ""]
+    held = positions.build(records, date(2026, 10, 12))
+    values = valuations.build(held, frame)
+    ref = references.simulate(records, frame, date(2026, 10, 12), "rules")
+    table = metrics.daily(records, values, ref, ref, pd.Series(dtype=float), metrics.base_day(records, frame))
+    month = metrics.monthly(records, table, values, placed, date(2026, 10, 12)).iloc[0]
+    assert month["orders"] == 2 and month["last_day"] == pd.Timestamp("2026-10-09")
+

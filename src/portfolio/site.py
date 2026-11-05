@@ -241,7 +241,7 @@ def _date_axes(dates) -> tuple:
 def _colophon(now_row) -> str:
     """The footer's last line. The record is built on the date of its holdings, so the build date comes
     from the committed outputs and a rebuild reproduces the page."""
-    built = fmt.day(now_row["positions_as_of"])
+    built = fmt.day(_built(now_row))
     return (f'<p class="colophon">Carlo Hofer &middot; Data: the issuers\' published data &middot; '
             f'<a href="{config.REPOSITORY_URL}">Code on GitHub</a> &middot; Built {_esc(built)}</p>')
 
@@ -250,22 +250,65 @@ def _asof(day, extra="") -> str:
     return f"As of {fmt.day(day)}" + (f". {extra}" if extra else "")
 
 
+def _built(now_row) -> pd.Timestamp:
+    """The day of the build: the column built, or the date of the holdings where the table has no such column."""
+    value = now_row.get("built") if hasattr(now_row, "get") else None
+    return pd.Timestamp(now_row["positions_as_of"] if value is None or pd.isna(value) else value)
+
+
 def _two_dates(now_row) -> str:
-    """The date of the prices and the date of the holdings, for figures that combine the two."""
-    return f"Prices as of {fmt.day(now_row['weights_as_of'])}, holdings as of {fmt.day(now_row['positions_as_of'])}"
+    """The date of the record. The prices and the holdings share it, and when they differ both are written."""
+    prices, held = pd.Timestamp(now_row["weights_as_of"]), pd.Timestamp(now_row["positions_as_of"])
+    if prices == held:
+        return f"As of {fmt.day(prices)}"
+    return f"Prices as of {fmt.day(prices)}, holdings as of {fmt.day(held)}"
+
+
+def _later_orders(orders, now_row) -> pd.DataFrame:
+    """The orders placed after the last net asset values, which enter the record with the next ones."""
+    if now_row is None or not len(orders):
+        return orders.iloc[0:0]
+    return orders[pd.to_datetime(orders["date"]) > pd.Timestamp(now_row["weights_as_of"])]
+
+
+def _after_record(orders, now_row, counted=False) -> str:
+    """One sentence on the top-ups received and the orders placed after the last net asset values, by day. With
+    counted, the sentence says that a count of orders includes them."""
+    if now_row is None:
+        return ""
+    day = pd.Timestamp(now_row["weights_as_of"])
+    parts = []
+    if not counted:
+        raw = now_row.get("contributions_after", "") if hasattr(now_row, "get") else ""
+        dates = [d for d in raw.split("|") if d] if isinstance(raw, str) else []
+        parts += [f"the top-up of {fmt.day_words(d)}" for d in dates]
+    later = _later_orders(orders, now_row)
+    sizes = later.groupby("date").size() if len(later) else pd.Series(dtype=int)
+    for d, n in sizes.items():
+        parts.append(f"the order of {fmt.day_words(d)}" if n == 1
+                     else f"the {NUMBER_WORD.get(n, str(n)).lower()} orders of {fmt.day_words(d)}")  # fmt: skip
+    if not parts:
+        return ""
+    what = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
+    if counted:
+        return f"The count includes {what}, placed after the last net asset values, of {fmt.day_words(day)}."
+    events = len(parts) - len(sizes) + int(sizes.sum()) if len(sizes) else len(parts)
+    verb = "enters" if events == 1 else "enter"
+    return (f"{what[0].upper()}{what[1:]} came after the last net asset values, of {fmt.day_words(day)}, and {verb} "
+            "the record with the next ones.")
 
 
 # Overview ------------------------------------------------------------------------------------------
 
 
-def _money_weighted(previous, orders) -> tuple:
-    """The money-weighted return at the last month end: cumulative in the first year, per year after it."""
-    if previous is not None and pd.notna(previous.get("money_weighted_per_year")):
-        return fmt.pct(previous["money_weighted_per_year"], True), f"Per year, to {previous['month']}"
-    if previous is not None and pd.notna(previous.get("money_weighted_since_start")):
-        return fmt.pct(previous["money_weighted_since_start"], True), f"Since the first purchase, to {previous['month']}"
-    first = pd.Period(orders["date"].min(), "M").end_time if len(orders) else None
-    return "n/a", f"From the first month end, {fmt.day(first)}" if first is not None else "From the first month end"
+def _money_weighted(latest, orders) -> tuple:
+    """The money-weighted return to the last valuation day, the day of the time-weighted return beside it:
+    cumulative in the first year, per year after it."""
+    if latest is not None and pd.notna(latest.get("money_weighted_per_year")):
+        return fmt.pct(latest["money_weighted_per_year"], True), f"Per year, to {fmt.day(latest['last_day'])}"
+    if latest is not None and pd.notna(latest.get("money_weighted_since_start")):
+        return fmt.pct(latest["money_weighted_since_start"], True), f"Since the first purchase, to {fmt.day(latest['last_day'])}"
+    return "n/a", "From the first valuation day"
 
 
 MONEY_WEIGHTED = "The money-weighted return counts the timing of the contributions, which the time-weighted return removes."
@@ -277,7 +320,7 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
     w_now = now.iloc[0]
     month_orders = 0
     if len(orders):
-        current = pd.Timestamp(w_now["positions_as_of"]).to_period("M")
+        current = _built(w_now).to_period("M")
         month_orders = int((pd.to_datetime(orders["date"]).dt.to_period("M") == current).sum())
     previous = monthly[monthly["complete"] == "yes"].iloc[-1] if len(monthly) and (monthly["complete"] == "yes").any() else None
 
@@ -295,7 +338,7 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
          "Equity weight minus the target weight"),
         ("Return since the first purchase", fmt.pct(last["growth_portfolio"] / 100 - 1, signed=True) if last is not None else "n/a",
          "Time-weighted, contributions removed" if last is not None else "From the first valuation day"),
-        ("Money-weighted return", *_money_weighted(previous, orders)),
+        ("Money-weighted return", *_money_weighted(monthly.iloc[-1] if len(monthly) else None, orders)),
         ("Drawdown now", fmt.pct(-last["drawdown_portfolio"]) if last is not None else "n/a",
          "Below the previous peak" if last is not None else "From the first valuation day"),
         ("Orders this month", f"{month_orders} of {config.ORDERS_PER_MONTH}", "The allowance of rule 6"),
@@ -306,6 +349,7 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
         for n, v, c in tiles
     )
     asof = _two_dates(w_now)
+    pending = _after_record(orders, w_now)
     page.add("overview", f'<div class="wide"><div class="tiles">{tile_html}</div><p class="tilenote">{_esc(MONEY_WEIGHTED)}</p><p class="source">{_esc(asof)}. '
              f'Source: <code>outputs/allocation_now.csv</code>, <code>outputs/portfolio_daily.csv</code></p></div>')
 
@@ -343,7 +387,7 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
                    [["Equity", fmt.pct(w_now["weight_equity"]), fmt.pct(config.TARGET[config.EQUITY]), band_text],
                     ["Bonds", fmt.pct(w_now["weight_bonds"]), fmt.pct(config.TARGET[config.BONDS]), ""],
                     ["Cash", fmt.pct(cash), "", ""]], numeric=("Weight", "Target weight"), rounding=True)  # fmt: skip
-    note2 = f"Cash {fmt.pct(cash)}. The band applies to the equity weight only."
+    note2 = f"Cash {fmt.pct(cash)}. The band applies to the equity weight only." + (f" {pending}" if pending else "")
     page.add("overview", _card("c2", "Allocation now against the target and the band", asof,
              "outputs/allocation_now.csv", table=table, note=note2, height=210, wide=True),
              {"id": "c2", "traces": traces, "layout": layout})  # fmt: skip
@@ -375,8 +419,12 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
               **wide, "annotations": annotations, "hovermode": "closest", "margin": {"r": 48}}  # fmt: skip
     table = _table(["Date", "Portfolio", "Reference A", "Reference B", "Index blend"], rows,
                    numeric=("Portfolio", "Reference A", "Reference B", "Index blend"))  # fmt: skip
+    blend_points = daily[["date", "growth_index_blend"]].dropna() if "growth_index_blend" in daily else daily.iloc[0:0]
+    blend_text = ("The index blend starts at the first month end" if len(blend_points) != 1 else
+                  "The index blend starts at the portfolio's level on the first month end, "
+                  f"{fmt.day_words(blend_points['date'].iloc[0])}, and is drawn once a second month's returns are published")
     asof3 = _asof(daily["date"].iloc[-1] if len(daily) else w_now["weights_as_of"],
-                  "100 is the starting amount before the first order. The index blend starts at the first month end")  # fmt: skip
+                  f"100 is the starting amount before the first order. {blend_text}")  # fmt: skip
     page.add("overview", _card("c3", "Growth of 100: the portfolio, the two reference portfolios and the index blend",
              asof3, "outputs/portfolio_daily.csv", table=None if empty else table, height=340, wide=True, empty=empty),
              None if empty else {"id": "c3", "traces": traces, "layout": layout,
@@ -419,7 +467,7 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
 # Rebalancing ---------------------------------------------------------------------------------------
 
 
-def rebalancing(page, daily, orders, band, compliance, monthly):
+def rebalancing(page, daily, orders, band, compliance, monthly, now=None):
     history = daily.iloc[1:]
     empty = None if len(history) else "The equity weight starts on the first valuation day."
     low, high = config.BAND
@@ -473,7 +521,8 @@ def rebalancing(page, daily, orders, band, compliance, monthly):
         not len(orders) or (orders["rule"].isin(["4", "5", "4+5"])).sum() == 0) else ""  # fmt: skip
     page.add("rebalancing", _card("c5", "Equity weight in its band, with every order",
              _asof(daily["date"].iloc[-1], first_cycle), ["outputs/portfolio_daily.csv", "outputs/orders.csv",
-             "outputs/band_events.csv", "outputs/compliance.csv"], table=table, height=320, wide=True, empty=empty),
+             "outputs/band_events.csv", "outputs/compliance.csv"], table=table, note=_after_record(orders, now) or None,
+             height=320, wide=True, empty=empty),
              None if empty else {"id": "c5", "traces": traces, "layout": layout, "layout_narrow": narrow})  # fmt: skip
 
     # Chart 6: orders against the allowance.
@@ -496,7 +545,8 @@ def rebalancing(page, daily, orders, band, compliance, monthly):
     table = _table(["Date", "Sleeve", "Side", "Rule", "Inside 15:45 to 17:00", "Bid and ask recorded"], rows)
     note = _departures(compliance, orders)
     page.add("rebalancing", _card("c6", "Orders per month against the allowance of five",
-             _asof(daily["date"].iloc[-1]), "outputs/orders.csv", table=table, note=note, height=260),
+             _asof(daily["date"].iloc[-1], _after_record(orders, now, counted=True).rstrip(".")), "outputs/orders.csv",
+             table=table, note=note, height=260),
              {"id": "c6", "traces": traces, "layout": layout})  # fmt: skip
 
 
@@ -1024,7 +1074,7 @@ def risk_view(page, out, boot, monthly):
     _stress(page, out["stress.csv"])
 
 
-def _cost_of_ownership(page, costs, implementation, monthly, orders):
+def _cost_of_ownership(page, costs, implementation, monthly, orders, now=None):
     if not len(costs):
         return
     funds = costs[costs["sleeve"] != "portfolio"]
@@ -1034,13 +1084,19 @@ def _cost_of_ownership(page, costs, implementation, monthly, orders):
         latest = float(data["implementation_cost_bps"].iloc[-1])
         impl = (f"Beside them, the implementation cost of {_ref('c8')} is {fmt.bps(latest)}, cumulative since "
                 f"{fmt.day_words(data['date'].iloc[0])} and positive when the portfolio trails reference portfolio A. ")
-        price = float(monthly["execution_against_nav_bps"].sum()) if len(monthly) else 0.0
-        if round(latest) < 0 and price < 0:
-            count = len(orders)
-            which = f"the {NUMBER_WORD.get(count, str(count)).lower()} orders so far were" if count > 1 else "the one order so far was"
-            impl += f"It is negative because {which} executed below the day's net asset value ({_ref('c7')}). "
+        against = (orders["price_against_nav"].fillna("").astype(str) if len(orders) and "price_against_nav" in orders
+                   else pd.Series(dtype=str))  # fmt: skip
+        valued = against[against.isin(["below", "above", "at"])]
+        count, below = len(valued), int((valued == "below").sum())
+        if round(latest) < 0 and count and below == count:
+            which = (f"each of the {NUMBER_WORD.get(count, str(count)).lower()} orders valued so far was" if count > 1
+                     else "the one order valued so far was")  # fmt: skip
+            impl += f"It is negative because {which} executed below its day's net asset value ({_ref('c7')}). "
         elif round(latest) < 0:
             impl += "It is negative while the portfolio is ahead of reference portfolio A. "
+        pending = _after_record(orders, now)
+        if pending:
+            impl += f"{pending} "
     else:
         impl = f"Beside them, {_ref('c8')} gives the implementation cost from the first order. "
     line = (f"The two ETFs' ongoing costs, from their key information documents, come to "
@@ -1050,8 +1106,12 @@ def _cost_of_ownership(page, costs, implementation, monthly, orders):
     bp = lambda v: fmt.bps(v * 1e4, False)  # noqa: E731
     rows = [[SHORT_FUND.get(r["isin"], r["fund"]), bp(r["ongoing_costs"]), bp(r["management_fees"]), bp(r["transaction_costs"]),
              fmt.pct(r["weight"]), fmt.day(r["document_date"])] for _, r in funds.iterrows()]  # fmt: skip
+    # Cash not yet invested carries no ongoing costs. Its row makes the weights add up to the portfolio.
+    cash = 1.0 - float(weighted["weight"])
+    if cash >= 0.0005:
+        rows.append(["Cash", bp(0.0), bp(0.0), bp(0.0), fmt.pct(cash), ""])
     rows.append(["The portfolio", bp(weighted["ongoing_costs"]), bp(weighted["management_fees"]), bp(weighted["transaction_costs"]),
-                 fmt.pct(weighted["weight"]), ""])  # fmt: skip
+                 fmt.pct(float(weighted["weight"]) + max(cash, 0.0) if cash >= 0.0005 else weighted["weight"]), ""])  # fmt: skip
     columns = ["Fund", "Ongoing costs", "TER", "Transaction", "Weight", "Document of"]
     table = _table(columns, rows, numeric=("Ongoing costs", "TER", "Transaction", "Weight"), wrap_first=True, rounding=True)
     page.add("costs", _card("ownership", "What the portfolio costs a year, in basis points",
@@ -1642,7 +1702,7 @@ def _log_register(page, register):
 
 
 def log(page, monthly, notes_list=(), reports=None, orders=pd.DataFrame(), register=pd.DataFrame(), next_cycle="",
-        issues=()):  # fmt: skip
+        issues=(), now=None):  # fmt: skip
     _log_quarterly(page, list(issues), orders)
     _log_notes(page, list(notes_list), next_cycle)
     _log_reports(page, reports or {}, orders, next_cycle)
@@ -1681,11 +1741,17 @@ def log(page, monthly, notes_list=(), reports=None, orders=pd.DataFrame(), regis
         rows = [[f(r) for _, f in columns] for _, r in monthly.iterrows()]
         numeric = tuple(n for n in names[1:] if n != "Last day")
         tables.append(f'<p class="label">{_esc(heading)}</p>' + _table(names, rows, numeric=numeric,
-                                                                       rounding=heading.startswith("Weights")))
+                      rounding=heading.startswith("Weights")).replace("<table>", '<table class="headwrap">', 1))  # fmt: skip
+    note = "Each chart's own table is under it, and every tile is a cell of these tables or of outputs/portfolio_daily.csv."
+    if len(_later_orders(orders, now)):
+        note = ("Each chart's own table is under it, and every tile is a cell of these tables or of outputs/portfolio_daily.csv, "
+                "except that the orders tile also counts the orders placed after the last net asset values.")
+    pending = _after_record(orders, now)
+    if pending:
+        note += f" {pending}"
     page.add("log", _card("c24", "The monthly table", "Months since the first purchase. Drawdown and worst fall are "
              "per cent below the previous peak. Volatility from month 12", "outputs/metrics_monthly.csv", plot=False, kind="table",
-             wide=True, table=None, note="Each chart's own table is under it, and every tile is a cell of these tables or "
-             "of outputs/portfolio_daily.csv.").replace('<p class="note">', "".join(tables) + '<p class="note">', 1))  # fmt: skip
+             wide=True, table=None, note=note).replace('<p class="note">', "".join(tables) + '<p class="note">', 1))  # fmt: skip
 
 
 # The page ------------------------------------------------------------------------------------------
@@ -1693,7 +1759,7 @@ def log(page, monthly, notes_list=(), reports=None, orders=pd.DataFrame(), regis
 
 def _next_cycle_day(now_row) -> str:
     """The first cycle day after the date of the holdings, or on it."""
-    day = pd.Timestamp(now_row["positions_as_of"]).date()
+    day = _built(now_row).date()
     cycle = trading_days.cycle_day(day.year, day.month)
     if cycle < day:
         following = pd.Period(day, "M") + 1
@@ -1763,9 +1829,11 @@ def build(out_dir: Path = None) -> Path:
     orders = out["orders.csv"]
     page = Page()
     overview(page, daily, monthly, out["allocation_now.csv"], orders)
-    rebalancing(page, daily, orders, out["band_events.csv"], out["compliance.csv"], monthly)
+    now_row = out["allocation_now.csv"].iloc[0]
+    rebalancing(page, daily, orders, out["band_events.csv"], out["compliance.csv"], monthly, now_row)
     costs(page, monthly, out["implementation_cost.csv"], daily)
-    _cost_of_ownership(page, out.get("cost_of_ownership.csv", pd.DataFrame()), out["implementation_cost.csv"], monthly, orders)
+    _cost_of_ownership(page, out.get("cost_of_ownership.csv", pd.DataFrame()), out["implementation_cost.csv"], monthly, orders,
+                       now_row)  # fmt: skip
     contributions(page, daily, monthly)
     lookthrough(page, out)
     risk_view(page, out, _read("simulation_bootstrap.csv", config.ROOT / "mandate"), monthly)
@@ -1780,7 +1848,7 @@ def build(out_dir: Path = None) -> Path:
     simulations(page, simulated["history"], simulated["paths"], monthly)
     reports = {p.stem: p.read_text(encoding="utf-8") for p in sorted(config.CYCLES_DIR.glob("*.md"))} if config.CYCLES_DIR.exists() else {}
     log(page, monthly, notes_module.read(), reports, orders, out.get("departures.csv", pd.DataFrame()),
-        _next_cycle_day(out["allocation_now.csv"].iloc[0]), _quarterly_issues())  # fmt: skip
+        _next_cycle_day(now_row), _quarterly_issues(), now_row)  # fmt: skip
     _check_roles(page.charts, palette)
     _number(page.sections)
 

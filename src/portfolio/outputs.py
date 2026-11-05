@@ -72,12 +72,16 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
                                   metrics.start_amount(records), base)  # fmt: skip
     blend = references.index_blend(growth.iloc[1:], msci, bond_month, today)
     table = metrics.daily(records, values, ref_a, ref_b, blend, base)
-    placed = metrics.orders(records)
+    placed = metrics.orders(records, navs)
     band, issues = metrics.compliance(records, navs, today)
     monthly = metrics.monthly(records, table, values, placed, today)
 
-    # The state now: the units held at the end of today at the latest net asset values.
-    now = valuations.at(held, navs, pd.Timestamp(today))
+    # The state now, on one date for the whole record: the units held at the end of the last valuation day, at
+    # its net asset values. An order or a contribution after that day enters with the next net asset values, and
+    # the page names it as not yet valued.
+    record_day = table.index.max() if len(table) > 1 else None
+    positions_day = record_day if record_day is not None else pd.Timestamp(today)
+    now = valuations.at(held, navs, positions_day)
     total = now[E] + now[B] + now["cash"]
     weights_now = {E: now[E] / total, B: now[B] / total, "cash": now["cash"] / total}
 
@@ -114,9 +118,11 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     written.append(_write(metrics.quarters(records, table, values, placed, today), "quarters.csv", as_of, out_dir))
     impl = table[["implementation_cost_bps"]].dropna().reset_index()
     written.append(_write(impl, "implementation_cost.csv", as_of, out_dir))
+    later = records.contributions[records.contributions["moment"].dt.normalize() > positions_day]
     now_frame = pd.DataFrame(
-        [{"weights_as_of": now["nav_date"], "positions_as_of": pd.Timestamp(today),
-          "weight_equity": weights_now[E], "weight_bonds": weights_now[B], "weight_cash": weights_now["cash"]}]
+        [{"weights_as_of": now["nav_date"], "positions_as_of": positions_day, "built": pd.Timestamp(today),
+          "weight_equity": weights_now[E], "weight_bonds": weights_now[B], "weight_cash": weights_now["cash"],
+          "contributions_after": "|".join(sorted({m.strftime("%Y-%m-%d") for m in later["moment"]}))}]
     )  # fmt: skip
     written.append(_write(now_frame, "allocation_now.csv", now["nav_date"], out_dir))
 
