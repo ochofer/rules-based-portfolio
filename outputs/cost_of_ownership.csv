@@ -1,4 +1,4 @@
 as_of,sleeve,fund,isin,weight,management_fees,transaction_costs,ongoing_costs,document_date
-2026-10-30,equity,iShares MSCI ACWI UCITS ETF USD (Acc),IE00B6R52259,0.6941219525,0.002,0.0001,0.0021,2026-09-03
-2026-10-30,bonds,Vanguard EUR Eurozone Government Bond UCITS ETF (EUR) Accumulating,IE00BH04GL39,0.3058780475,0.0007,0,0.0007,2026-09-29
-2026-10-30,portfolio,Weighted by the sleeve weights,,1,0.0016023585,6.94122e-05,0.0016717707,
+2026-11-04,equity,iShares MSCI ACWI UCITS ETF USD (Acc),IE00B6R52259,0.7002078459,0.002,0.0001,0.0021,2026-09-03
+2026-11-04,bonds,Vanguard EUR Eurozone Government Bond UCITS ETF (EUR) Accumulating,IE00BH04GL39,0.2997902372,0.0007,0,0.0007,2026-09-29
+2026-11-04,portfolio,Weighted by the sleeve weights,,0.9999980831,0.0016102689,7.00208e-05,0.0016802896,
