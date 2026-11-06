@@ -8,9 +8,17 @@ returns from February 1999 to December 2025, the worst fall of every split from
 selects the largest equity target weight whose worst fall stays within the
 limit.
 
+In November 2026, after the first cycle day, a second run was added to answer
+a question readers ask: the same test with the US stock market in place of the
+global equity series, with the same bonds, the same band rule, the same splits
+and the same months. The split was set on the global series alone, and the US
+run chooses nothing: its table reads no in the column chosen on every row.
+
 Data, downloaded at run time and cached in cache/ (never committed):
   - Kenneth French's developed-market and emerging-market factor files (the
     market return is Mkt-RF plus RF, in US dollars).
+  - Kenneth French's US research factors, monthly (the US market return is
+    Mkt-RF plus RF, in US dollars), for the US run only.
   - The European Central Bank's euro reference rate against the US dollar,
     daily (dataset EXR).
   - The European Central Bank's euro area yield curve for all government
@@ -20,7 +28,8 @@ Data, downloaded at run time and cached in cache/ (never committed):
 
 Usage:   python3 mandate/allocation_check.py
 Output:  mandate/allocation_check_results.md, the same text on screen, and the table of every split in
-         mandate/allocation_check_results.csv.
+         mandate/allocation_check_results.csv. The US run writes its table of every split to
+         mandate/allocation_check_us_results.csv and its figures to the screen.
 Requires Python 3.9 or later, pandas and numpy.
 """
 import io
@@ -39,6 +48,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE = os.path.join(ROOT, "cache")
 OUT = os.path.join(ROOT, "mandate", "allocation_check_results.md")
 OUT_CSV = os.path.join(ROOT, "mandate", "allocation_check_results.csv")
+OUT_US_CSV = os.path.join(ROOT, "mandate", "allocation_check_us_results.csv")
 
 # The mandate's numbers.
 RISK_LIMIT = 0.35        # worst fall allowed in the test: one third, rounded up to the next 5 points
@@ -48,9 +58,18 @@ EMERGING_SHARE = 0.10    # emerging markets' approximate share of a global index
 BOND_MATURITY = 7.0      # in years, close to the average duration of a euro government bond index
 FIRST_MONTH, LAST_MONTH = "1999-01", "2025-12"
 
+# Two expectations for the US run, written on 5 November 2026 before it ran and kept as written. The run
+# reports whether each is met, and nothing is tuned to meet them.
+# E8: the worst fall of the US series at 70/30 exceeds 35 per cent, since the dollar fell against the euro from
+#     2001 to 2003 while the US market fell further than the global series.
+# E9: the largest US split whose worst fall is within 35 per cent is 65/35 or lower.
+E8_US_FALL_AT_70_ABOVE = 0.35
+E9_US_LARGEST_SPLIT_AT_MOST = 0.65
+
 SOURCES = {
     "developed": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Developed_3_Factors_CSV.zip",
     "emerging": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Emerging_5_Factors_CSV.zip",
+    "us_market": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip",
     "ecb_usd_per_eur": "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?format=csvdata",
     "ecb_10y": "https://data-api.ecb.europa.eu/service/data/IRS/M.U2.L.L40.CI.0000.EUR.N.Z?format=csvdata",
     "ecb_7y": "https://data-api.ecb.europa.eu/service/data/YC/B.U2.EUR.4F.G_N_C.SV_C_YM.SR_7Y?format=csvdata",
@@ -133,13 +152,18 @@ def ecb_seven_year():
     return month_end(daily) / 100
 
 
+def usd_per_eur_month_end():
+    """The ECB euro reference rate against the US dollar at each month end."""
+    daily_rate = ecb_series("ecb_usd_per_eur")
+    daily_rate.index = pd.to_datetime(daily_rate.index)
+    return month_end(daily_rate)
+
+
 def monthly_returns():
     """Monthly euro returns of the equity and bond sleeves, February 1999 to December 2025."""
     developed, header_dev = french_market("developed")
     emerging, header_em = french_market("emerging")
-    daily_rate = ecb_series("ecb_usd_per_eur")
-    daily_rate.index = pd.to_datetime(daily_rate.index)
-    usd_per_eur = month_end(daily_rate)
+    usd_per_eur = usd_per_eur_month_end()
     # An investor in euro gains when the dollar rises against the euro, so the
     # dollar return is multiplied by last month's rate over this month's rate.
     currency = usd_per_eur.shift(1) / usd_per_eur
@@ -169,6 +193,20 @@ def monthly_returns():
         "ECB ten-year government bond yield": "last observation " + str(ten_year.index[-1]),
     }
     return returns, vintages
+
+
+def us_returns(returns):
+    """The test's returns with the US stock market in place of the global equity series: French's US market
+    return in US dollars, converted to euro with the same rate as the global series, beside the same bonds, over
+    the same months. Returns the frame and the US file's header line."""
+    us, header = french_market("us_market")
+    usd_per_eur = usd_per_eur_month_end()
+    currency = usd_per_eur.shift(1) / usd_per_eur
+    equity = ((1 + us) * currency - 1).reindex(returns.index)
+    frame = pd.DataFrame({"equity": equity, "bonds": returns["bonds"]})
+    if frame.isna().any().any():
+        raise SystemExit("The US series has a missing month inside the test's months.")
+    return frame, header
 
 
 def band_path(returns, equity_target):
@@ -210,8 +248,9 @@ def signed(x):
     return "0.00" if text in ("+0.00", "-0.00") else text
 
 
-def main():
-    returns, vintages = monthly_returns()
+def split_rows(returns):
+    """Every split on the grid under the band rule: growth per year, volatility, the worst fall with its peak and
+    low months, and the fall in each named period."""
     years = len(returns) / 12
     rows = []
     for w in EQUITY_GRID:
@@ -223,8 +262,52 @@ def main():
         fall_2008, _, _ = worst_fall(values, "2007-01", "2010-12")
         fall_2022, _, _ = worst_fall(values, "2021-12", "2022-12")
         rows.append((w, growth, volatility, fall, peak, low, fall_2000, fall_2008, fall_2022))
+    return rows
+
+
+def largest_within(rows):
+    """The row of the largest equity target weight whose worst fall is within the limit, or None."""
     within = [r for r in rows if r[3] <= RISK_LIMIT]
-    chosen = max(within, key=lambda r: r[0]) if within else None
+    return max(within, key=lambda r: r[0]) if within else None
+
+
+def results_table(rows, chosen):
+    """The table of every split, as written to the results files. chosen is the row held, or None."""
+    table = pd.DataFrame(rows, columns=["equity_weight", "growth_per_year", "volatility", "worst_fall", "peak", "low",
+                                        "fall_1999_2004", "fall_2007_2010", "fall_2022"])
+    table.insert(0, "split", [f"{round(w * 100)}/{round((1 - w) * 100)}" for w in table["equity_weight"]])
+    table["within_limit"] = ["yes" if f <= RISK_LIMIT else "no" for f in table["worst_fall"]]
+    table["chosen"] = ["yes" if chosen and w == chosen[0] else "no" for w in table["equity_weight"]]
+    return table
+
+
+def csv_text(table):
+    """The results table as the text of its file."""
+    return table.to_csv(index=False, float_format="%.6f", lineterminator="\n")
+
+
+def us_summary(rows, header):
+    """The US run's figures and the two expectations set before it, for the screen."""
+    largest = largest_within(rows)
+    at_70 = next(r for r in rows if round(r[0] * 100) == 70)
+    split = f"{round(largest[0] * 100)}/{round((1 - largest[0]) * 100)}" if largest else "none"
+    e8 = at_70[3] > E8_US_FALL_AT_70_ABOVE
+    e9 = largest is None or largest[0] <= E9_US_LARGEST_SPLIT_AT_MOST
+    return "\n".join([
+        "## The US run",
+        "",
+        f'Kenneth French, US research factors: file header "{header}".',
+        f"Largest split within {RISK_LIMIT * 100:.0f} per cent: {split}.",
+        f"Worst fall at 70/30: {at_70[3] * 100:.1f} per cent, from {at_70[4]} to {at_70[5]}.",
+        f"E8, the worst fall at 70/30 exceeds 35 per cent: {'met' if e8 else 'not met'}.",
+        f"E9, the largest split within 35 per cent is 65/35 or lower: {'met' if e9 else 'not met'}.",
+    ])
+
+
+def main():
+    returns, vintages = monthly_returns()
+    rows = split_rows(returns)
+    chosen = largest_within(rows)
 
     out = []
     out.append("# Allocation check: results")
@@ -288,16 +371,18 @@ def main():
     out.append("")
     for source, note in vintages.items():
         out.append(f"- {source}: {note}")
-    table = pd.DataFrame(rows, columns=["equity_weight", "growth_per_year", "volatility", "worst_fall", "peak", "low",
-                                        "fall_1999_2004", "fall_2007_2010", "fall_2022"])
-    table.insert(0, "split", [f"{round(w * 100)}/{round((1 - w) * 100)}" for w in table["equity_weight"]])
-    table["within_limit"] = ["yes" if f <= RISK_LIMIT else "no" for f in table["worst_fall"]]
-    table["chosen"] = ["yes" if chosen and w == chosen[0] else "no" for w in table["equity_weight"]]
+    table = results_table(rows, chosen)
     table.to_csv(OUT_CSV, index=False, float_format="%.6f", lineterminator="\n")
     text = "\n".join(out) + "\n"
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(text)
     print(text)
+
+    # The US run: the same test with the US market in place of the global series. Nothing is chosen from it.
+    us, us_header = us_returns(returns)
+    us_rows = split_rows(us)
+    results_table(us_rows, None).to_csv(OUT_US_CSV, index=False, float_format="%.6f", lineterminator="\n")
+    print(us_summary(us_rows, us_header))
 
 
 if __name__ == "__main__":
