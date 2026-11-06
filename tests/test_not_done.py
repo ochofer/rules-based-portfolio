@@ -55,7 +55,7 @@ def test_the_two_exhibits_sit_inside_the_section_in_the_order_the_text_names_the
     assert benchmark < html.index('data-exhibit="c33"') < html.index('data-exhibit="c34"') < html.index("<b>No views.</b>")
     assert html.index("<b>No views.</b>") < html.index("<b>No signal.</b>") < html.index('<ol class="notes">')
     assert [c["id"] for c in page.charts] == ["c33", "c34"] and {c["view"] for c in page.charts} == {"method"}
-    assert html.count("Committed in") == 2
+    assert "Committed in" not in html
 
 
 def test_the_us_exhibit_pairs_the_two_series_and_holds_the_global_split_in_the_accent():

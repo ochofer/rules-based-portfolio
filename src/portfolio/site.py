@@ -105,10 +105,10 @@ def _table(columns, rows, numeric=(), prose=False, wrap_first=None, rounding=Fal
 
 
 def _card(cid, title, asof, source, plot=True, table=None, note=None, wide=False, height=300, empty=None,
-          anchor=None, kind=None, extra=None, committed=None) -> str:  # fmt: skip
+          anchor=None, kind=None, extra=None) -> str:  # fmt: skip
     """A card. A chart card is a figure and a card that is a table on its own is a table (kind), each numbered by
     the build in page order. A card of text takes kind="text" and no number. A note may be one paragraph or a tuple of them,
-    extra is markup placed under them, and committed names the file whose commit the source line links to."""
+    and extra is markup placed under them."""
     kind = kind or ("figure" if plot else "text")
     target = f' id="{anchor}"' if anchor else ""
     heading = f'<h3 data-exhibit="{cid}" data-kind="{kind}">' if kind in ("figure", "table") else "<h3>"
@@ -125,8 +125,7 @@ def _card(cid, title, asof, source, plot=True, table=None, note=None, wide=False
         parts.append(extra)
     if source:
         files = ", ".join(f"<code>{_esc(s)}</code>" for s in ([source] if isinstance(source, str) else source))
-        commit = f". Committed in {_history(committed)}" if committed else ""
-        parts.append(f'<p class="source">Source: {files}{commit}</p>')
+        parts.append(f'<p class="source">Source: {files}</p>')
     if table:
         parts.append(f'<details class="twin"><summary>Table</summary>{table}</details>')
     parts.append("</article>")
@@ -1495,7 +1494,7 @@ def _us_test(allocation: pd.DataFrame, us: pd.DataFrame, period: tuple, added) -
             "40/60 to 100/0")  # fmt: skip
     card = _card("c33", "The allocation test on the US stock market: the worst fall of each split beside the global series",
                  asof, ["mandate/allocation_check_results.csv", "mandate/allocation_check_us_results.csv"],
-                 committed="mandate/allocation_check_us_results.csv", table=table, note=note, height=520,
+                 table=table, note=note, height=520,
                  anchor="method-united-states")  # fmt: skip
     return card, {"id": "c33", "view": "method", "traces": traces, "layout": layout}
 
@@ -1526,7 +1525,7 @@ def _alternative(daily: pd.DataFrame, fund: str) -> tuple:
     layout = {"showlegend": True, "legend": {"y": 1.02}, "yaxis": {"title": {"text": "Growth of 100"}}, **wide,
               "hovermode": "closest"}  # fmt: skip
     card = _card("c34", "Growth of 100: reference portfolio A and the S&P 500 alternative", asof,
-                 "outputs/portfolio_daily.csv", committed="outputs/portfolio_daily.csv", table=None if empty else table,
+                 "outputs/portfolio_daily.csv", table=None if empty else table,
                  note=(caption, note), height=320, empty=empty, anchor="method-alternative")  # fmt: skip
     chart = None if empty else {"id": "c34", "view": "method", "traces": traces, "layout": layout,
                                 "layout_narrow": narrow}  # fmt: skip
