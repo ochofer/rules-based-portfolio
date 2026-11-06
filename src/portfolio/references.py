@@ -99,6 +99,36 @@ def simulate(ledger: Ledger, navs_eur: pd.DataFrame, end: date, mode: str) -> pd
     return pd.DataFrame(rows).set_index("date")
 
 
+def alternative_fund(path: Path = None) -> tuple:
+    """The fund of the S&P 500 alternative: the first in rank order that the account offers, under the rules'
+    selection criteria with the S&P 500 in place of the global index (method/selection_sp500.csv). Returns its
+    name and ISIN."""
+    frame = pd.read_csv(path or config.METHOD_DIR / "selection_sp500.csv").drop_duplicates("isin").sort_values("rank")
+    row = frame[frame["offered_on_the_account"] == "yes"].iloc[0]
+    return str(row["fund"]), str(row["isin"])
+
+
+def sp500_alternative(ledger: Ledger, unit_value: pd.Series, end: date) -> pd.DataFrame:
+    """Daily values in euro of the S&P 500 alternative: the same contributions on the same days into one S&P 500
+    ETF at its net asset value in euro, in fractional units and without costs. The starting amount buys at the
+    net asset value of the day of the first purchase, as reference portfolio A's does, and each top-up buys on
+    the first day with a net asset value on or after its date. Returns one row per day of unit_value from the
+    first purchase to end: units and value."""
+    unit_value = unit_value.dropna()
+    contributions = ledger.contributions
+    start_day = _execution_day(unit_value.to_frame("value"), pd.Timestamp(contributions.iloc[0]["moment"].date()))
+    if start_day is None:
+        return pd.DataFrame(columns=["units", "value"])
+    days = unit_value.index[(unit_value.index >= start_day) & (unit_value.index <= pd.Timestamp(end))]
+    flows = [(pd.Timestamp(c.moment.date()), float(c.amount_eur)) for c in contributions.iloc[1:].itertuples()]
+    units, rows, previous = float(contributions.iloc[0]["amount_eur"]) / unit_value.loc[start_day], [], None
+    for day in days:
+        units += sum(a for d, a in flows if (previous is None or d > previous) and d <= day) / unit_value.loc[day]
+        rows.append({"date": day, "units": units, "value": units * unit_value.loc[day]})
+        previous = day
+    return pd.DataFrame(rows).set_index("date")
+
+
 def fetch_msci(refresh: bool, cache_dir: Path, start: date, end: date) -> Path:
     url = MSCI_LEVELS.format(start=start.strftime("%Y%m%d"), end=end.strftime("%Y%m%d"))
     return prices.fetch("msci/acwi_netr_eur.json", url, refresh, cache_dir=cache_dir)

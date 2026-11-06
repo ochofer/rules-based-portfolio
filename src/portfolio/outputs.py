@@ -54,11 +54,18 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     records = ledger_module.read()
     series = prices.load(refresh=refresh)
     navs = prices.navs_in_euro(series)
+    # The S&P 500 alternative's fund, valued on the same days in euro. The record runs to the last day on which
+    # all three funds have published a net asset value, so the whole page keeps one date.
+    alt_name, alt_isin = references.alternative_fund()
+    alt_usd = prices.load_alternative(alt_isin, refresh)
+    navs = navs.loc[: min(navs.index.max(), alt_usd.index.max())]
+    alt_eur = alt_usd.reindex(alt_usd.index.union(navs.index)).ffill().reindex(navs.index) / navs["usd_per_eur"]
     held = positions.build(records, today)
     values = valuations.build(held, navs)
     base = metrics.base_day(records, navs)
     ref_a = references.simulate(records, navs, today, "rules")
     ref_b = references.simulate(records, navs, today, "calendar")
+    alternative = references.sp500_alternative(records, alt_eur, today)
 
     first = records.contributions.iloc[0]["moment"].date()
     msci_start = (pd.Timestamp(first.year, first.month, 1) - pd.Timedelta(days=40)).date()
@@ -71,7 +78,7 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     growth = metrics.growth_index(values["value_eur"], metrics.flows_on_days(records, values.index),
                                   metrics.start_amount(records), base)  # fmt: skip
     blend = references.index_blend(growth.iloc[1:], msci, bond_month, today)
-    table = metrics.daily(records, values, ref_a, ref_b, blend, base)
+    table = metrics.daily(records, values, ref_a, ref_b, blend, base, alternative)
     placed = metrics.orders(records, navs)
     band, issues = metrics.compliance(records, navs, today)
     monthly = metrics.monthly(records, table, values, placed, today)
@@ -153,7 +160,9 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
 
     checks = _checks(records, navs, look, weights_now, loadings)
     written.append(_write(checks, "checks.csv", as_of, out_dir))
-    sources = _sources(series, msci, equity_as_of, bonds_as_of, latest_sheet.name, daily_factors, vintage, risk_sources)
+    alt_source = (f"{alt_name}, {alt_isin}, net asset values in US dollars", f"hsbc/{alt_isin}_nav.json", alt_usd.index.max())
+    sources = _sources(series, msci, equity_as_of, bonds_as_of, latest_sheet.name, daily_factors, vintage,
+                       [alt_source, *risk_sources])  # fmt: skip
     written.append(_write(sources, "sources.csv", as_of, out_dir))
     privacy(records, out_dir)
     return {"as_of": as_of, "files": written}

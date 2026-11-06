@@ -146,15 +146,18 @@ def daily(
     reference_b: pd.DataFrame,
     blend: pd.Series,
     base: pd.Timestamp,
+    alternative: pd.DataFrame = None,
 ) -> pd.DataFrame:
-    """One row per valuation day, with the base row first."""
+    """One row per valuation day, with the base row first. alternative, when given, is the S&P 500 alternative's
+    daily value, whose growth of 100 follows reference portfolio A's convention."""
     start = start_amount(ledger)
     flows = flows_on_days(ledger, values.index)
     out = pd.DataFrame({"growth_portfolio": growth_index(values["value_eur"], flows, start, base)})
-    for name, ref in (("growth_reference_a", reference_a), ("growth_reference_b", reference_b)):
-        if len(ref):
-            out[name] = growth_index(ref["value"], flows_on_days(ledger, ref.index), start, base)
-        else:
+    for name, ref in (("growth_reference_a", reference_a), ("growth_reference_b", reference_b),
+                      ("growth_sp500_alternative", alternative)):  # fmt: skip
+        if ref is not None and len(ref):
+            out[name] = growth_index(ref["value"], flows_on_days(ledger, ref.index), start, base).reindex(out.index)
+        elif ref is not None or name != "growth_sp500_alternative":
             out[name] = np.nan
     out["growth_index_blend"] = blend.reindex(out.index)
     out["drawdown_portfolio"] = drawdown(out["growth_portfolio"])

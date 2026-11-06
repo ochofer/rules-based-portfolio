@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import config, trading_days
+from . import config, references, trading_days
 from . import risk as risk_module
 from . import formatting as fmt
 from . import notes as notes_module
@@ -105,9 +105,10 @@ def _table(columns, rows, numeric=(), prose=False, wrap_first=None, rounding=Fal
 
 
 def _card(cid, title, asof, source, plot=True, table=None, note=None, wide=False, height=300, empty=None,
-          anchor=None, kind=None) -> str:  # fmt: skip
+          anchor=None, kind=None, extra=None, committed=None) -> str:  # fmt: skip
     """A card. A chart card is a figure and a card that is a table on its own is a table (kind), each numbered by
-    the build in page order. A card of text takes kind="text" and no number."""
+    the build in page order. A card of text takes kind="text" and no number. A note may be one paragraph or a tuple of them,
+    extra is markup placed under them, and committed names the file whose commit the source line links to."""
     kind = kind or ("figure" if plot else "text")
     target = f' id="{anchor}"' if anchor else ""
     heading = f'<h3 data-exhibit="{cid}" data-kind="{kind}">' if kind in ("figure", "table") else "<h3>"
@@ -118,11 +119,14 @@ def _card(cid, title, asof, source, plot=True, table=None, note=None, wide=False
         parts.append(f'<div class="empty">{_esc(empty)}</div>')
     elif plot:
         parts.append(f'<div class="plot" id="{cid}" style="height:{height}px" role="img" aria-label="{_esc(title)}"></div>')
-    if note:
-        parts.append(f'<p class="note">{_esc(note)}</p>')
+    for paragraph in [note] if isinstance(note, str) else (note or []):
+        parts.append(f'<p class="note">{_esc(paragraph)}</p>')
+    if extra:
+        parts.append(extra)
     if source:
         files = ", ".join(f"<code>{_esc(s)}</code>" for s in ([source] if isinstance(source, str) else source))
-        parts.append(f'<p class="source">Source: {files}</p>')
+        commit = f". Committed in {_history(committed)}" if committed else ""
+        parts.append(f'<p class="source">Source: {files}{commit}</p>')
     if table:
         parts.append(f'<details class="twin"><summary>Table</summary>{table}</details>')
     parts.append("</article>")
@@ -425,8 +429,11 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
                   f"{fmt.day_words(blend_points['date'].iloc[0])}, and is drawn once a second month's returns are published")
     asof3 = _asof(daily["date"].iloc[-1] if len(daily) else w_now["weights_as_of"],
                   f"100 is the starting amount before the first order. {blend_text}")  # fmt: skip
+    why = ("<p class=\"note\">Why the portfolio has no optimiser, no index benchmark, no views and no signal: "
+           f"{_link('method-not-done', 'Method')}.</p>")
     page.add("overview", _card("c3", "Growth of 100: the portfolio, the two reference portfolios and the index blend",
-             asof3, "outputs/portfolio_daily.csv", table=None if empty else table, height=340, wide=True, empty=empty),
+             asof3, "outputs/portfolio_daily.csv", table=None if empty else table, height=340, wide=True, empty=empty,
+             extra=why),
              None if empty else {"id": "c3", "traces": traces, "layout": layout,
                                  "layout_narrow": {"annotations": [], "margin": {"r": 12}, **narrow}})  # fmt: skip
 
@@ -1303,12 +1310,14 @@ def _controls(page, controls: pd.DataFrame):
 
 def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: str, sources: pd.DataFrame,
            bootstrap: pd.DataFrame, correlation: tuple = (pd.DataFrame(), pd.DataFrame()),
-           controls: pd.DataFrame = pd.DataFrame()):  # fmt: skip
+           controls: pd.DataFrame = pd.DataFrame(), not_done: dict = None):  # fmt: skip
     _allocation_curve(page, allocation)
     if len(bootstrap):
         _bootstrap(page, bootstrap)
     if any(len(c) for c in correlation):
         _correlation(page, *correlation)
+    if not_done:
+        _not_done(page, allocation, **not_done)
 
     blocks = []
     for sleeve, title in (("equity", "Equity ETFs"), ("bonds", "Bond ETFs")):
@@ -1375,6 +1384,244 @@ def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: 
         _controls(page, controls)
     page.add("method", f'<article class="card wide rules" id="method-rules"><h3>The rules</h3><p class="asof">Rendered from '
              f'rules/RULES.md at build time, with the amendments table</p>{rules_html}</article>')
+    page.add("method", _other_projects())
+
+
+# What the portfolio does not do ------------------------------------------------------------------------
+
+ADDED_WITH = "method/selection_sp500.csv"  # the section came with this file, so the file's first commit dates it
+TEST_PERIOD = re.compile(r"from (\d{4}-\d{2}) to (\d{4}-\d{2}), (\d+) months")
+NOTES = (
+    ("DeMiguel, V., Garlappi, L. and Uppal, R. (2009). Optimal versus naive diversification: how inefficient is the "
+     "1/N portfolio strategy? Review of Financial Studies 22(5), 1915 to 1953.", "https://doi.org/10.1093/rfs/hhm075"),
+    ("Optimal versus naive diversification, the replication and the index-tracking study, with its dashboard, note "
+     "and code:", STUDY_URL),
+    ("Kenneth French's data library, the US market return and the developed markets outside the United States:",
+     "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html"),
+    ("Black, F. and Litterman, R. (1992). Global portfolio optimization. Financial Analysts Journal 48(5), 28 to 43.",
+     "https://doi.org/10.2469/faj.v48.n5.28"),
+    ("Grinold, R. C. (1989). The fundamental law of active management. Journal of Portfolio Management 15(3), 30 to "
+     "37.", "https://doi.org/10.3905/jpm.1989.409211"),
+    ("The agenda of the review, mandate/REVIEW_2027.md in the repository:",
+     config.REPOSITORY_URL + "/blob/main/mandate/REVIEW_2027.md"),
+)
+# The wording of the cards on the site's projects page. The README's section Other projects carries the same.
+OTHER_PROJECTS = (
+    ("Optimal versus naive diversification.",
+     "Under an index-tracking mandate on French's 49 industries, five covariance estimators understate their own "
+     "tracking error, by 22 to 61 per cent. The replication of DeMiguel, Garlappi and Uppal (2009) reproduces 29 of "
+     "the 30 Sharpe ratios that carry a band.",
+     (("Page", STUDY_URL), ("dashboard", SITE_URL + "optimal-vs-naive-diversification/dashboard/B-P_dashboard.html"),
+      ("code", "https://github.com/ochofer/optimal-vs-naive-diversification"))),
+    ("Climate risk as an equity signal.",
+     "An ownership graph linking 328 listed companies to the 5,115 tracked assets they own. Of 19 apparent "
+     "ownership changes checked by hand, 12 had no transaction behind them.",
+     (("Page", PROJECTS_URL + "climate-risk-equity-signal/"),
+      ("note", "https://github.com/ochofer/paper1-hazard-exposure-data/releases/download/note-v1.2/"
+               "what-a-vintage-difference-measures.pdf"),
+      ("code", "https://github.com/ochofer/paper1-hazard-exposure-data"))),
+)
+
+
+def _first_commit_day(path: str, fallback) -> pd.Timestamp:
+    """The day of a file's first commit, read from git, or the fallback while the file is not yet committed or
+    the tree is not a clone."""
+    import subprocess
+
+    try:
+        found = subprocess.run(["git", "--no-optional-locks", "log", "--diff-filter=A", "--format=%cs", "--", path],
+                               cwd=config.ROOT, capture_output=True, text=True, timeout=30).stdout.split()
+    except (OSError, subprocess.SubprocessError):
+        found = []
+    return pd.Timestamp(found[-1] if found else fallback)
+
+
+def _test_period(path: Path = None) -> tuple:
+    """The allocation test's first and last month and its number of months, from the results file it writes."""
+    text = (path or config.ROOT / "mandate" / "allocation_check_results.md").read_text(encoding="utf-8")
+    first, last, months = TEST_PERIOD.search(text).groups()
+    return first, last, int(months)
+
+
+def _fn(n: int) -> str:
+    """A footnote mark that links to its entry in the notes."""
+    return f'<sup class="fn"><a href="#note-{n}" id="note-ref-{n}">{n}</a></sup>'
+
+
+def _signed(x) -> str:
+    """A difference of two indices, one decimal, with its sign."""
+    value = round(float(x), 1) + 0.0
+    return (f"{value:+.1f}" if value else "0.0").replace("-", fmt.MINUS)
+
+
+def _us_test(allocation: pd.DataFrame, us: pd.DataFrame, period: tuple, added) -> tuple:
+    """The worst fall of each split under the band rule, on the global equity series of the allocation test and
+    on the US stock market, as paired bars."""
+    splits = list(allocation["split"])
+    us = us.set_index("split").reindex(splits).reset_index()
+    held = [c == "yes" for c in allocation["chosen"]]
+    traces = []
+    for frame, name, colour, label in (
+            (allocation, "Global equity series", ["@accent" if h else "@other" for h in held], "global series"),
+            (us, "US stock market", "@us_series", "US stock market")):  # fmt: skip
+        traces.append({"type": "bar", "orientation": "h", "name": name, "y": splits,
+                       "x": [fmt.rounded(v * 100, 2) for v in frame["worst_fall"]], "marker": {"color": colour},
+                       **_hover([f"{s}, {label}: worst fall {fmt.pct(v)}" for s, v in zip(splits, frame["worst_fall"])])})  # fmt: skip
+    annotations = [_label(35, 1, "35%", yref="paper", anchor="right", role="@status_breach", xshift=-4, yshift=8),
+                   _label(40, 1, "40%", yref="paper", anchor="left", role="@status_breach", xshift=4, yshift=8)]  # fmt: skip
+    layout = {"barmode": "group", "bargap": 0.28, "bargroupgap": 0.06, "showlegend": True,
+              "legend": {"orientation": "h", "x": 0, "y": -0.1, "yanchor": "top", "traceorder": "normal"},
+              "yaxis": {"type": "category", "categoryorder": "array", "categoryarray": splits, "autorange": "reversed",
+                        "title": {"text": "Split, equity/bonds"}, "showgrid": False},
+              "xaxis": {"title": {"text": "Worst fall, per cent"}, "rangemode": "tozero"},
+              "shapes": [_vline(35, "@status_breach"), _vline(40, "@status_breach")], "annotations": annotations,
+              "margin": {"t": 24}}  # fmt: skip
+    rows = [[s, fmt.pct(g["worst_fall"]), fmt.pct(u["worst_fall"]), fmt.pct(g["growth_per_year"]),
+             fmt.pct(u["growth_per_year"]), g["within_limit"], u["within_limit"]]
+            for s, (_, g), (_, u) in zip(splits, allocation.iterrows(), us.iterrows())]  # fmt: skip
+    columns = ["Split", "Worst fall, global", "Worst fall, US", "Growth per year, global", "Growth per year, US",
+               "Within 35%, global", "Within 35%, US"]  # fmt: skip
+    table = _table(columns, rows, numeric=tuple(columns[1:5]))
+    g70, u70 = allocation.set_index("split").loc["70/30"], us.set_index("split").loc["70/30"]
+    first, last, _ = period
+    note = ("The allocation test run again with the US stock market in euro in place of the global equity series, "
+            "with the same bonds, the same band rule, the same splits and the same months. At 70/30 the global "
+            f"series' worst fall runs from {_month_name(g70['peak'])} to {_month_name(g70['low'])}, and the US "
+            f"series' from {_month_name(u70['peak'])} to {_month_name(u70['low'])}. The US series was added in "
+            f"{pd.Timestamp(added).strftime('%B %Y')}, after the first cycle day, in answer to a question readers ask, "
+            "and the split was set on the global series alone. The global series' 70/30 bar, in the primary ink, is "
+            "the split held.")  # fmt: skip
+    asof = (f"Monthly euro returns, {_month_name(first)} to {_month_name(last)}, rebalanced by the band, splits from "
+            "40/60 to 100/0")  # fmt: skip
+    card = _card("c33", "The allocation test on the US stock market: the worst fall of each split beside the global series",
+                 asof, ["mandate/allocation_check_results.csv", "mandate/allocation_check_us_results.csv"],
+                 committed="mandate/allocation_check_us_results.csv", table=table, note=note, height=520,
+                 anchor="method-united-states")  # fmt: skip
+    return card, {"id": "c33", "view": "method", "traces": traces, "layout": layout}
+
+
+def _alternative(daily: pd.DataFrame, fund: str) -> tuple:
+    """The growth of 100 of reference portfolio A and of the S&P 500 alternative from the first purchase."""
+    series = (("Reference A, same rules", "growth_reference_a", "@reference_a"),
+              ("S&P 500 alternative", "growth_sp500_alternative", "@sp500_alternative"))  # fmt: skip
+    columns = ["date"] + [c for _, c, _ in series]
+    data = daily[columns].dropna() if set(columns) <= set(daily.columns) else pd.DataFrame(columns=columns)
+    traces = [{"type": "scatter", "mode": "lines+markers" if len(data) < 3 else "lines", "name": name,
+               "x": list(data["date"]), "y": [fmt.rounded(v, 1) for v in data[column]],
+               "line": {"color": role, "width": 2}, "marker": {"size": 8, "color": role},
+               **_hover([f"{d}<br>{name}: {fmt.index(v)}" for d, v in zip(data["date"], data[column])])}
+              for name, column, role in series]  # fmt: skip
+    rows = [[_start_label(r["date"], i), fmt.index(r["growth_reference_a"]), fmt.index(r["growth_sp500_alternative"]),
+             _signed(r["growth_sp500_alternative"] - r["growth_reference_a"])] for i, (_, r) in enumerate(data.iterrows())]  # fmt: skip
+    headers = ["Date", "Reference A", "S&P 500 alternative", "Alternative minus reference A, index points"]
+    table = _table(headers, rows, numeric=tuple(headers[1:]))
+    caption = ("Two rule sets on the same contributions from the first purchase, both without costs. The S&P 500 "
+               f"alternative is {fund}, at its net asset value in euro. Over the record's months the gap says nothing "
+               "about either rule set.")  # fmt: skip
+    note = ("The portfolio's own line is not on the chart. Reference A stands for it, and the difference between the "
+            "portfolio and reference A is the implementation cost, which the Costs view shows.")  # fmt: skip
+    empty = None if len(data) >= 2 else "The S&P 500 alternative is drawn from the second valuation day."
+    asof = _asof(data["date"].iloc[-1], "100 is the starting amount before the first order") if len(data) else ""
+    wide, narrow = _date_axes(data["date"])
+    layout = {"showlegend": True, "legend": {"y": 1.02}, "yaxis": {"title": {"text": "Growth of 100"}}, **wide,
+              "hovermode": "closest"}  # fmt: skip
+    card = _card("c34", "Growth of 100: reference portfolio A and the S&P 500 alternative", asof,
+                 "outputs/portfolio_daily.csv", committed="outputs/portfolio_daily.csv", table=None if empty else table,
+                 note=(caption, note), height=320, empty=empty, anchor="method-alternative")  # fmt: skip
+    chart = None if empty else {"id": "c34", "view": "method", "traces": traces, "layout": layout,
+                                "layout_narrow": narrow}  # fmt: skip
+    return card, chart
+
+
+def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.DataFrame, fund: str, period: tuple,
+              added) -> None:  # fmt: skip
+    """What the portfolio does not do, and why: a card of text across the Method view, with the US run of the
+    allocation test and the S&P 500 alternative inside it. Every value in the text is read from a committed file."""
+    first, last, months = period
+    test = allocation.set_index("split")
+    error = test.loc["100/0", "volatility"] / (months / 12) ** 0.5 * 100
+    gap = (test.loc["100/0", "growth_per_year"] - test.loc["40/60", "growth_per_year"]) * 100
+    within = us_test[us_test["within_limit"] == "yes"]
+    u70 = us_test.set_index("split").loc["70/30"]
+    costs = '<a href="#costs">Costs view</a>'
+    fields = {
+        "test": _ref("c21"), "frontier": _ref("c32"), "growth": _ref("c3"), "us_test": _ref("c33"),
+        "alternative": _ref("c34"), "costs": costs, "years": f"{months / 12:.0f}", "error": f"{error:.1f}",
+        "gap": f"{gap:.1f}", "us_split": _esc(within.loc[within["equity_weight"].idxmax(), "split"]),
+        "us_fall": f"{u70['worst_fall'] * 100:.1f}", "us_peak": _month_name(u70["peak"]),
+        "us_low": _month_name(u70["low"]), "fund": _esc(fund), **{f"n{i}": _fn(i) for i in range(1, len(NOTES) + 1)},
+    }  # fmt: skip
+    parts = (
+        ("No optimiser.",
+         "The split is set by the risk limit: 70 per cent equity is the largest target weight whose worst fall on the "
+         "test's history stayed within 35 per cent ({test}). An optimiser would need the expected return of each "
+         "sleeve, and that is the input the data cannot supply. The standard error of the equity series' mean yearly "
+         "return over the test's {years} years is about {error} percentage points, computed as the series' yearly "
+         "volatility over the square root of its years, against a gap in growth per year of {gap} points between the "
+         "40/60 and the 100/0 split on the same history (the table under {test}). DeMiguel, Garlappi and Uppal "
+         "measured how much history a sample-based optimiser needs before it beats an equal split out of sample: about "
+         "3,000 months for 25 assets and about 6,000 for 50.{n1} A replication of their study by the same author finds "
+         "one of 32 optimising rules beating the equal split at the 5 per cent level on the 261 months since the "
+         "paper.{n2} The frontier of the two sleeves is in the Look-through view ({frontier}). With two assets it is a "
+         "line, and the limit picks the point on it."),
+        ("No index benchmark, and why not the S&P 500.",
+         "A benchmark is the portfolio a client would hold without the manager, so that the manager's contribution can "
+         "be measured as the difference and bounded. This portfolio has no client and no manager apart from its rules. "
+         "Its reference portfolios are therefore the rules themselves without costs: reference A, the same "
+         "contributions under the same rules at net asset value, and reference B, the same contributions returned to "
+         "70/30 on every cycle day ({growth}). The gap between the portfolio and reference A is the implementation "
+         "cost, shown in the {costs}, and it is the one figure a reader can hold the manager to. The question readers "
+         "ask most is why the portfolio does not simply hold the S&P 500. The global equity fund already holds the "
+         "index's companies at about two thirds of its weight, so holding the index alone sells the other third of the "
+         "world's listed companies and puts the whole portfolio into one country and one currency. A weight on one "
+         "country above its share of the world is a view, and the rules take none. The advice to hold the index alone "
+         "grew popular during the fifteen years in which the United States beat the rest of the world, and over the "
+         "ten years from 2000 to 2009 the index lost money in dollars, dividends included, and ended the decade behind "
+         "the developed markets outside the United States.{n3} On the limit, {us_test} repeats the allocation test "
+         "with the US stock market in euro in place of the global series, with the same splits, the same band rule and "
+         "the same months: the largest split within 35 per cent is {us_split}, and the worst fall at 70/30 is "
+         "{us_fall} per cent, from {us_peak} to {us_low}. {alternative} shows what the same contributions on the same "
+         "days would be in {fund}, the S&P 500 ETF that the selection criteria of the rules pick, at its net asset "
+         "value in euro and without costs, beside reference A. The two lines are two rule sets over the record's "
+         "months, a span on which the gap says nothing about either."),
+        ("No views.",
+         "A view is a statement that an asset's expected return differs from what its price implies, held with a "
+         "stated confidence. The standard method for turning views into weights starts from the market portfolio and "
+         "tilts it by each view in proportion to the confidence in it.{n4} With no views the method returns the market "
+         "portfolio, and that is what the equity sleeve holds, at the weights of the world's listed companies. The one "
+         "judgement in the rules is the one behind holding equity at all, that its return exceeds the return on bonds "
+         "over five to ten years, and the limit sets how much of the portfolio rides on it."),
+        ("No signal.",
+         "A signal is a view produced by a rule applied to data and tested on history. None enters the portfolio. The "
+         "value of a forecasting skill grows with the square root of the number of independent bets it is applied "
+         "to,{n5} and a portfolio of two funds with one decision a year makes about one bet a year, so no skill would "
+         "be detectable in its record and none would be worth its cost. At this portfolio's size the orders a signal "
+         "calls for cost more than the signal could earn, and the {costs} shows what each order costs. A portfolio "
+         "that carries a signal also becomes a test of that signal, and a few years of one portfolio cannot run that "
+         "test. Signals belong in a separate study on decades of data, and a signal that passes its test there can "
+         "enter the portfolio only through the yearly review of the rules, as a dated amendment with its test fixed "
+         "in advance.{n6} The first review is in October 2027 and its agenda is public."),
+    )
+    us_card, us_chart = _us_test(allocation, us_test, period, added)
+    alt_card, alt_chart = _alternative(daily, fund)
+    paragraphs = [f'<p class="part"><b>{_esc(label)}</b> {_esc(body).format(**fields)}</p>' for label, body in parts]
+    notes = "".join(f'<li id="note-{i}">{_esc(text)} <a href="{_esc(url)}">{_esc(url)}</a></li>'
+                    for i, (text, url) in enumerate(NOTES, start=1))  # fmt: skip
+    dated = (f"Added on {fmt.day_words(added)}, after the first cycle day, in answer to the questions readers ask "
+             "most. The rules are unchanged.")  # fmt: skip
+    page.add("method", f'<article class="card wide essay" id="method-not-done"><h3>What the portfolio does not do, '
+             f'and why</h3><p class="asof">{_esc(dated)}</p>{"".join(paragraphs[:2])}{us_card}{alt_card}'
+             f'{"".join(paragraphs[2:])}<p class="label">Notes</p><ol class="notes">{notes}</ol></article>', us_chart)  # fmt: skip
+    if alt_chart:
+        page.charts.append(alt_chart)
+
+
+def _other_projects() -> str:
+    """The links to the other projects, in the wording of their cards on the site."""
+    entries = "".join(f'<p><b>{_esc(title)}</b> {_esc(text)} '
+                      + ", ".join(f'<a href="{_esc(url)}">{_esc(word)}</a>' for word, url in links) + "</p>"
+                      for title, text, links in OTHER_PROJECTS)  # fmt: skip
+    return f'<article class="card wide projects" id="method-projects"><h3>Other projects</h3>{entries}</article>'
 
 
 # Simulations -----------------------------------------------------------------------------------------
@@ -1844,8 +2091,12 @@ def build(out_dir: Path = None) -> Path:
     selection = pd.read_csv(config.METHOD_DIR / "selection_tracking_difference.csv")
     simulated = {name: _read(f"simulation_{name}.csv", config.ROOT / "mandate") for name in ("bootstrap", "history", "paths")}
     correlation = (_read("sleeve_correlation.csv", config.ROOT / "mandate"), out.get("etf_correlation.csv", pd.DataFrame()))
+    us_test = _read("allocation_check_us_results.csv", config.ROOT / "mandate")
+    not_done = None if not len(us_test) else {
+        "us_test": us_test, "daily": daily, "fund": references.alternative_fund()[0], "period": _test_period(),
+        "added": _first_commit_day(ADDED_WITH, _built(now_row))}  # fmt: skip
     method(page, allocation, selection, _rules_html(), out["sources.csv"], simulated["bootstrap"], correlation,
-           _read("controls.csv", config.METHOD_DIR))  # fmt: skip
+           _read("controls.csv", config.METHOD_DIR), not_done)  # fmt: skip
     simulations(page, simulated["history"], simulated["paths"], monthly)
     reports = {p.stem: p.read_text(encoding="utf-8") for p in sorted(config.CYCLES_DIR.glob("*.md"))} if config.CYCLES_DIR.exists() else {}
     log(page, monthly, notes_module.read(), reports, orders, out.get("departures.csv", pd.DataFrame()),
@@ -1866,10 +2117,11 @@ def build(out_dir: Path = None) -> Path:
                        "combines both, and " + _link("lookthrough-risk-section", "the risk of the whole portfolio")
                        + ", estimated on index returns.",
         "factors": "The equity ETF's loadings on Kenneth French's developed-market factors.",
-        "method": "How the split and the two ETFs were chosen, the data behind the charts, the controls and the rules, in "
-                  "seven parts: " + _link("method-allocation", "the allocation test") + ", "
+        "method": "How the split and the two ETFs were chosen, what the portfolio does not do, the data behind the charts, "
+                  "the controls and the rules, in eight parts: " + _link("method-allocation", "the allocation test") + ", "
                   + _link("method-bootstrap", "its bootstrap") + ", "
                   + _link("method-correlation", "the correlation of the two sleeves") + ", "
+                  + _link("method-not-done", "what the portfolio does not do and why") + ", "
                   + _link("method-selection", "the ETF selection") + ", " + _link("method-sources", "the data sources")
                   + ", " + _link("method-controls", "the controls") + " and " + _link("method-rules", "the rules") + ".",
         "simulations": "The rules applied to the allocation test's returns and to paths resampled from them, in three parts: "

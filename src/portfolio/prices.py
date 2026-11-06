@@ -6,6 +6,8 @@ Sources, all published by the issuers or by the European Central Bank:
   - Vanguard: the daily net asset value of IE00BH04GL39 in euro, from the data service behind
     vanguard.co.uk.
   - ECB: the euro reference rate against the US dollar (dataset EXR), daily.
+  - HSBC: the daily net asset value of IE000JZ473P7 in US dollars, the fund of the S&P 500 alternative, from
+    the price history on its page at assetmanagement.hsbc.co.uk.
 Files are cached locally, never committed and never redistributed. cache/sources.json records each
 download's URL, time and size.
 """
@@ -34,6 +36,10 @@ ISHARES_DOCUMENT = (
 VANGUARD_SERVICE = "https://www.vanguard.co.uk/gpx/graphql"
 VANGUARD_PORT_ID = "9591"
 ECB_USD_PER_EUR = "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?format=csvdata"
+HSBC_SITE = "https://www.assetmanagement.hsbc.co.uk"
+HSBC_FUND_PAGE = HSBC_SITE + "/en/individual-investor/funds/{isin}"
+HSBC_EXCHANGE = "XLON"  # the listing whose base-currency price history the page shows as the net asset value
+HSBC_FEEDS = ("IE000JZ473P7",)  # the HSBC share classes whose price history this module reads
 
 SS = "urn:schemas-microsoft-com:office:spreadsheet"
 MONTHS = {
@@ -153,6 +159,87 @@ def parse_ecb(path: Path) -> pd.Series:
         name="usd_per_eur",
     )
     return series.sort_index()
+
+
+def _hsbc_post(path: str, body, component: str, token: str = None) -> str:
+    """One request to the data service behind the fund page, as the page makes it."""
+    url = path if path.startswith("http") else HSBC_SITE + path
+    headers = {"User-Agent": USER_AGENT, "X-Country": "GB", "X-Language": "EN", "X-Component": component}
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    data = json.dumps(body).encode("utf-8") if body is not None else b""
+    request = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    with urllib.request.urlopen(request, timeout=120) as response:
+        return response.read().decode("utf-8")
+
+
+def hsbc_price_history(isin: str) -> bytes:
+    """The price history of an HSBC ETF share class, as its fund page requests it: the page names its
+    presentation, the presentation names the price chart and the listings, and the chart's series for the
+    listing's base currency is the net asset value by date."""
+    request = urllib.request.Request(HSBC_FUND_PAGE.format(isin=isin.lower()), headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(request, timeout=120) as response:
+        page = response.read().decode("utf-8", "replace")
+    m = re.search(r"presentationUrl:\s*\{\s*'url'\s*:\s*'([^']+)',\s*'id'\s*:\s*'([^']+)'", page)
+    if not m:
+        raise ValueError(f"{isin}: the fund page names no presentation")
+    info = {"country": "GB", "language": "EN", "investorType": "INDV", "shareId": isin}
+    token = _hsbc_post("/api/v1/token/issue", None, m.group(2))
+    presentation = json.loads(_hsbc_post(m.group(1), {"id": m.group(2), "pageInformation": info}, m.group(2), token))
+    chart = next(s for tab in presentation["tabs"] for s in tab.get("sections", []) if s.get("type") == "LineGraph")
+    listing = next(e for e in presentation["exchange"]["items"] if e["id"] == HSBC_EXCHANGE)
+    base = next(g for g in listing["currency"] if g["name"] == "Base Currency")["options"][0]
+    component = chart["requestUrl"]["id"]
+    token = _hsbc_post("/api/v1/token/issue", None, component)
+    body = dict(chart["payload"], pageInformation=info, exchange=listing["id"], currency=base["id"])
+    series = json.loads(_hsbc_post("/api/v1/detail/line-chart-series", body, component, token))
+    return json.dumps({"isin": isin, "currency": base["label"], "series": series}).encode("utf-8")
+
+
+def fetch_hsbc(isin: str, refresh: bool = False, attempts: int = 3, cache_dir: Path = config.CACHE_DIR) -> Path:
+    """The cached price history of an HSBC ETF, downloaded when missing or when refresh is set, three tries
+    10 seconds apart, through a temporary file."""
+    name = f"hsbc/{isin}_nav.json"
+    path = Path(cache_dir) / name
+    if path.exists() and not refresh:
+        return path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    for attempt in range(1, attempts + 1):
+        try:
+            body = hsbc_price_history(isin)
+            break
+        except (OSError, ValueError, KeyError, StopIteration) as error:
+            if attempt == attempts:
+                raise SystemExit(f"Could not download the net asset values of {isin} from HSBC ({error}). Try again "
+                                 f"later; the cached copy, if any, is unchanged at {path}.")  # fmt: skip
+            time.sleep(10)
+    tmp = path.with_name(path.name + ".part")
+    tmp.write_bytes(body)
+    os.replace(tmp, path)
+    _log_download(name, HSBC_FUND_PAGE.format(isin=isin.lower()), len(body), Path(cache_dir))
+    return path
+
+
+def parse_hsbc_navs(path: Path) -> pd.Series:
+    """The price history of an HSBC ETF: net asset value by date, in US dollars."""
+    answer = json.loads(Path(path).read_text())
+    if answer["currency"] != "USD":
+        raise ValueError(f"{path}: the net asset values are not in US dollars")
+    points = next(s for s in answer["series"] if s.get("name") == "Price")["data"]
+    values = {pd.Timestamp(p["x"]): float(p["y"]) for p in points if p.get("y") is not None}
+    if not values:
+        raise ValueError(f"{path}: the price history is empty")
+    return pd.Series(values, name="nav_usd").sort_index()
+
+
+def load_alternative(isin: str, refresh: bool = False, cache_dir: Path = config.CACHE_DIR) -> pd.Series:
+    """The net asset values in US dollars of the S&P 500 alternative's fund. Its issuer's feed is the one
+    written for it, and a fund without one stops the build."""
+    if isin not in HSBC_FEEDS:
+        raise ValueError(f"no net asset value feed is written for {isin}, the fund the selection picks")
+    return parse_hsbc_navs(fetch_hsbc(isin, refresh, cache_dir=cache_dir))
 
 
 def vanguard_query(start: str = "2019-01-01", end: str = None) -> dict:

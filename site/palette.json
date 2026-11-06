@@ -36,6 +36,8 @@
   "cost_1": "#16213a",
   "cost_2": "#3d5f99",
   "cost_3": "#7f98c2",
-  "cost_4": "#c5d1e6"
+  "cost_4": "#c5d1e6",
+  "us_series": "#12929f",
+  "sp500_alternative": "#12929f"
  }
 }
