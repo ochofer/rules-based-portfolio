@@ -1,6 +1,6 @@
 # Rules-based portfolio
 
-I run a real-money portfolio under written rules: 70 per cent in a global equity ETF and 30 per cent in a euro government bond ETF, funded by a starting amount and a fixed monthly top-up. The mandate sets the objective and the risk limit, a test on monthly data from 1999 to 2025 derives the split from that limit, and the rules determine every order the portfolio places. The rules were fixed before the first order and are tagged `rules-v1.0`.
+I run a real-money portfolio under written rules: 70 per cent in a global equity ETF and 30 per cent in a euro government bond ETF, funded by a starting amount and a fixed monthly top-up. The mandate sets the objective and the risk limit, and a test on monthly data from 1999 to 2025 derives the split from that limit. The rules produce the orders the portfolio places, and every departure from them is kept in a register. The rules were fixed before the first order and are tagged `rules-v1.0`.
 
 Each sleeve is an ETF, and the record looks through both to the companies and bonds inside them.
 
