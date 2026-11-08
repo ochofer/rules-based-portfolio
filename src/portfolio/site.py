@@ -18,6 +18,7 @@ import pandas as pd
 from . import config, references, trading_days
 from . import risk as risk_module
 from . import formatting as fmt
+from . import guide as guide_module
 from . import notes as notes_module
 from . import quarterly as quarterly_module
 
@@ -1037,7 +1038,7 @@ def _frontier(page, frontiers, summary, components):
     note = (f"Estimated on the past returns of {_window_text(summary)}, of which the means are the least reliable input: "
             "long-only portfolios of the components, fully invested, at 25 target returns from the minimum-variance portfolio's "
             "to the highest component mean. The portfolio does not optimise, by its rules, and its point is where its two "
-            "cap-weighted ETFs put it. The distance from the curve is what holding cap weights cost on this window, "
+            "cap-weighted ETFs put it. The distance from the curve is how far the cap weights sat from the frontier estimated on this window, "
             f"and the grey curve, the 120 months before it, shows how far the frontier moves between windows. The study "
             f"{STUDY_NAME} finds that sample-based optimisation of this kind does not keep its in-sample advantage out of "
             "sample. The table gives the weights of each point of the window's frontier.")  # fmt: skip
@@ -2101,7 +2102,9 @@ def build(out_dir: Path = None) -> Path:
     log(page, monthly, notes_module.read(), reports, orders, out.get("departures.csv", pd.DataFrame()),
         _next_cycle_day(now_row), _quarterly_issues(), now_row)  # fmt: skip
     _check_roles(page.charts, palette)
-    _number(page.sections)
+    numbers = _number(page.sections)
+    # The guide to the dashboard is built with it, and the build stops when a part of the page has no entry in it.
+    guide_module.write(page.sections, numbers, VIEWS, terms(), _built(now_row), out_dir)
 
     first = daily["date"].iloc[1] if len(daily) > 1 else None
     leads = {
@@ -2172,7 +2175,8 @@ def build(out_dir: Path = None) -> Path:
 <p>{_esc(intro)}</p>
 <div class="meta"><span>{_esc(_two_dates(out["allocation_now.csv"].iloc[0]))}</span><span>{_esc(started)}</span>
 <a href="{config.REPOSITORY_URL}">Repository</a><a href="{config.REPOSITORY_URL}/blob/main/rules/RULES.md">Rules</a>
-<a href="{config.REPOSITORY_URL}/blob/main/mandate/MANDATE.md">Mandate</a></div>
+<a href="{config.REPOSITORY_URL}/blob/main/mandate/MANDATE.md">Mandate</a>
+<a href="guide/guide.pdf">Guide to the dashboard (PDF)</a></div>
 </div></header>
 <div class="viewtabs" role="navigation" aria-label="Views"><div class="wrap">{tabs}</div></div>
 <main class="wrap">

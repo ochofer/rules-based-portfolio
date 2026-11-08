@@ -7,6 +7,7 @@ data/
 reports/
 *.pdf
 !quarterly/*.pdf
+!guide/guide.pdf
 # Python
 __pycache__/
 *.pyc

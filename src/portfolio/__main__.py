@@ -13,6 +13,8 @@ Commands:
                      cycle day and the month's figures; the words are written by hand
   build  [--date D]  the public files in outputs/ and the dashboard, index.html at the root
   privacy            check that no figure in outputs/ is a private amount of the ledger
+  guide --print      print the guide to the dashboard, guide/guide.pdf, from its page, which build writes;
+                     without --print, check that the PDF carries the page's words, title and author
 Add --refresh to download every source again first.
 
 Every command prints euro amounts and units, which are private: the output is for the terminal and for
@@ -327,6 +329,21 @@ def cmd_quarterly(args) -> int:
     return 0
 
 
+def cmd_guide(args) -> int:
+    from . import guide
+
+    if args.print:
+        out = guide.print_pdf(font=Path(args.font) if args.font else None)
+        print(f"Printed {guide.FOLDER}/{out.name}.")
+        return 0
+    faults = guide.check()
+    for fault in faults:
+        print(fault)
+    print(f"{guide.FOLDER}/{guide.PDF} carries the words, title and author of {guide.FOLDER}/{guide.PAGE}."
+          if not faults else f"{len(faults)} fault(s) in the guide's PDF.")  # fmt: skip
+    return 1 if faults else 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="python3 -m portfolio")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -343,10 +360,14 @@ def main(argv=None) -> int:
     q.add_argument("--print", action="store_true")
     q.add_argument("--printed", type=lambda s: datetime.strptime(s, "%Y-%m-%d").date())
     q.add_argument("--font")
+    g = sub.add_parser("guide")
+    g.add_argument("--print", action="store_true")
+    g.add_argument("--check", action="store_true")
+    g.add_argument("--font")
     args = parser.parse_args(argv)
     try:
         commands = {"check": cmd_check, "status": cmd_status, "cycle": cmd_cycle, "post": cmd_post, "note": cmd_note,
-                    "build": cmd_build, "privacy": cmd_privacy, "quarterly": cmd_quarterly}  # fmt: skip
+                    "build": cmd_build, "privacy": cmd_privacy, "quarterly": cmd_quarterly, "guide": cmd_guide}  # fmt: skip
         return commands[args.command](args)
     except (
         ledger_module.LedgerError,

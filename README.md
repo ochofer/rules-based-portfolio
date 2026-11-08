@@ -4,7 +4,7 @@ I run a real-money portfolio under written rules: 70 per cent in a global equity
 
 Each sleeve is an ETF, and the record looks through both to the companies and bonds inside them.
 
-The dashboard is at https://www.carlohofer.com/rules-based-portfolio/. It is rebuilt every Monday and on each cycle day, and its header gives the dates of its prices and of its holdings. Its Method view explains [what the portfolio does not do, and why](https://www.carlohofer.com/rules-based-portfolio/#method-not-done): no optimiser, no index benchmark, no views and no signal.
+The dashboard is at https://www.carlohofer.com/rules-based-portfolio/. It is rebuilt every Monday and on each cycle day, and its header gives the dates of its prices and of its holdings. Its Method view explains [what the portfolio does not do, and why](https://www.carlohofer.com/rules-based-portfolio/#method-not-done): no optimiser, no index benchmark, no views and no signal. The [guide to the dashboard](guide/guide.pdf) explains every view, tile, figure and table for readers with or without a background in finance: what each shows, how to read it and where its numbers come from.
 
 ## How the portfolio is run
 
@@ -31,6 +31,7 @@ On the cycle day, the 5th of each month or the first trading day after it when t
 | `notes/` | The monthly note written after each cycle day. |
 | `quarterly/` | The quarterly report: each issue's page, built once from the tables of the commit it names and never rebuilt, the PDF printed from it, the commentary it carries and any errata. |
 | `method/` | The fixed tables the program applies: MSCI's regions, the funds the equity ETF holds, share classes of one company, the ETF selection, the choice of the S&P 500 alternative's ETF and the controls. |
+| `guide/` | The guide to the dashboard: its text, `source.md`, the page built from it with the dashboard, and the PDF printed from that page. |
 | `index.html`, `site/` | The dashboard, the style, script and colour palette it is built with, and the style of the quarterly report. |
 
 
@@ -57,7 +58,7 @@ python3 mandate/simulations.py
 python3 -m pytest tests
 ```
 
-`allocation_check.py` downloads its six source files into `cache/`, which is not committed, and rewrites `mandate/allocation_check_results.md` and the two tables of every split, `mandate/allocation_check_results.csv` for the global equity series and `mandate/allocation_check_us_results.csv` for the US stock market. The US run was added in November 2026, after the first cycle day, to answer a question readers ask, and the split was set on the global series alone. Its sample ends in December 2025, so a later run differs only where a source revises its history. `simulations.py` reads the same files, checks that its code reproduces the allocation test, and rewrites the three simulation tables with one fixed seed, so a run reproduces them, and the table of the rolling correlation. The tests run on invented ledgers and simulated returns. The program reads the private ledger: with `PYTHONPATH=src`, `python3 -m portfolio check` checks the ledger against rules 7 and 10, `status` shows the holdings and weights, `cycle` gives the orders of a cycle day and, on that day, writes the cycle report, `post` adds the line after the orders, `note` drafts the monthly note's figures, `build` writes `outputs/` and `index.html`, `quarterly 2026-Q4 --commit <commit>` writes the issue of a quarter from the tables of that commit, `quarterly 2026-Q4 --print` prints its PDF with Playwright's Chromium, and `quarterly --check` rebuilds every issue from its commit and checks that each PDF carries its page's words, title and author.
+`allocation_check.py` downloads its six source files into `cache/`, which is not committed, and rewrites `mandate/allocation_check_results.md` and the two tables of every split, `mandate/allocation_check_results.csv` for the global equity series and `mandate/allocation_check_us_results.csv` for the US stock market. The US run was added in November 2026, after the first cycle day, to answer a question readers ask, and the split was set on the global series alone. Its sample ends in December 2025, so a later run differs only where a source revises its history. `simulations.py` reads the same files, checks that its code reproduces the allocation test, and rewrites the three simulation tables with one fixed seed, so a run reproduces them, and the table of the rolling correlation. The tests run on invented ledgers and simulated returns. The program reads the private ledger: with `PYTHONPATH=src`, `python3 -m portfolio check` checks the ledger against rules 7 and 10, `status` shows the holdings and weights, `cycle` gives the orders of a cycle day and, on that day, writes the cycle report, `post` adds the line after the orders, `note` drafts the monthly note's figures, `build` writes `outputs/`, `index.html` and the guide's page, `guide/guide.html`, `guide --print` prints the guide's PDF from that page with Playwright's Chromium, `quarterly 2026-Q4 --commit <commit>` writes the issue of a quarter from the tables of that commit, `quarterly 2026-Q4 --print` prints its PDF with Playwright's Chromium, and `quarterly --check` rebuilds every issue from its commit and checks that each PDF carries its page's words, title and author.
 
 ## Terms
 
@@ -77,7 +78,7 @@ python3 -m pytest tests
 - **net asset value**: the value of one share of an ETF at the close of a day, as its issuer publishes it.
 - **look-through**: the portfolio's exposure to the securities inside the two ETFs, each ETF's holdings weighted by the ETF's weight in the portfolio.
 - **reference portfolio**: a portfolio computed from the same contributions and prices as the portfolio, without costs. Reference portfolio A follows the same rules, and reference portfolio B goes back to the target weights on every cycle day.
-- **S&P 500 alternative**: the same contributions on the same days into one S&P 500 ETF at its net asset value in euro, in fractional units and without costs, starting with the starting amount at the net asset value of the day of the first purchase, exactly as reference portfolio A starts. It stands for the rule "hold the S&P 500 and nothing else" with no costs, so that it is compared with reference A like for like, two rule sets on the same money.
+- **S&P 500 alternative**: the same contributions on the same days into one S&P 500 ETF at its net asset value in euro, in fractional units and without costs, starting with the starting amount at the net asset value of the day of the first purchase, exactly as reference portfolio A starts. It stands for the rule "hold the S&P 500 and nothing else" with no costs, so that it is compared with reference portfolio A like for like, two rule sets on the same money.
 - **index blend**: 70 per cent MSCI ACWI net total return and 30 per cent the Bloomberg Euro-Aggregate Treasury index, in euro, rebalanced at each month end.
 - **implementation cost**: reference portfolio A's value relative to the portfolio's, with contributions removed, in basis points, positive when the portfolio trails.
 - **half-spread**: half the gap between the ask and the bid quoted when an order is placed.
@@ -88,8 +89,8 @@ python3 -m pytest tests
 - **drawdown**: the fall in the portfolio's value below its previous peak on a given day, with contributions removed, in per cent.
 - **worst fall**: the largest drawdown, meaning the largest fall in the portfolio's value from a previous peak to a later low, with contributions removed.
 - **tracking difference**: an ETF's return minus its index's return over a calendar year, in percentage points.
-- **duration**: the approximate percentage change in a bond's price for a change of one percentage point in its yield, in years. For the bond sleeve it is the average duration in the issuer's factsheet.
-- **factor**: the return of one of the developed-market factors in Kenneth French's data library: the market's return minus the risk-free rate, and long-short portfolios for size, value, profitability, investment and momentum.
+- **duration**: a bond's average time to its payments, weighted by their value, in years. It is also, approximately, the percentage fall in the bond's price when its yield rises by one percentage point. For the bond sleeve it is the average duration in the issuer's factsheet.
+- **factor**: one of the return series in Kenneth French's data library for developed markets: the market's return minus the risk-free rate, and the returns of long-short portfolios for size, value, profitability, investment and momentum.
 - **loading**: the coefficient of the ETF's return minus the risk-free rate on a factor's return.
 - **risk-free rate**: the one-month US Treasury bill return in French's files.
 - **standard error**: the estimated standard deviation of an estimate.
@@ -99,18 +100,20 @@ python3 -m pytest tests
 - **resampled paths**: the bootstrap's ten-year paths carried forward from the first purchase with the top-up and the rules, in units of the starting amount.
 - **in-sample**: computed on the data on which a choice was made, here the returns from 1999 to 2025 on which the split was chosen.
 - **time-weighted return**: the return with contributions removed, chained from day to day, so the timing and the size of the contributions do not affect it.
+- **market effect**: a month's change in the portfolio's value that did not come from contributions, in per cent of the value at the start of the month.
 - **money-weighted return**: the rate at which the contributions, each from its date, grow to the portfolio's value, so the timing of the contributions counts. Cumulative in the first year and per year after it.
 - **cycle report**: the file `cycles/YYYY-MM.md` written on a cycle day before any order, with each rule that bears on the proposed orders, its figure and a pass or a fail, and one line after the orders that compares them with the proposal.
 - **monthly note**: the note of 120 to 200 words, in `notes/YYYY-MM.md`, written by hand after each cycle day.
 - **departure**: an order placed, or left unplaced, other than as the rules require. The departures register lists each one with its rule and its consequence.
 - **rolling correlation**: the correlation of two series of monthly returns over the 36 months to each month end.
 - **component**: one of the parts into which the look-through divides the portfolio to estimate its risk: the four equity regions, the bond sleeve's three maturity groups, and cash, which has no return.
-- **maturity group**: the bonds of the bond sleeve with 1 to 5, 5 to 10 or over 10 years to maturity, each priced as a zero-coupon euro area government bond at 3, 7.5 or 20 years from the ECB's yield curve.
+- **maturity group**: the bonds of the bond sleeve with 1 to 5, 5 to 10 or over 10 years to maturity, each priced as a zero-coupon euro area government bond at 3, 7.5 or 20 years from the European Central Bank's yield curve.
 - **estimated volatility**: the standard deviation of the portfolio's return over a year, estimated from the components' monthly returns over the last 120 months at the latest look-through weights.
 - **realised volatility**: the standard deviation of the portfolio's last 12 monthly time-weighted returns, times the square root of 12, so a figure for a year.
 - **value at risk**: the loss over one month that the portfolio, at today's weights, exceeded in one month in twenty of the 120-month window, read from those months or from the normal distribution with the estimated volatility.
 - **expected shortfall**: the mean loss over one month in the months beyond the value at risk, from the window or from the normal distribution.
-- **forecast's calibration**: the standard deviation of each month's return divided by the monthly volatility estimated at the end of the month before. 1 means the estimates matched the returns, and above 1 that they were too low.
+- **forecast's calibration**: the standard deviation, over the months that have a forecast, of each month's return divided by the monthly volatility estimated for it at the end of the month before. 1 means the estimates matched the returns, and above 1 that they were too low.
+- **covariance**: how far two returns move together, in the units of variance, the square of volatility: their correlation times the product of their standard deviations.
 - **risk contribution**: a component's weight times the covariance of its return with the portfolio's return, divided by the portfolio's variance. The contributions sum to 100 per cent.
 - **efficient frontier**: the long-only, fully invested portfolios of the components with the lowest estimated volatility for each estimated return, on the means and covariances of one window of 120 months.
 - **minimum-variance portfolio**: the portfolio on the efficient frontier with the lowest estimated volatility.

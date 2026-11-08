@@ -1,0 +1,24 @@
+/* The guide to the dashboard, on top of the report's style */
+.gd-contents { background: var(--tint); padding: 12px 16px 14px; margin: 0 0 24px; font-size: 14px; }
+.gd-contents h2 { font-size: 1.3rem; margin: 0 0 4px; }
+.gd-contents ul { list-style: none; margin: 0; padding: 0; }
+.gd-contents > ul > li { margin: 8px 0 0; font-weight: 600; }
+.gd-contents ul ul { font-weight: 400; margin: 2px 0 0 14px; columns: 2; column-gap: 28px; }
+.gd-contents ul ul li { break-inside: avoid; margin: 1px 0; }
+.gd > p, .gd > ul, .gd > ol { max-width: 75ch; }
+.gd h3 { font-size: 1.05rem; font-weight: 600; color: var(--ink); margin: 28px 0 2px; }
+.gd-where { font-size: 13px; color: var(--meta); margin: 0 0 8px; }
+.gd code { font-size: 0.86em; overflow-wrap: anywhere; }
+@media (max-width: 700px) { .gd-contents ul ul { columns: 1; } }
+@media print {
+  /* Contextual forms of the sans, such as a bracket after a figure, would print as marks that carry no letter. */
+  body { font-feature-settings: "calt" 0, "case" 0; }
+  .gd .rp-stamp { font-variant-numeric: normal; }
+  .gd > h2 { break-before: page; margin-top: 0; }
+  .gd h3 { font-size: 10.5pt; margin-top: 5mm; break-after: avoid; }
+  .gd-where { font-size: 8.5pt; break-after: avoid; }
+  .gd-contents { font-size: 9pt; padding: 3mm 4mm; }
+  .gd-contents h2 { font-size: 14pt; }
+  /* One column in print, so that the contents read in the order of the guide. */
+  .gd-contents ul ul { columns: 1; }
+}
