@@ -2163,6 +2163,7 @@ def build(out_dir: Path = None) -> Path:
 {_link_preview()}<style>
 {css}</style>
 <script src="{PLOTLY}" integrity="{PLOTLY_INTEGRITY}" crossorigin="anonymous" defer></script>
+{config.COUNTER}
 </head>
 <body>
 <header class="ch-band"><div class="ch-band__in">

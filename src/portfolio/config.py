@@ -23,6 +23,11 @@ SITE_DIR = ROOT / "site"  # public: the page template, its script and the palett
 REPOSITORY_URL = "https://github.com/ochofer/rules-based-portfolio"
 DASHBOARD_URL = "https://www.carlohofer.com/rules-based-portfolio/"
 PREVIEW_IMAGE = "og-portfolio.png"  # the link-preview picture at the root, for the dashboard and each quarterly issue
+# The visit counter of the site, in the head of every page the repository publishes: GoatCounter, which sets no
+# cookies and does not count a page opened from a file. Its fifth version is pinned with its integrity hash.
+COUNTER = ('<script data-goatcounter="https://carlohofer.goatcounter.com/count" async src="https://gc.zgo.at/count.v5.js" '
+           'crossorigin="anonymous" integrity="sha384-atnOLvQb9t+jTSipvd75X2yginT4PjVbqDdlJAmxMm+wYElFmeR6EmLP5bYeoRVQ"></script>')
+COUNTER_HOST = "https://gc.zgo.at/**"  # not loaded when a page is printed
 
 EQUITY, BONDS = "equity", "bonds"
 SLEEVES = (EQUITY, BONDS)

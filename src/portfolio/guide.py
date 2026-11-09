@@ -171,6 +171,7 @@ def page(source: str, found: dict, terms: list) -> str:
 <meta name="author" content="{AUTHOR}">
 <meta name="description" content="What each view, tile, figure and table of the rules-based portfolio's dashboard shows, how to read it and where its numbers come from.">
 <link rel="icon" href="{FAVICON_URL}" type="image/svg+xml">
+{config.COUNTER}
 <style>{css}</style>
 </head>
 <body>
@@ -194,12 +195,17 @@ def page(source: str, found: dict, terms: list) -> str:
 """
 
 
+def _body(page: str) -> str:
+    return page.split("<body", 1)[-1]
+
+
 def edition(new_page: str, previous: Path, built) -> str:
-    """The edition's date: the previous page's while the words stay the same, and the build's day when they change."""
+    """The edition's date: the previous page's while the words stay the same, and the build's day when they change.
+    The page's body is compared, so a change to the head alone, such as a script, keeps the date."""
     if previous.exists():
         old = previous.read_text(encoding="utf-8")
         dated = EDITION_LINE.search(old)
-        if dated and EDITION_LINE.sub(f"Edition of {EDITION}", old) == new_page:
+        if dated and _body(EDITION_LINE.sub(f"Edition of {EDITION}", old)) == _body(new_page):
             return dated.group(1)
     day = pd.Timestamp(built)
     return f"{day.day} {day.strftime('%B %Y')}"
@@ -240,6 +246,7 @@ def print_pdf(page_path: Path = None, font: Path = None) -> Path:
             data = Path(font).read_bytes()
             tab.route("https://www.carlohofer.com/assets/fonts/**", lambda r: r.fulfill(
                 status=200, body=data, headers={"Content-Type": "font/woff2", "Access-Control-Allow-Origin": "*"}))
+        tab.route(config.COUNTER_HOST, lambda r: r.abort())
         tab.goto(page_path.resolve().as_uri(), wait_until="networkidle")
         tab.evaluate("document.fonts.ready")
         tab.pdf(path=str(part), format="A4", print_background=True, prefer_css_page_size=True, tagged=True,

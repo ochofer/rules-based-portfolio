@@ -727,6 +727,7 @@ def build(root: Path, quarter: pd.Period, commit: str) -> str:
 <meta name="author" content="{AUTHOR}">
 {_preview(root, quarter, issue.period_words())}<meta name="issue" content="{q_label}">
 <meta name="commit" content="{html.escape(commit)}">
+{config.COUNTER}
 <style>{css}</style>
 </head>
 <body>
@@ -801,6 +802,7 @@ def print_pdf(page: Path, printed: date, font: Path = None) -> Path:
             data = Path(font).read_bytes()
             tab.route("https://www.carlohofer.com/assets/fonts/**", lambda r: r.fulfill(
                 status=200, body=data, headers={"Content-Type": "font/woff2", "Access-Control-Allow-Origin": "*"}))
+        tab.route(config.COUNTER_HOST, lambda r: r.abort())
         tab.goto(page.resolve().as_uri(), wait_until="networkidle")
         tab.evaluate("document.fonts.ready")
         tab.pdf(path=str(out), format="A4", print_background=True, prefer_css_page_size=True, tagged=True)

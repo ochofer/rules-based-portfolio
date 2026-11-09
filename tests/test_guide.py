@@ -90,16 +90,24 @@ def test_a_heading_may_cover_a_part_and_its_one_exhibit():
 
 
 def test_the_edition_keeps_its_date_while_the_words_stay_the_same(tmp_path):
-    page = f"<p>Edition of {guide.EDITION}</p><p>Words</p><footer>Edition of {guide.EDITION}</footer>"
+    page = f"<head></head><body><p>Edition of {guide.EDITION}</p><p>Words</p><footer>Edition of {guide.EDITION}</footer>"
     previous = tmp_path / "guide.html"
     assert guide.edition(page, previous, "2026-11-08") == "8 November 2026"
     previous.write_text(page.replace(guide.EDITION, "8 November 2026"))
     assert guide.edition(page, previous, "2026-12-07") == "8 November 2026"
+    assert guide.edition(page.replace("<head>", f"<head>{config.COUNTER}"), previous, "2026-12-07") == "8 November 2026"
     assert guide.edition(page.replace("Words", "New words"), previous, "2026-12-07") == "7 December 2026"
 
 
 def test_the_pdf_is_the_print_of_the_page_with_its_title_and_author():
     assert guide.check() == []
+
+
+def test_every_page_the_repository_publishes_carries_the_pinned_visit_counter_in_its_head():
+    assert 'integrity="sha384-' in config.COUNTER and "count.v5.js" in config.COUNTER
+    for page in (config.ROOT / "index.html", GUIDE / guide.PAGE):
+        head = page.read_text(encoding="utf-8").split("</head>")[0]
+        assert head.count(config.COUNTER) == 1, page.name
 
 
 def test_the_dashboard_and_the_readme_link_to_the_guide():

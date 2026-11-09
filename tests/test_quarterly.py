@@ -336,6 +336,7 @@ def test_an_issue_carries_its_own_preview_tags_and_the_favicon(tree):
     assert description == re.search(r'<meta property="og:description" content="([^"]+)">', head).group(1)
     assert len(html_module.unescape(description)) <= 155
     assert f"Quarterly report, {quarterly.quarter_name(quarter)}" in re.search(r'og:title" content="([^"]+)"', head).group(1)
+    assert head.count(config.COUNTER) == 1
 
 
 def test_no_issue_without_its_preview_picture(tree):
