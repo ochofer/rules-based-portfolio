@@ -105,6 +105,7 @@ def test_the_pdf_is_the_print_of_the_page_with_its_title_and_author():
 
 def test_every_page_the_repository_publishes_carries_the_pinned_visit_counter_in_its_head():
     assert 'integrity="sha384-' in config.COUNTER and "count.v5.js" in config.COUNTER
+    assert "/\\.pdf$/i.test(u.pathname)" in config.COUNTER and "event: true" in config.COUNTER
     for page in (config.ROOT / "index.html", GUIDE / guide.PAGE):
         head = page.read_text(encoding="utf-8").split("</head>")[0]
         assert head.count(config.COUNTER) == 1, page.name

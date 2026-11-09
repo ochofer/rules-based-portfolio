@@ -175,6 +175,18 @@ footer p.colophon { max-width: none; margin: 20px 0 0; padding-top: 12px; border
 </style>
 <script src="https://cdn.plot.ly/plotly-cartesian-2.35.2.min.js" integrity="sha384-gKF7EaMDoWW1zLWkouldmVWF5jqEKrAswAciW73iNzqlomabVVPO60XkJvL5q/Ie" crossorigin="anonymous" defer></script>
 <script data-goatcounter="https://carlohofer.goatcounter.com/count" async src="https://gc.zgo.at/count.v5.js" crossorigin="anonymous" integrity="sha384-atnOLvQb9t+jTSipvd75X2yginT4PjVbqDdlJAmxMm+wYElFmeR6EmLP5bYeoRVQ"></script>
+<script>
+document.addEventListener('click', function (e) {
+  var a = e.target.closest && e.target.closest('a[href]');
+  if (!a || !window.goatcounter || !window.goatcounter.count) return;
+  var u = new URL(a.href, location.href);
+  var pdf = /\.pdf$/i.test(u.pathname);
+  if (!pdf && u.hostname === location.hostname) return;
+  var path = 'PDF ' + u.hostname + u.pathname;
+  if (!pdf) path = 'Link ' + (u.hostname || u.protocol) + u.pathname;
+  window.goatcounter.count({path: path, title: a.textContent.trim(), event: true});
+});
+</script>
 </head>
 <body>
 <header class="ch-band"><div class="ch-band__in">

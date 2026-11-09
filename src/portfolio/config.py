@@ -24,9 +24,23 @@ REPOSITORY_URL = "https://github.com/ochofer/rules-based-portfolio"
 DASHBOARD_URL = "https://www.carlohofer.com/rules-based-portfolio/"
 PREVIEW_IMAGE = "og-portfolio.png"  # the link-preview picture at the root, for the dashboard and each quarterly issue
 # The visit counter of the site, in the head of every page the repository publishes: GoatCounter, which sets no
-# cookies and does not count a page opened from a file. Its fifth version is pinned with its integrity hash.
+# cookies and does not count a page opened from a file. Its fifth version is pinned with its integrity hash. The
+# second script is the site's own, written without the conditional operator: a click on a PDF, or on a link to
+# another site, is counted as an event.
 COUNTER = ('<script data-goatcounter="https://carlohofer.goatcounter.com/count" async src="https://gc.zgo.at/count.v5.js" '
-           'crossorigin="anonymous" integrity="sha384-atnOLvQb9t+jTSipvd75X2yginT4PjVbqDdlJAmxMm+wYElFmeR6EmLP5bYeoRVQ"></script>')
+           'crossorigin="anonymous" integrity="sha384-atnOLvQb9t+jTSipvd75X2yginT4PjVbqDdlJAmxMm+wYElFmeR6EmLP5bYeoRVQ"></script>\n'
+           """<script>
+document.addEventListener('click', function (e) {
+  var a = e.target.closest && e.target.closest('a[href]');
+  if (!a || !window.goatcounter || !window.goatcounter.count) return;
+  var u = new URL(a.href, location.href);
+  var pdf = /\\.pdf$/i.test(u.pathname);
+  if (!pdf && u.hostname === location.hostname) return;
+  var path = 'PDF ' + u.hostname + u.pathname;
+  if (!pdf) path = 'Link ' + (u.hostname || u.protocol) + u.pathname;
+  window.goatcounter.count({path: path, title: a.textContent.trim(), event: true});
+});
+</script>""")
 COUNTER_HOST = "https://gc.zgo.at/**"  # not loaded when a page is printed
 
 EQUITY, BONDS = "equity", "bonds"
