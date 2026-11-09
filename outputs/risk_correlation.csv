@@ -1,50 +1,50 @@
 as_of,component_a,component_b,correlation
-2026-11-04,North America,North America,1
-2026-11-04,North America,Europe and Middle East,0.7566429789
-2026-11-04,North America,Pacific,0.7720255105
-2026-11-04,North America,Emerging markets,0.5981366382
-2026-11-04,North America,"Bonds, short",0.2583092186
-2026-11-04,North America,"Bonds, medium",0.3524212553
-2026-11-04,North America,"Bonds, long",0.367889819
-2026-11-04,Europe and Middle East,North America,0.7566429789
-2026-11-04,Europe and Middle East,Europe and Middle East,1
-2026-11-04,Europe and Middle East,Pacific,0.7917148197
-2026-11-04,Europe and Middle East,Emerging markets,0.6312886968
-2026-11-04,Europe and Middle East,"Bonds, short",0.3204203235
-2026-11-04,Europe and Middle East,"Bonds, medium",0.3756038986
-2026-11-04,Europe and Middle East,"Bonds, long",0.3395790597
-2026-11-04,Pacific,North America,0.7720255105
-2026-11-04,Pacific,Europe and Middle East,0.7917148197
-2026-11-04,Pacific,Pacific,1
-2026-11-04,Pacific,Emerging markets,0.7345222827
-2026-11-04,Pacific,"Bonds, short",0.3265758025
-2026-11-04,Pacific,"Bonds, medium",0.386298847
-2026-11-04,Pacific,"Bonds, long",0.3453933477
-2026-11-04,Emerging markets,North America,0.5981366382
-2026-11-04,Emerging markets,Europe and Middle East,0.6312886968
-2026-11-04,Emerging markets,Pacific,0.7345222827
-2026-11-04,Emerging markets,Emerging markets,1
-2026-11-04,Emerging markets,"Bonds, short",0.2604376252
-2026-11-04,Emerging markets,"Bonds, medium",0.3095100297
-2026-11-04,Emerging markets,"Bonds, long",0.2756690267
-2026-11-04,"Bonds, short",North America,0.2583092186
-2026-11-04,"Bonds, short",Europe and Middle East,0.3204203235
-2026-11-04,"Bonds, short",Pacific,0.3265758025
-2026-11-04,"Bonds, short",Emerging markets,0.2604376252
-2026-11-04,"Bonds, short","Bonds, short",1
-2026-11-04,"Bonds, short","Bonds, medium",0.9221796579
-2026-11-04,"Bonds, short","Bonds, long",0.7807106205
-2026-11-04,"Bonds, medium",North America,0.3524212553
-2026-11-04,"Bonds, medium",Europe and Middle East,0.3756038986
-2026-11-04,"Bonds, medium",Pacific,0.386298847
-2026-11-04,"Bonds, medium",Emerging markets,0.3095100297
-2026-11-04,"Bonds, medium","Bonds, short",0.9221796579
-2026-11-04,"Bonds, medium","Bonds, medium",1
-2026-11-04,"Bonds, medium","Bonds, long",0.9172513112
-2026-11-04,"Bonds, long",North America,0.367889819
-2026-11-04,"Bonds, long",Europe and Middle East,0.3395790597
-2026-11-04,"Bonds, long",Pacific,0.3453933477
-2026-11-04,"Bonds, long",Emerging markets,0.2756690267
-2026-11-04,"Bonds, long","Bonds, short",0.7807106205
-2026-11-04,"Bonds, long","Bonds, medium",0.9172513112
-2026-11-04,"Bonds, long","Bonds, long",1
+2026-11-06,North America,North America,1
+2026-11-06,North America,Europe and Middle East,0.7566429789
+2026-11-06,North America,Pacific,0.7720255105
+2026-11-06,North America,Emerging markets,0.5981366382
+2026-11-06,North America,"Bonds, short",0.2583092186
+2026-11-06,North America,"Bonds, medium",0.3524212553
+2026-11-06,North America,"Bonds, long",0.367889819
+2026-11-06,Europe and Middle East,North America,0.7566429789
+2026-11-06,Europe and Middle East,Europe and Middle East,1
+2026-11-06,Europe and Middle East,Pacific,0.7917148197
+2026-11-06,Europe and Middle East,Emerging markets,0.6312886968
+2026-11-06,Europe and Middle East,"Bonds, short",0.3204203235
+2026-11-06,Europe and Middle East,"Bonds, medium",0.3756038986
+2026-11-06,Europe and Middle East,"Bonds, long",0.3395790597
+2026-11-06,Pacific,North America,0.7720255105
+2026-11-06,Pacific,Europe and Middle East,0.7917148197
+2026-11-06,Pacific,Pacific,1
+2026-11-06,Pacific,Emerging markets,0.7345222827
+2026-11-06,Pacific,"Bonds, short",0.3265758025
+2026-11-06,Pacific,"Bonds, medium",0.386298847
+2026-11-06,Pacific,"Bonds, long",0.3453933477
+2026-11-06,Emerging markets,North America,0.5981366382
+2026-11-06,Emerging markets,Europe and Middle East,0.6312886968
+2026-11-06,Emerging markets,Pacific,0.7345222827
+2026-11-06,Emerging markets,Emerging markets,1
+2026-11-06,Emerging markets,"Bonds, short",0.2604376252
+2026-11-06,Emerging markets,"Bonds, medium",0.3095100297
+2026-11-06,Emerging markets,"Bonds, long",0.2756690267
+2026-11-06,"Bonds, short",North America,0.2583092186
+2026-11-06,"Bonds, short",Europe and Middle East,0.3204203235
+2026-11-06,"Bonds, short",Pacific,0.3265758025
+2026-11-06,"Bonds, short",Emerging markets,0.2604376252
+2026-11-06,"Bonds, short","Bonds, short",1
+2026-11-06,"Bonds, short","Bonds, medium",0.9221796579
+2026-11-06,"Bonds, short","Bonds, long",0.7807106205
+2026-11-06,"Bonds, medium",North America,0.3524212553
+2026-11-06,"Bonds, medium",Europe and Middle East,0.3756038986
+2026-11-06,"Bonds, medium",Pacific,0.386298847
+2026-11-06,"Bonds, medium",Emerging markets,0.3095100297
+2026-11-06,"Bonds, medium","Bonds, short",0.9221796579
+2026-11-06,"Bonds, medium","Bonds, medium",1
+2026-11-06,"Bonds, medium","Bonds, long",0.9172513112
+2026-11-06,"Bonds, long",North America,0.367889819
+2026-11-06,"Bonds, long",Europe and Middle East,0.3395790597
+2026-11-06,"Bonds, long",Pacific,0.3453933477
+2026-11-06,"Bonds, long",Emerging markets,0.2756690267
+2026-11-06,"Bonds, long","Bonds, short",0.7807106205
+2026-11-06,"Bonds, long","Bonds, medium",0.9172513112
+2026-11-06,"Bonds, long","Bonds, long",1
