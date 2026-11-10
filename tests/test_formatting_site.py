@@ -148,7 +148,11 @@ def test_the_page_numbers_its_exhibits_and_every_reference_finds_one():
     visible = re.sub(r"<script.*?</script>|<style.*?</style>", " ", page, flags=re.S)
     text = html.unescape(re.sub(r"<[^>]+>", " ", visible))
     assert not re.search(r"\bcharts? \d", text, re.I), re.findall(r".{0,40}\bcharts? \d.{0,20}", text, re.I)
-    assert "real-time" not in text.lower()
+    # The page never calls itself real-time. The Other projects block quotes other projects' cards word for word,
+    # so it is left out of this one check.
+    own = re.sub(r'<article class="card wide projects" id="method-projects">.*?</article>', " ", visible, flags=re.S)
+    assert own != visible
+    assert "real-time" not in html.unescape(re.sub(r"<[^>]+>", " ", own)).lower()
 
 
 def test_the_log_writes_the_next_cycle_day_in_words():

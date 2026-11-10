@@ -2108,6 +2108,12 @@ OTHER_PROJECTS = (
       ("note", "https://github.com/ochofer/paper1-hazard-exposure-data/releases/download/note-v1.2/"
                "what-a-vintage-difference-measures.pdf"),
       ("code", "https://github.com/ochofer/paper1-hazard-exposure-data"))),
+    ("Volatility-managed portfolios: a replication.",
+     "A replication of Moreira and Muir's volatility-managed portfolios and of the real-time critique on Ken French's "
+     "factors, then the months after the paper's sample. In build: the data and the signal are in place, and nothing "
+     "in it is a result yet.",
+     (("Page", PROJECTS_URL + "volatility-managed-portfolios/"),
+      ("code", "https://github.com/ochofer/volatility-managed-portfolios"))),
 )
 
 
