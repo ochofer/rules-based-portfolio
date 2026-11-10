@@ -47,9 +47,48 @@ def record(write_ledger):
             "rate": rate}  # fmt: skip
 
 
-def _build(r, blend=None):
+def _build(r, blend=None, extra=None):
     blend = pd.Series(dtype=float) if blend is None else blend
-    return comparisons.build(r["records"], r["navs"], r["values"], r["table"], r["ref_a"], r["ref_b"], blend, r["rate"], END)
+    return comparisons.build(r["records"], r["navs"], r["values"], r["table"], r["ref_a"], r["ref_b"], blend, r["rate"], END,
+                             extra)  # fmt: skip
+
+
+def _walk(days, seed, start=100.0, scale=0.01):
+    rng = np.random.default_rng(seed)
+    return pd.Series(start * np.cumprod(1 + rng.normal(0.0003, scale, len(days))), index=days)
+
+
+def _extra(navs, mag7_from="2026-11-03"):
+    """Invented inputs of the second stage: three dollar funds, one euro mixed fund, one feed that stopped, the four
+    regions' levels, two snapshots of region weights and the ECB spot rate."""
+    days = navs.index
+    usd = {k: _walk(days, i) for i, k in enumerate(["msci_world", "mag7", "first_ranked"], start=11)}
+    eur = {k: v / navs["usd_per_eur"] for k, v in usd.items()}
+    mixed = _walk(days, 21, 50.0, 0.005)
+    levels = pd.DataFrame({name: _walk(days, 31 + i) for i, name in enumerate(comparisons.REGION_NAMES)})
+    rows = []
+    for key, first, second in [("held", (0.65, 0.15, 0.08, 0.12), (0.66, 0.14, 0.08, 0.12)),
+                               ("msci_world", (0.75, 0.17, 0.08, 0.0), (0.74, 0.18, 0.08, 0.0)),
+                               ("first_ranked", (0.64, 0.16, 0.08, 0.12), (0.64, 0.16, 0.08, 0.12)),
+                               ("lifestrategy_60", (0.60, 0.20, 0.08, 0.12), (0.60, 0.20, 0.08, 0.12)),
+                               ("mag7", (1.0, 0, 0, 0), (1.0, 0, 0, 0))]:  # fmt: skip
+        for day, weights in (("2026-10-30", first), ("2026-11-20", second)):
+            rows += [{"comparator": key, "snapshot": pd.Timestamp(day), "region": n, "weight": w}
+                     for n, w in zip(comparisons.REGION_NAMES, weights)]  # fmt: skip
+    spot = pd.Series(np.linspace(0.026, 0.024, len(days)) + 0.001 * np.sin(np.arange(len(days))), index=days)
+    return {
+        "one_fund": {
+            "msci_world": {"eur": eur["msci_world"], "usd": usd["msci_world"], "share": 1.0},
+            "lifestrategy_60": {"eur": mixed, "usd": None, "share": 0.6, "bonds_na": True},
+            "nasdaq100": {"eur": None, "status": "series not read on 2026-12-04"},
+            "mag7": {"eur": eur["mag7"], "usd": usd["mag7"], "share": 1.0, "from": pd.Timestamp(mag7_from)},
+        },
+        "first_ranked": {"eur": eur["first_ranked"], "usd": usd["first_ranked"]},
+        "regions": pd.DataFrame(rows),
+        "region_levels": levels,
+        "bond": {"spot": spot, "duration": 6.7},
+        "unavailable": {"bank_offensief": "no published return"},
+    }
 
 
 def test_the_bands_of_the_other_splits():
@@ -84,8 +123,8 @@ def test_the_band_is_two_tracking_errors_times_the_square_root_of_the_years():
 
 def test_the_daily_effects_sum_to_each_daily_difference_exactly(record):
     r = record
-    sims, _, growth = comparisons.simulations(r["records"], r["navs"], r["values"], r["table"], r["ref_a"], r["ref_b"],
-                                              r["rate"], END)  # fmt: skip
+    sims, _, growth, _, _ = comparisons.simulations(r["records"], r["navs"], r["values"], r["table"], r["ref_a"], r["ref_b"],
+                                                    r["rate"], END)  # fmt: skip
     days = r["table"].index
     returns = pd.DataFrame({k: comparisons._returns(g) for k, g in growth.items()})
     funds = comparisons._fund_returns(r["navs"], days)
@@ -101,7 +140,8 @@ def test_the_daily_effects_sum_to_each_daily_difference_exactly(record):
 def test_the_summary_the_growth_and_the_effects(record):
     out = _build(record)
     summary = out["summary"].set_index("comparator")
-    assert list(summary.index) == [k for k, _, _ in comparisons.ROWS]
+    first_stage = {"portfolio", "benchmark", "reference_a", "reference_b", "savings", *(s[0] for s in comparisons.SPLITS)}
+    assert list(summary.index) == [k for k, _, _ in comparisons.ROWS if k in first_stage]
     assert summary.loc["portfolio", "return_time_weighted"] == pytest.approx(record["table"]["growth_portfolio"].iloc[-1] / 100 - 1)
     assert math.isnan(summary.loc["portfolio", "difference"]) and math.isnan(summary.loc["savings", "correlation"])
     assert summary.loc["split_100_0", "volatility"] > summary.loc["split_60_40", "volatility"]
@@ -142,8 +182,9 @@ def test_the_comparisons_part_on_the_page():
     part = view.split('id="comparisons"', 1)[1].split('id="contributions"', 1)[0]
     # E10: the panes are the browser's disclosure element, closed by default, each under the question it answers.
     assert re.findall(r'<details class="ch-pane"><summary>([^<]+)</summary>', part) == [
-        "The same rules without costs", "The same rules with other funds or splits", "The money left in the bank",
-        "Where each difference came from"]
+        "The same rules without costs", "The same rules with other funds or splits", "One fund instead of two",
+        "The money left in the bank", "Not like for like: a bank&#x27;s managed profile", "Where each difference came from"]
+    assert "4 Nov to" in summary_rows(part, "The Mag7 fund") and "How the one-fund comparators&#x27; funds were chosen" in part
     assert '<details class="ch-pane" open' not in part
     summary = part.split('<div class="ch-pair">', 1)[0] if '<div class="ch-pair">' in part else part.split('ch-pair', 1)[0]
     names = re.findall(r"<tr><td>([^<]+)</td>", summary)
@@ -159,6 +200,39 @@ def test_the_comparisons_part_on_the_page():
     assert [t["name"] for t in charts["c21"]["traces"]][2] == "US series"
 
 
+def summary_rows(part, name):
+    import re
+
+    table = part.split("ch-pair", 1)[0]
+    return next(r for r in re.findall(r"<tr>(.*?)</tr>", table) if f"<td>{name}</td>" in r)
+
+
+def test_the_second_pane_is_named_for_the_splits_until_the_first_ranked_funds_are_in_it():
+    from portfolio import config, site
+
+    class Page:
+        def __init__(self):
+            self.charts, self.html = [], []
+
+        def add(self, view, html):
+            self.html.append(html)
+
+    out = {n: pd.read_csv(config.OUTPUTS_DIR / n) for n in ("comparisons.csv", "comparisons_daily.csv", "comparison_effects.csv",
+                                                           "comparison_fees.csv", "comparison_regions.csv")}  # fmt: skip
+    for drop, headline in ((False, "The same rules with other funds or splits"), (True, "The same rules at other splits")):
+        page = Page()
+        summary = out["comparisons.csv"]
+        effects = out["comparison_effects.csv"]
+        if drop:
+            summary = summary[summary["comparator"] != "first_ranked"]
+            effects = effects[effects["comparator"] != "first_ranked"]
+        site.comparisons_part(page, summary, out["comparisons_daily.csv"], effects, out["comparison_fees.csv"],
+                              out["comparison_regions.csv"])  # fmt: skip
+        html = "".join(page.html)
+        assert f"<summary>{headline}</summary>" in html
+        assert ("70/30 with the first-ranked funds" in html.split("<summary>One fund", 1)[0].split("The same rules", 2)[-1]) is not drop
+
+
 def test_the_comparator_funds_are_fixed_with_their_dates_and_the_ranked_ones_are_the_first_offered():
     from portfolio import config
 
@@ -169,10 +243,174 @@ def test_the_comparator_funds_are_fixed_with_their_dates_and_the_ranked_ones_are
     assert by[("first_ranked", "equity")] == "IE00B44Z5B48" and by[("first_ranked", "bonds")] == "IE00BH04GL39"
     assert by[("lifestrategy_60", "mixed")] == "IE00BMVB5P51" and by[("lifestrategy_80", "mixed")] == "IE00BMVB5R75"
     mag7 = funds[funds["comparator"] == "mag7"].iloc[0]
-    assert mag7["isin"] == "IE000NFL4BX4" and mag7["series_from"] == "2026-11-04" and mag7["condition"]
+    assert mag7["isin"] == "IE000NFL4BX4" and mag7["series_from"] == "2026-11-04" and mag7["condition"] and mag7["condition_met_on"] == "2026-11-10"
     assert references.first_offered(config.METHOD_DIR / "selection_msci_world.csv")[1] == by[("msci_world", "equity")]
     assert references.first_offered(config.METHOD_DIR / "selection_nasdaq100.csv")[1] == by[("nasdaq100", "equity")]
     # The first equity fund of the rules' own ranking is not offered on the account, so it differs from the fund held.
     ranking = pd.read_csv(config.METHOD_DIR / "selection_tracking_difference.csv").drop_duplicates("isin")
     first = ranking[(ranking["sleeve"] == "equity") & (ranking["rank"] == 1)].iloc[0]
     assert first["isin"] == "IE00B44Z5B48" and first["offered_on_the_account"] == "no"
+
+
+def test_the_published_spreadsheets_of_state_street_hanetf_and_dws(tmp_path):
+    from portfolio import prices
+
+    (tmp_path / "ssga").mkdir()
+    (tmp_path / "hanetf").mkdir()
+    ssga = pd.DataFrame([["Fund Name:", "SPDR fund"], ["ISIN:", "IE00BFY0GT14"], ["Base Currency:", "USD"], [None, None],
+                         ["Date", "Net asset value"], ["09-Nov-2026", "40.5"], ["06-Nov-2026", "40.1"], ["Marketing communication", None]])  # fmt: skip
+    ssga.to_excel(tmp_path / "ssga" / "IE00BFY0GT14_navhist.xlsx", header=False, index=False)
+    hanetf = pd.DataFrame([["Fund Name:", "Mag7"], ["Date", "Net asset value"], [pd.Timestamp("2026-11-04"), 7.9], [pd.Timestamp("2026-11-05"), 7.6]])
+    hanetf.to_excel(tmp_path / "hanetf" / "IE000NFL4BX4_nav.xlsx", header=False, index=False)
+    series, currency = prices.load_comparator("IE00BFY0GT14", cache_dir=tmp_path)
+    assert currency == "USD" and list(series.index) == list(pd.to_datetime(["2026-11-06", "2026-11-09"]))
+    assert list(series) == [40.1, 40.5]
+    series, currency = prices.load_comparator("IE000NFL4BX4", cache_dir=tmp_path)
+    assert currency == "USD" and series.iloc[0] == 7.9 and len(series) == 2
+    # DWS's sheet: the net asset value is the third column, after the assets under management.
+    (tmp_path / "dws").mkdir()
+    dws = pd.DataFrame([["* disclaimer", None, None, None], ["Name", "NASDAQ 100 UCITS ETF 1C", None, None],
+                        ["ISIN", "IE00BMFKG444", None, None], ["Currency", "USD", None, None], [None, None, None, None],
+                        ["Date", "Asset Under Management", "Net asset value", "Index Level"], ["09.11.2026", 2.9e9, 64.7658, 32544.0],
+                        ["06.11.2026", 2.8e9, 62.6374, 31473.9]])  # fmt: skip
+    dws.to_excel(tmp_path / "dws" / "IE00BMFKG444_history.xlsx", header=False, index=False)
+    series, currency = prices.load_comparator("IE00BMFKG444", cache_dir=tmp_path)
+    assert currency == "USD" and list(series) == [62.6374, 64.7658] and series.index[0] == pd.Timestamp("2026-11-06")
+    with pytest.raises(ValueError):
+        prices.load_comparator("IE00B4L5Y983", cache_dir=tmp_path)
+
+
+def test_the_second_stage_effects_sum_to_each_daily_difference_exactly(record):
+    """The identity of the first stage, extended: for the one-fund comparators the regions, the dollar's part and the
+    rest within each region close the gap to the two funds held at the fund's equity share, and for savings the
+    bond rows close the gap to the bond fund."""
+    r, extra = record, _extra(record["navs"])
+    sims, values, growth, windows, missing = comparisons.simulations(r["records"], r["navs"], r["values"], r["table"],
+                                                                     r["ref_a"], r["ref_b"], r["rate"], END, extra)  # fmt: skip
+    assert missing == {"nasdaq100": "series not read on 2026-12-04", "bank_offensief": "no published return"} and windows == {"mag7": pd.Timestamp("2026-11-03")}
+    days = r["table"].index
+    returns = pd.DataFrame({k: comparisons._returns(g) for k, g in growth.items()})
+    funds = comparisons._fund_returns(r["navs"], days)
+    state = {k: comparisons._state(sims[k], r["navs"], days) for k in ["reference_a", *(s[0] for s in comparisons.SPLITS)]}
+    navs_f = comparisons._with_equity(r["navs"], extra["first_ranked"]["eur"])
+    state["first_ranked"] = comparisons._state(sims["first_ranked"], navs_f, days)
+    returns["_first_ranked_fund"] = comparisons._fund_returns(navs_f, days)["r_e"]
+    ctx = comparisons._context(extra, days, sims, r["navs"])
+    for key in ["first_ranked", "msci_world", "lifestrategy_60", "mag7", "savings"]:
+        window = returns.index if key not in windows else returns.index[returns.index > windows[key]]
+        effects = comparisons.daily_effects(key, returns.loc[window], funds.loc[window], state, ctx)
+        gap = returns.loc[window, key] - returns.loc[window, "portfolio"]
+        assert np.abs(effects.sum(axis=1) - gap).max() < 1e-12, key
+        if key != "savings":
+            assert effects["regions"].abs().sum() > 0 and effects["within_regions"].abs().sum() > 0, key
+    savings = comparisons.daily_effects("savings", returns, funds, state, ctx)
+    assert savings["change_in_yield"].abs().sum() > 0 and savings["bonds_rest"].abs().sum() > 0
+    mixed = comparisons.daily_effects("lifestrategy_60", returns, funds, state, ctx)
+    assert mixed[list(comparisons.BOND_EFFECTS)].isna().all().all()
+    # The regions effect is Brinson and Fachler's allocation term: weights that differ only by a constant add nothing.
+    same = comparisons.region_shares(pd.Series({"North America": 0.6, "Pacific": 0.2, "Europe and Middle East": 0.2}))
+    assert same.sum() == pytest.approx(1.0) and same["Emerging markets"] == 0
+
+
+def test_the_second_stage_rows(record):
+    extra = _extra(record["navs"])
+    out = _build(record, extra=extra)
+    summary = out["summary"].set_index("comparator")
+    keys = [k for k, _, _ in comparisons.ROWS if k not in ("sp500", "lifestrategy_80")]
+    assert list(summary.index) == keys
+    # A fund held alone: its time-weighted return is its net asset value's, in euro.
+    unit = extra["one_fund"]["msci_world"]["eur"]
+    days = record["table"].index
+    assert summary.loc["msci_world", "return_time_weighted"] == pytest.approx(unit.loc[days[-1]] / unit.loc[days[1]] - 1)
+    # The Mag7 fund runs from its first day with the portfolio's value at that close.
+    day = pd.Timestamp("2026-11-03")
+    assert summary.loc["mag7", "first_day"] == day
+    mag7 = extra["one_fund"]["mag7"]["eur"]
+    assert summary.loc["mag7", "return_time_weighted"] == pytest.approx(mag7.loc[days[-1]] / mag7.loc[day] - 1)
+    growth = record["table"]["growth_portfolio"]
+    own = growth.loc[days[-1]] / growth.loc[day] - 1
+    assert summary.loc["mag7", "difference"] == pytest.approx(summary.loc["mag7", "return_time_weighted"] - own)
+    assert summary.loc["nasdaq100", "status"] == "series not read on 2026-12-04"
+    assert summary.loc["bank_offensief", "status"] == "no published return"
+    assert summary.loc["lifestrategy_60", "equity_share"] == 0.6 and summary.loc["msci_world", "equity_share"] == 1.0
+    assert math.isnan(summary.loc["nasdaq100", "return_time_weighted"])
+    effects = out["effects"]
+    record_rows = effects[effects["period"] == "record"].pivot(index="comparator", columns="effect", values="value")
+    for key in ["first_ranked", "msci_world", "lifestrategy_60", "mag7", "savings"]:
+        total = record_rows.loc[key].drop("timing").sum()  # the empty bond rows of the mixed fund are skipped
+        assert total == pytest.approx(summary.loc[key, "difference"], abs=1e-12), key
+    assert record_rows.loc["lifestrategy_60", list(comparisons.BOND_EFFECTS)].isna().all()
+    assert "nasdaq100" not in record_rows.index
+    # Fewer than 20 daily returns: the return shows, the difference, the band and the effects wait.
+    short = _build(record, extra=_extra(record["navs"], mag7_from="2026-11-23"))
+    row = short["summary"].set_index("comparator").loc["mag7"]
+    assert row["periods"] < comparisons.MIN_DAILY_RETURNS and not math.isnan(row["return_time_weighted"])
+    assert math.isnan(row["difference"]) and math.isnan(row["band"]) and math.isnan(row["volatility"])
+    assert "mag7" not in set(short["effects"]["comparator"])
+
+
+def test_region_weights_by_day_and_the_snapshots_kept():
+    table = pd.DataFrame([{"comparator": "x", "snapshot": pd.Timestamp(d), "region": "Pacific", "weight": w}
+                          for d, w in (("2026-10-30", 0.1), ("2026-11-09", 0.2), ("2026-11-27", 0.3), ("2026-12-02", 0.4))])  # fmt: skip
+    kept = comparisons.keep_snapshots(None, table, date(2026, 12, 3))
+    assert list(kept["snapshot"].dt.strftime("%Y-%m-%d")) == ["2026-10-30", "2026-11-27", "2026-12-02"]
+    days = pd.to_datetime(["2026-10-20", "2026-11-02", "2026-11-30"])
+    weights = comparisons.by_day(comparisons._snapshots(kept, "x"), days, ["Pacific"])
+    assert list(weights["Pacific"]) == [0.1, 0.1, 0.3]  # the first snapshot holds for the days before it
+    holdings = pd.DataFrame({"country": ["United States", "Japan", "", "Germany"], "weight": [0.6, 0.1, 0.05, 0.25]})
+    regions = pd.DataFrame({"country": ["United States", "Japan", "Germany"],
+                            "region": ["North America", "Pacific", "Europe and Middle East"]})  # fmt: skip
+    shares = comparisons.by_country(holdings, regions)
+    assert shares.sum() == pytest.approx(1.0) and shares["North America"] == pytest.approx(0.6 / 0.95)
+    regions = pd.concat([regions, pd.DataFrame({"country": ["Korea (South)"], "region": ["Emerging markets"]})])
+    named = comparisons.by_country(pd.DataFrame({"country": ["South Korea", "United States"], "weight": [0.1, 0.9]}), regions)
+    assert named["Emerging markets"] == pytest.approx(0.1)
+    with pytest.raises(ValueError):
+        comparisons.by_country(pd.DataFrame({"country": ["Atlantis"], "weight": [1.0]}), regions)
+
+
+def test_a_lifestrategy_fund_takes_its_regions_from_its_underlying_funds():
+    import pandas as pd
+    from portfolio import config
+
+    mapping = pd.read_csv(config.METHOD_DIR / "lifestrategy_underlying.csv")
+    allocation = pd.DataFrame({"fund": ["Vanguard FTSE All-World UCITS ETF (USD) Accumulating",
+                                        "Vanguard FTSE North America UCITS ETF",
+                                        "Vanguard Global Aggregate Bond UCITS ETF EUR Hedged Accumulating",
+                                        "Vanguard FTSE Japan UCITS ETF (USD) Accumulating"],
+                               "share": [0.3, 0.2, 0.4, 0.1]})  # fmt: skip
+    held = pd.Series({"North America": 0.6, "Europe and Middle East": 0.2, "Pacific": 0.1, "Emerging markets": 0.1})
+    equity, weights = comparisons.mixed_regions(allocation, mapping, held, held)
+    assert equity == pytest.approx(0.6)
+    assert weights["North America"] == pytest.approx((0.3 * 0.6 + 0.2) / 0.6)
+    assert weights["Pacific"] == pytest.approx((0.3 * 0.1 + 0.1) / 0.6) and weights.sum() == pytest.approx(1.0)
+    with pytest.raises(ValueError):
+        comparisons.mixed_regions(pd.DataFrame({"fund": ["Vanguard Something New"], "share": [1.0]}), mapping, held, held)
+
+
+def test_the_costs_beside_the_comparisons():
+    ownership = pd.DataFrame({"sleeve": ["equity", "bonds", "portfolio"], "ongoing_costs": [0.0021, 0.0007, 0.00167],
+                              "document_date": ["2026-09-03", "2026-09-29", None]})  # fmt: skip
+    implementation = pd.Series([-9.6, -5.4], index=pd.to_datetime(["2026-11-05", "2026-11-06"]))
+    bank = {"basic_a_quarter": 0.0006, "management_a_quarter": 0.001, "funds_low": 0.001, "funds_high": 0.0015,
+            "dated": pd.Timestamp("2025-05-01")}  # fmt: skip
+    out = comparisons.fees(ownership, implementation, {"lifestrategy_60": (0.0025, pd.Timestamp("2026-09-30"))}, bank)
+    rows = out.set_index(["comparator", "item"])
+    assert rows.loc[("portfolio", "Ongoing costs of the two ETFs at the portfolio's weights"), "bps_low"] == pytest.approx(16.7)
+    assert rows.loc[("portfolio", "Implementation cost, cumulative"), "bps_low"] == -5.4
+    assert rows.loc[("lifestrategy_60", "Ongoing charges figure"), "bps_high"] == pytest.approx(25)
+    all_in = rows.loc[("bank_offensief", "All in")]
+    assert all_in["bps_low"] == pytest.approx(74) and all_in["bps_high"] == pytest.approx(79)
+
+
+def test_the_rabobank_cost_overview_is_read_from_its_text():
+    from portfolio import prices
+
+    text = ("Basisdienstverlening • Inclusief transacties.\nU betaalt tot € 100.000 0,06% per kwartaal over het\n"
+            "Portefeuillebeheer online inzicht\nU betaalt tot € 100.000 0,10% over het gemiddeld\n"
+            "Per jaar bedragen deze kosten tussen 0,1 en 0,15% van de waarde\nKostenoverzicht Rabo Beheerd Beleggen Basis mei 2025")
+    costs = prices.parse_rabobank_costs(text)
+    assert costs["basic_a_quarter"] == pytest.approx(0.0006) and costs["management_a_quarter"] == pytest.approx(0.001)
+    assert costs["funds_high"] == pytest.approx(0.0015) and costs["dated"] == pd.Timestamp("2025-05-01")
+    with pytest.raises(ValueError):
+        prices.parse_rabobank_costs("Kostenoverzicht without its rates")

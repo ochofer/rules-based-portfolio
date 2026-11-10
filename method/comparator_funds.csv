@@ -1,8 +1,8 @@
-comparator,sleeve,fund,isin,how_chosen,fixed_on,series_from,condition
-msci_world,equity,State Street SPDR MSCI World UCITS ETF USD Unhedged (Acc),IE00BFY0GT14,"The first fund offered on the account in the rules' equity ranking with the MSCI World in place of the global index, method/selection_msci_world.csv",2026-11-10,,
-nasdaq100,equity,Xtrackers Nasdaq 100 UCITS ETF 1C,IE00BMFKG444,"The first fund offered on the account in the rules' equity ranking with the Nasdaq-100 in place of the global index, method/selection_nasdaq100.csv",2026-11-10,,
-lifestrategy_60,mixed,Vanguard LifeStrategy 60% Equity UCITS ETF (EUR) Accumulating,IE00BMVB5P51,The euro accumulating class of the 60% Equity fund,2026-11-10,,
-lifestrategy_80,mixed,Vanguard LifeStrategy 80% Equity UCITS ETF (EUR) Accumulating,IE00BMVB5R75,The euro accumulating class of the 80% Equity fund,2026-11-10,,
-first_ranked,equity,SPDR MSCI All Country World UCITS ETF (Acc),IE00B44Z5B48,"The first fund in the rules' equity ranking, method/selection_tracking_difference.csv, which the account does not offer",2026-11-10,,
-first_ranked,bonds,Vanguard EUR Eurozone Government Bond UCITS ETF (EUR) Accumulating,IE00BH04GL39,"The first fund in the rules' bond ranking, method/selection_tracking_difference.csv, the bond fund held",2026-11-10,,
-mag7,equity,HANetf Defiance Mag7 UCITS ETF Accumulating,IE000NFL4BX4,Named when the comparators were fixed,2026-11-10,2026-11-04,Joins only if HANetf publishes a daily net asset value series that the program can read without scraping. Otherwise it waits for the review of October 2027.
+comparator,sleeve,fund,isin,how_chosen,fixed_on,series_from,condition,condition_met_on
+msci_world,equity,State Street SPDR MSCI World UCITS ETF USD Unhedged (Acc),IE00BFY0GT14,"The first fund offered on the account in the rules' equity ranking with the MSCI World in place of the global index, method/selection_msci_world.csv",2026-11-10,,,
+nasdaq100,equity,Xtrackers Nasdaq 100 UCITS ETF 1C,IE00BMFKG444,"The first fund offered on the account in the rules' equity ranking with the Nasdaq-100 in place of the global index, method/selection_nasdaq100.csv",2026-11-10,,,
+lifestrategy_60,mixed,Vanguard LifeStrategy 60% Equity UCITS ETF (EUR) Accumulating,IE00BMVB5P51,The euro accumulating class of the 60% Equity fund,2026-11-10,,,
+lifestrategy_80,mixed,Vanguard LifeStrategy 80% Equity UCITS ETF (EUR) Accumulating,IE00BMVB5R75,The euro accumulating class of the 80% Equity fund,2026-11-10,,,
+first_ranked,equity,SPDR MSCI All Country World UCITS ETF (Acc),IE00B44Z5B48,"The first fund in the rules' equity ranking, method/selection_tracking_difference.csv, which the account does not offer",2026-11-10,,,
+first_ranked,bonds,Vanguard EUR Eurozone Government Bond UCITS ETF (EUR) Accumulating,IE00BH04GL39,"The first fund in the rules' bond ranking, method/selection_tracking_difference.csv, the bond fund held",2026-11-10,,,
+mag7,equity,HANetf Defiance Mag7 UCITS ETF Accumulating,IE000NFL4BX4,Named when the comparators were fixed,2026-11-10,2026-11-04,Joins only if HANetf publishes a daily net asset value series that the program can read without scraping. Otherwise it waits for the review of October 2027.,2026-11-10

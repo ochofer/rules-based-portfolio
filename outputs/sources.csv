@@ -1,15 +1,28 @@
-as_of,source,downloaded,last_date_covered
-2026-11-06,"iShares, IE00B6R52259, net asset values in US dollars",2026-11-09,2026-11-06
-2026-11-06,"Vanguard, IE00BH04GL39, net asset values in euro",2026-11-09,2026-11-06
-2026-11-06,"ECB, euro reference rate against the US dollar",2026-11-09,2026-11-06
-2026-11-06,"iShares, IE00B6R52259, holdings",2026-11-09,2026-11-06
-2026-11-06,"Vanguard, IE00BH04GL39, holdings",2026-11-09,2026-09-30
-2026-11-06,"Vanguard, IE00BH04GL39, monthly factsheet",2026-11-09,2026-09-30
-2026-11-06,"Kenneth French, Developed 5 Factors and Momentum, daily, Bloomberg database 202609",2026-11-09,2026-09-30
-2026-11-06,"MSCI ACWI net total return in euro, end-of-day levels",2026-11-09,2026-11-06
-2026-11-06,"HSBC S&P 500 UCITS ETF USD (Acc), IE000JZ473P7, net asset values in US dollars",2026-11-09,2026-11-06
-2026-11-06,"ECB, euro short-term rate, volume-weighted",2026-11-10,2026-11-09
-2026-11-06,"MSCI North America, Europe, Pacific and Emerging Markets, net total return in euro, month-end levels",2026-11-09,2026-10-30
-2026-11-06,"ECB, yield curve of all euro area government bonds, spot rates at 3, 7.5 and 20 years",2026-11-09,2026-11-05
-2026-11-06,"iShares, IE00B6R52259, key information document",2026-11-09,2026-09-03
-2026-11-06,"Vanguard, IE00BH04GL39, key information document",2026-11-09,2026-09-29
+as_of,source,downloaded,last_date_covered,address
+2026-11-06,"iShares, IE00B6R52259, net asset values in US dollars",2026-11-09,2026-11-06,https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data/api/v1/get-fund-document?appType=PRODUCT_PAGE&appSubType=ISHARES&targetSite=ishares-uk&locale=en_GB&portfolioId=251850&component=fundDownloadV2&userType=individual
+2026-11-06,"Vanguard, IE00BH04GL39, net asset values in euro",2026-11-09,2026-11-06,https://www.vanguard.co.uk/gpx/graphql
+2026-11-06,"ECB, euro reference rate against the US dollar",2026-11-09,2026-11-06,https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?format=csvdata
+2026-11-06,"iShares, IE00B6R52259, holdings",2026-11-09,2026-11-06,https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data/api/v1/get-fund-document?appType=PRODUCT_PAGE&appSubType=ISHARES&targetSite=ishares-uk&locale=en_GB&portfolioId=251850&component=holdings&userType=individual
+2026-11-06,"Vanguard, IE00BH04GL39, holdings",2026-11-09,2026-09-30,https://www.vanguard.co.uk/gpx/graphql
+2026-11-06,"Vanguard, IE00BH04GL39, monthly factsheet",2026-11-09,2026-09-30,https://fund-docs.vanguard.com/EUR_Eurozone_Government_Bond_UCITS_ETF_EUR_Accumulating_9591_EU_INT_EN.pdf
+2026-11-06,"Kenneth French, Developed 5 Factors and Momentum, daily, Bloomberg database 202609",2026-11-09,2026-09-30,https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Developed_5_Factors_Daily_CSV.zip
+2026-11-06,"MSCI ACWI net total return in euro, end-of-day levels",2026-11-09,2026-11-06,https://app2.msci.com/products/service/index/indexmaster/getLevelDataForGraph?currency_symbol=EUR&index_variant=NETR&start_date=20260822&end_date=20261109&data_frequency=DAILY&index_codes=892400
+2026-11-06,"HSBC S&P 500 UCITS ETF USD (Acc), IE000JZ473P7, net asset values in US dollars",2026-11-09,2026-11-06,https://www.assetmanagement.hsbc.co.uk/en/individual-investor/funds/ie000jz473p7
+2026-11-06,"ECB, euro short-term rate, volume-weighted",2026-11-10,2026-11-09,https://data-api.ecb.europa.eu/service/data/EST/B.EU000A2X2A25.WT?format=csvdata
+2026-11-06,"MSCI North America, Europe, Pacific and Emerging Markets, net total return in euro, month-end levels",2026-11-09,2026-10-30,https://app2.msci.com/products/service/index/indexmaster/getLevelDataForGraph?currency_symbol=EUR&index_variant=NETR&start_date=19981231&end_date=20261109&data_frequency=END_OF_MONTH&index_codes=990200
+2026-11-06,"ECB, yield curve of all euro area government bonds, spot rates at 3, 7.5 and 20 years",2026-11-09,2026-11-05,https://data-api.ecb.europa.eu/service/data/YC/B.U2.EUR.4F.G_N_C.SV_C_YM.SR_3Y?format=csvdata&startPeriod=2004-09-01
+2026-11-06,"iShares, IE00B6R52259, key information document",2026-11-09,2026-09-03,https://www.blackrock.com/nl/particuliere-beleggers/literature/kiid/eu-priips-ishares-msci-acwi-ucits-etf-usd-acc-ie00b6r52259-en.pdf
+2026-11-06,"Vanguard, IE00BH04GL39, key information document",2026-11-09,2026-09-29,https://fund-docs.vanguard.com/ie00bh04gl39_priipskid_en.pdf
+2026-11-06,"State Street, IE00BFY0GT14, net asset values in US dollars",2026-11-10,2026-11-09,https://www.ssga.com/library-content/products/fund-data/etfs/emea/navhist-emea-en-sppw-gy.xlsx
+2026-11-06,"Vanguard, IE00BMVB5P51, net asset values in euro",2026-11-10,2026-11-09,https://www.vanguard.co.uk/gpx/graphql
+2026-11-06,"Vanguard, IE00BMVB5R75, net asset values in euro",2026-11-10,2026-11-09,https://www.vanguard.co.uk/gpx/graphql
+2026-11-06,"DWS, IE00BMFKG444, net asset values in US dollars, from the product page's historical data after its entry gate for the Netherlands, non-professional investor",2026-11-10,2026-11-09,https://etf.deutsche-am.com/api/pdp/nl-nl/etf/IE00BMFKG444/historicaldata/download?startDate={start}&endDate={end}&includeTax=false
+2026-11-06,"HANetf, IE000NFL4BX4, net asset values in US dollars",2026-11-10,2026-11-09,https://hanetf.com/wp-content/assets/upload/NAV_history-MAGZ-IE000NFL4BX4-all-all.xlsx
+2026-11-06,"State Street, IE00B44Z5B48, net asset values in US dollars",2026-11-10,2026-11-09,https://www.ssga.com/library-content/products/fund-data/etfs/emea/navhist-emea-en-spyy-gy.xlsx
+2026-11-06,"State Street, IE00BFY0GT14, daily holdings",2026-11-10,2026-11-09,https://www.ssga.com/library-content/products/fund-data/etfs/emea/holdings-daily-emea-en-sppw-gy.xlsx
+2026-11-06,"State Street, IE00B44Z5B48, daily holdings",2026-11-10,2026-11-09,https://www.ssga.com/library-content/products/fund-data/etfs/emea/holdings-daily-emea-en-spyy-gy.xlsx
+2026-11-06,"Vanguard, IE00BMVB5P51, monthly factsheet",2026-11-10,2026-09-30,https://fund-docs.vanguard.com/LifeStrategy_60_Equity_UCITS_ETF_EUR_Accumulating_9494_EU_INT_EN.pdf
+2026-11-06,"Vanguard, IE00BMVB5R75, monthly factsheet",2026-11-10,2026-09-30,https://fund-docs.vanguard.com/LifeStrategy_80_Equity_UCITS_ETF_EUR_Accumulating_9496_EU_INT_EN.pdf
+2026-11-06,"MSCI North America, Europe, Pacific and Emerging Markets, net total return in euro, daily levels",2026-11-10,2026-11-09,https://app2.msci.com/products/service/index/indexmaster/getLevelDataForGraph?currency_symbol=EUR&index_variant=NETR&start_date=20260930&end_date=20261110&data_frequency=DAILY&index_codes=990200
+2026-11-06,"ECB, yield curve of all euro area government bonds, spot rate at 7 years, daily",2026-11-10,2026-11-09,https://data-api.ecb.europa.eu/service/data/YC/B.U2.EUR.4F.G_N_C.SV_C_YM.SR_7Y?format=csvdata&startPeriod=2004-09-01
+2026-11-06,"Rabobank, cost overview of Rabo Beheerd Beleggen Basis",2026-11-10,2025-05-01,https://media.rabobank.com/asset/10715cd7-c653-494d-b1dd-279bd16c8a48/Kostenoverzicht-Rabo-Beheerd-Beleggen-Basis.pdf

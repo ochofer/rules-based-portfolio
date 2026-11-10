@@ -100,6 +100,26 @@ def fetch_regions(refresh: bool, today, cache_dir: Path = config.CACHE_DIR) -> p
     return frame
 
 
+def fetch_regions_daily(refresh: bool, start, end, cache_dir: Path = config.CACHE_DIR) -> pd.DataFrame:
+    """Daily levels of the four regional indices in euro, net total return, from the same MSCI tool as the month-end
+    levels: one column each, for the comparisons' regions."""
+    columns = {}
+    for name, code, _ in REGIONS:
+        url = MSCI_MONTHLY.format(start=pd.Timestamp(start).strftime("%Y%m%d"), end=pd.Timestamp(end).strftime("%Y%m%d"),
+                                  code=code).replace("END_OF_MONTH", "DAILY")  # fmt: skip
+        path = prices.fetch(f"msci/region_{code}_netr_eur_daily.json", url, refresh, cache_dir=cache_dir)
+        levels = json.loads(Path(path).read_text())["indexes"]["INDEX_LEVELS"]
+        columns[name] = pd.Series({pd.Timestamp(str(x["calc_date"])): float(x["level_eod"]) for x in levels}, dtype=float)
+    return pd.DataFrame(columns).sort_index()
+
+
+def fetch_spot_daily(years: int, refresh: bool, cache_dir: Path = config.CACHE_DIR) -> pd.Series:
+    """The ECB curve's daily spot rate at a whole number of years, as a fraction, for the comparisons' bond rows."""
+    path = prices.fetch(f"ecb/curve_spot_{years}Y.csv", ECB_SPOT.format(maturity=f"{years}Y"), refresh, cache_dir=cache_dir)
+    frame = pd.read_csv(path, usecols=["TIME_PERIOD", "OBS_VALUE"]).dropna()
+    return pd.Series(frame["OBS_VALUE"].astype(float).values / 100, index=pd.to_datetime(frame["TIME_PERIOD"])).sort_index()
+
+
 def fetch_curve(refresh: bool, cache_dir: Path = config.CACHE_DIR) -> pd.DataFrame:
     """Month-end spot rates of the ECB curve at the three midpoints, as fractions."""
     columns, days = {}, []

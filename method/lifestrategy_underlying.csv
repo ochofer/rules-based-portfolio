@@ -1,0 +1,11 @@
+name_contains,sleeve,regions_from,how
+FTSE All-World,equity,held,"The regions of the held equity fund's look-through, an MSCI ACWI fund, for a FTSE All-World fund"
+FTSE Developed World,equity,msci_world,"The regions of the MSCI World comparator's holdings, for a FTSE Developed World fund"
+FTSE North America,equity,North America,The fund's region
+S&P 500,equity,North America,The fund's region
+FTSE Developed Europe,equity,Europe and Middle East,The fund's region
+FTSE Japan,equity,Pacific,The fund's region
+FTSE Developed Asia Pacific ex Japan,equity,Pacific,The fund's region
+FTSE Emerging Markets,equity,Emerging markets,The fund's region
+Bond,bonds,,A bond fund
+Gilt,bonds,,A bond fund

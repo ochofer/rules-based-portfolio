@@ -80,7 +80,6 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     blend = references.index_blend(growth.iloc[1:], msci, bond_month, today)
     table = metrics.daily(records, values, ref_a, ref_b, blend, base, alternative)
     rate = prices.load_estr(refresh)
-    compared = comparisons.build(records, navs, values, table, ref_a, ref_b, blend, rate, today)
     placed = metrics.orders(records, navs)
     band, issues = metrics.compliance(records, navs, today)
     monthly = metrics.monthly(records, table, values, placed, today)
@@ -125,9 +124,6 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
         written.append(_write(pd.DataFrame(columns=["month"]), "metrics_monthly.csv", as_of, out_dir))
     written.append(_write(costs, "costs_monthly.csv", as_of, out_dir))
     written.append(_write(metrics.quarters(records, table, values, placed, today), "quarters.csv", as_of, out_dir))
-    written.append(_write(compared["summary"], "comparisons.csv", as_of, out_dir))
-    written.append(_write(compared["daily"], "comparisons_daily.csv", as_of, out_dir))
-    written.append(_write(compared["effects"], "comparison_effects.csv", as_of, out_dir))
     impl = table[["implementation_cost_bps"]].dropna().reset_index()
     written.append(_write(impl, "implementation_cost.csv", as_of, out_dir))
     later = records.contributions[records.contributions["moment"].dt.normalize() > positions_day]
@@ -161,6 +157,14 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     risk_written, risk_sources = _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, records,
                                        now["nav_date"])  # fmt: skip
     written += risk_written
+
+    extra, comparison_sources = _comparison_inputs(refresh, today, navs, table, alt_usd, alt_eur, look, equity_as_of,
+                                                   factsheets.iloc[-1], out_dir)  # fmt: skip
+    compared = comparisons.build(records, navs, values, table, ref_a, ref_b, blend, rate, today, extra)
+    for frame, name in ((compared["summary"], "comparisons.csv"), (compared["daily"], "comparisons_daily.csv"),
+                        (compared["effects"], "comparison_effects.csv"), (compared["regions"], "comparison_regions.csv"),
+                        (extra["fees"], "comparison_fees.csv")):  # fmt: skip
+        written.append(_write(frame, name, as_of, out_dir))
     written.append(_write(metrics.attribution(daily_out), "attribution.csv", as_of, out_dir))
 
     checks = _checks(records, navs, look, weights_now, loadings)
@@ -168,7 +172,7 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     alt_source = (f"{alt_name}, {alt_isin}, net asset values in US dollars", f"hsbc/{alt_isin}_nav.json", alt_usd.index.max())
     rate_source = ("ECB, euro short-term rate, volume-weighted", "ecb/estr.csv", rate.index.max())
     sources = _sources(series, msci, equity_as_of, bonds_as_of, latest_sheet.name, daily_factors, vintage,
-                       [alt_source, rate_source, *risk_sources])  # fmt: skip
+                       [alt_source, rate_source, *risk_sources, *comparison_sources])  # fmt: skip
     written.append(_write(sources, "sources.csv", as_of, out_dir))
     privacy(records, out_dir)
     return {"as_of": as_of, "files": written}
@@ -282,6 +286,106 @@ def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, re
     ], sources
 
 
+UNREADABLE = (SystemExit, ValueError, OSError, KeyError)
+BANK_STATUS = "Rabobank publishes no return for its managed profiles"
+
+
+def _comparison_inputs(refresh, today, navs, table, alt_usd, alt_eur, look, equity_as_of, sheet, out_dir) -> tuple:
+    """The second stage's inputs to the comparisons, each from its publisher, and their rows of the sources table.
+
+    A comparator whose series cannot be read, or does not reach the record's last day, shows n/a with the date, and
+    no other publisher stands in for it. Region weights are kept from earlier builds at each month end
+    (comparisons.keep_snapshots)."""
+    funds = references.comparator_funds()
+    isin_of = {r.comparator: r.isin for r in funds.itertuples() if r.sleeve in ("equity", "mixed")}
+    starts = {r.comparator: r.series_from for r in funds.itertuples() if r.series_from}
+    fixed_on = pd.Timestamp(funds["fixed_on"].min())
+    last = table.index.max()
+    read_on = pd.Timestamp(today).strftime("%Y-%m-%d")
+    sources, spec = [], {"sp500": {"eur": alt_eur, "usd": alt_usd, "share": 1.0}}
+    for key in ("msci_world", "lifestrategy_60", "lifestrategy_80", "nasdaq100", "mag7", "first_ranked"):
+        isin = isin_of[key]
+        try:
+            values, currency = prices.load_comparator(isin, refresh)
+        except UNREADABLE:
+            spec[key] = {"eur": None, "status": f"series not read on {read_on}"}
+            continue
+        if values.index.max() < last:
+            spec[key] = {"eur": None, "status": f"net asset values only to {values.index.max():%Y-%m-%d}"}
+            continue
+        on_days = values.reindex(values.index.union(navs.index)).ffill().reindex(navs.index)
+        dollar = currency == "USD"
+        spec[key] = {"eur": on_days / navs["usd_per_eur"] if dollar else on_days, "usd": values if dollar else None, "share": 1.0}
+        if key in starts:
+            spec[key]["from"] = pd.Timestamp(starts[key])
+        issuer = prices.ISSUER_NAME[prices.COMPARATOR_FEEDS[isin][0]]
+        label = f"{issuer}, {isin}, net asset values in {'US dollars' if dollar else 'euro'}"
+        if issuer == "DWS":
+            label += ", from the product page's historical data after its entry gate for the Netherlands, non-professional investor"
+        sources.append((label, prices.comparator_cache_name(isin), values.index.max()))
+
+    rows = []
+
+    def snapshot(key, weights, day):
+        rows.extend({"comparator": key, "snapshot": pd.Timestamp(day), "region": r, "weight": float(w)}
+                    for r, w in comparisons.region_shares(weights).items())  # fmt: skip
+
+    held = comparisons.region_shares(look["equity_region"]["share_of_sleeve"])
+    snapshot("held", held, equity_as_of)
+    msci_regions = pd.read_csv(config.METHOD_DIR / "msci_regions.csv")
+    world = held
+    for key in ("msci_world", "first_ranked"):
+        if spec[key].get("eur") is None:
+            continue
+        try:
+            holdings, as_of = prices.load_ssga_holdings(isin_of[key], refresh)
+        except UNREADABLE:
+            continue
+        weights = comparisons.by_country(holdings, msci_regions)
+        snapshot(key, weights, as_of)
+        world = weights if key == "msci_world" else world
+        sources.append((f"State Street, {isin_of[key]}, daily holdings", f"ssga/{isin_of[key]}_holdings.xlsx", as_of))
+    for key in ("sp500", "nasdaq100", "mag7"):
+        snapshot(key, pd.Series({"North America": 1.0}), fixed_on)
+    mapping = pd.read_csv(config.METHOD_DIR / "lifestrategy_underlying.csv")
+    charges = {}
+    for key in ("lifestrategy_60", "lifestrategy_80"):
+        if spec[key].get("eur") is None:
+            continue
+        allocation, dated = prices.load_lifestrategy_allocation(isin_of[key], refresh)
+        share, weights = comparisons.mixed_regions(allocation, mapping, held, world)
+        spec[key].update(share=share, bonds_na=True)
+        snapshot(key, weights, dated)
+        charges[key] = prices.load_lifestrategy_charges(isin_of[key], refresh)
+        sources.append((f"Vanguard, {isin_of[key]}, monthly factsheet", f"vanguard/{isin_of[key]}_factsheet.pdf", dated))
+    previous_path = Path(out_dir) / "comparison_regions.csv"
+    previous = None
+    if previous_path.exists():
+        previous = pd.read_csv(previous_path).drop(columns=["as_of"], errors="ignore")
+        previous["snapshot"] = pd.to_datetime(previous["snapshot"])
+    regions = comparisons.keep_snapshots(previous, pd.DataFrame(rows), today)
+
+    levels = risk.fetch_regions_daily(refresh, table.index.min() - pd.Timedelta(days=10), today)
+    sources.append(("MSCI North America, Europe, Pacific and Emerging Markets, net total return in euro, daily levels",
+                    f"msci/region_{risk.REGIONS[0][1]}_netr_eur_daily.json", levels.index.max()))  # fmt: skip
+    duration = float(sheet["duration_years"])
+    years = int(round(duration))
+    spot = risk.fetch_spot_daily(years, refresh)
+    sources.append((f"ECB, yield curve of all euro area government bonds, spot rate at {years} years, daily",
+                    f"ecb/curve_spot_{years}Y.csv", spot.index.max()))  # fmt: skip
+    try:
+        bank = prices.load_rabobank_costs(refresh)
+        sources.append(("Rabobank, cost overview of Rabo Beheerd Beleggen Basis", "rabobank/kostenoverzicht_basis.pdf", bank["dated"]))
+    except UNREADABLE:
+        bank = None
+    ownership = pd.read_csv(Path(out_dir) / "cost_of_ownership.csv")
+    first = spec.pop("first_ranked")
+    extra = {"one_fund": spec, "first_ranked": first, "regions": regions, "region_levels": levels,
+             "bond": {"spot": spot, "duration": duration}, "unavailable": {"bank_offensief": BANK_STATUS},
+             "fees": comparisons.fees(ownership, table["implementation_cost_bps"], charges, bank)}  # fmt: skip
+    return extra, sources
+
+
 def _sources(series, msci, equity_as_of, bonds_as_of, sheet_as_at, daily_factors, vintage, extra=()) -> pd.DataFrame:
     log_path = config.CACHE_DIR / "sources.json"
     log = json.loads(log_path.read_text()) if log_path.exists() else {}
@@ -306,7 +410,8 @@ def _sources(series, msci, equity_as_of, bonds_as_of, sheet_as_at, daily_factors
     ]  # fmt: skip
     return pd.DataFrame(
         [
-            {"source": s, "downloaded": downloaded(name), "last_date_covered": pd.Timestamp(last)}
+            {"source": s, "downloaded": downloaded(name), "last_date_covered": pd.Timestamp(last),
+             "address": log.get(name, {}).get("url", "")}
             for s, name, last in rows
         ]
     )

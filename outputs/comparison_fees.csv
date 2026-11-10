@@ -1,0 +1,9 @@
+as_of,comparator,item,bps_low,bps_high,per,source,dated
+2026-11-06,portfolio,Ongoing costs of the two ETFs at the portfolio's weights,16.711495,16.711495,a year,The ETFs' key information documents,2026-09-29
+2026-11-06,portfolio,"Implementation cost, cumulative",-5.374297206,-5.374297206,since the first purchase,"The record, outputs/implementation_cost.csv",2026-11-06
+2026-11-06,lifestrategy_60,Ongoing charges figure,25,25,a year,Vanguard's monthly factsheet,2026-09-30
+2026-11-06,lifestrategy_80,Ongoing charges figure,25,25,a year,Vanguard's monthly factsheet,2026-09-30
+2026-11-06,bank_offensief,"Basic service, four quarters",24,24,"a year, on the first 100,000 euro invested",Rabobank's cost overview of Rabo Beheerd Beleggen Basis,2025-05-01
+2026-11-06,bank_offensief,"Portfolio management, four quarters",40,40,"a year, on the first 100,000 euro invested",Rabobank's cost overview of Rabo Beheerd Beleggen Basis,2025-05-01
+2026-11-06,bank_offensief,The funds' own costs,10,15,a year,Rabobank's cost overview of Rabo Beheerd Beleggen Basis,2025-05-01
+2026-11-06,bank_offensief,All in,74,79,"a year, on the first 100,000 euro invested",Rabobank's cost overview of Rabo Beheerd Beleggen Basis,2025-05-01
