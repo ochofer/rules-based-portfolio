@@ -269,7 +269,7 @@ def write_before(records, day: date, at: datetime, values: dict, proposed: list,
     lines = [
         f"# Cycle report, {day:%B %Y}",
         "",
-        f"{CYCLE_DAY}: {day}. Written {at:%Y-%m-%d %H:%M} Amsterdam time by `python3 -m portfolio cycle`, before any "
+        f"{CYCLE_DAY}: {day}. Written {at:%Y-%m-%d %H:%M} Amsterdam time by the program, before any "
         f"order of the day, at the net asset values of {pd.Timestamp(nav_day):%Y-%m-%d}.",
         "",
         "## Before the orders",
