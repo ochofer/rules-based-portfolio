@@ -2427,7 +2427,9 @@ def history_pane(page, history: pd.DataFrame, windows: pd.DataFrame) -> None:
         "in euro and in US dollars. For the US stock market at 70/30, the US stock market in dollars is its equity weight "
         "at the previous month end times the US market's return in dollars less the global series'. Both equity series "
         "are converted at the same rate, so that comparator's dollar row holds the drift term and the conversion's cross "
-        "term only, and the currencies inside the global series' dollar return stay in that return, as on the record.",
+        "term only, and the currencies inside the global series' dollar return stay in that return, as on the record. "
+        "The split of the US stock market at 70/30 is nonzero because the two paths' equity weights drift apart between "
+        "rebalancings, and the band triggers on different month ends when the two equity series differ.",
         "Calendar years are cumulative, in points, and 1999 runs from February. The whole test and the two periods are "
         "per year, in points a year: the difference of the two growth rates per year, with each effect as its monthly sum "
         "divided by the span's years. Compounding is the difference less the sum of the effects. It includes the "
