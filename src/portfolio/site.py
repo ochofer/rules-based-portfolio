@@ -1671,11 +1671,20 @@ def _alternative(daily: pd.DataFrame, fund: str) -> tuple:
     return card, chart
 
 
+def _per_cent(x: float) -> str:
+    """A return in words in a sentence, one decimal: minus 3.7 per cent, 29.6 per cent."""
+    value = round(float(x) * 100, 1) + 0.0
+    return f"minus {abs(value):.1f} per cent" if value < 0 else f"{value:.1f} per cent"
+
+
 def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.DataFrame, fund: str, period: tuple,
-              added) -> None:  # fmt: skip
+              added, periods: pd.DataFrame = None) -> None:  # fmt: skip
     """What the portfolio does not do, and why: a card of text across the Method view, with the US run of the
     allocation test and the S&P 500 alternative inside it. Every value in the text is read from a committed file."""
     first, last, months = period
+    if periods is None:
+        periods = _read("allocation_check_us_periods.csv", config.ROOT / "mandate")
+    cumulative = periods.set_index(["series", "first_month"])["cumulative_return_usd"]
     test = allocation.set_index("split")
     error = test.loc["100/0", "volatility"] / (months / 12) ** 0.5 * 100
     gap = (test.loc["100/0", "growth_per_year"] - test.loc["40/60", "growth_per_year"]) * 100
@@ -1688,6 +1697,10 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
         "gap": f"{gap:.1f}", "us_split": _esc(within.loc[within["equity_weight"].idxmax(), "split"]),
         "us_fall": f"{u70['worst_fall'] * 100:.1f}", "us_peak": _month_name(u70["peak"]),
         "us_low": _month_name(u70["low"]), "fund": _esc(fund), **{f"n{i}": _fn(i) for i in range(1, len(NOTES) + 1)},
+        "us_after": _per_cent(cumulative[("US stock market", "2010-01")]),
+        "rest_after": _per_cent(cumulative[("Developed markets outside the United States", "2010-01")]),
+        "us_decade": _per_cent(cumulative[("US stock market", "2000-01")]),
+        "rest_decade": _per_cent(cumulative[("Developed markets outside the United States", "2000-01")]),
     }  # fmt: skip
     parts = (
         ("No optimiser.",
@@ -1699,8 +1712,8 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
          "40/60 and the 100/0 split on the same history (the table under {test}). DeMiguel, Garlappi and Uppal "
          "measured how much history a sample-based optimiser needs before it beats an equal split out of sample: about "
          "3,000 months for 25 assets and about 6,000 for 50.{n1} A replication of their study by the same author finds "
-         "one of 32 optimising rules beating the equal split at the 5 per cent level on the 261 months since the "
-         "paper.{n2} The frontier of the two sleeves is in the Risk view ({frontier}). With two assets it is a "
+         "that none of the seven optimising rules it tests earns a higher Sharpe ratio than the equal split at the 5 "
+         "per cent level, on any of four sets of assets, over the 261 months since the paper.{n2} The frontier of the two sleeves is in the Risk view ({frontier}). With two assets it is a "
          "line, and the limit picks the point on it."),
         ("No index benchmark, and why not the S&P 500.",
          "A benchmark is the portfolio a client would hold without the manager, so that the manager's contribution can "
@@ -1713,9 +1726,9 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
          "index's companies at about two thirds of its weight, so holding the index alone sells the other third of the "
          "world's listed companies and puts the whole portfolio into one country and one currency. A weight on one "
          "country above its share of the world is a view, and the rules take none. The advice to hold the index alone "
-         "grew popular during the fifteen years in which the United States beat the rest of the world, and over the "
-         "ten years from 2000 to 2009 the index lost money in dollars, dividends included, and ended the decade behind "
-         "the developed markets outside the United States.{n3} On the limit, {us_test} repeats the allocation test "
+         "grew popular in the years after 2009, when the US stock market returned {us_after} in dollars, dividends "
+         "included, against {rest_after} for the developed markets outside the United States, and over the ten years "
+         "from 2000 to 2009 the same two series returned {us_decade} and {rest_decade}.{n3} On the limit, {us_test} repeats the allocation test "
          "with the US stock market in euro in place of the global series, with the same splits, the same band rule and "
          "the same months: the largest split within 35 per cent is {us_split}, and the worst fall at 70/30 is "
          "{us_fall} per cent, from {us_peak} to {us_low}. {alternative} shows what the same contributions on the same "
@@ -2281,7 +2294,8 @@ def build(out_dir: Path = None) -> Path:
     us_test = _read("allocation_check_us_results.csv", config.ROOT / "mandate")
     not_done = None if not len(us_test) else {
         "us_test": us_test, "daily": daily, "fund": references.alternative_fund()[0], "period": _test_period(),
-        "added": _first_commit_day(ADDED_WITH, _built(now_row))}  # fmt: skip
+        "added": _first_commit_day(ADDED_WITH, _built(now_row)),
+        "periods": _read("allocation_check_us_periods.csv", config.ROOT / "mandate")}  # fmt: skip
     method(page, allocation, selection, _rules_html(), out["sources.csv"], simulated["bootstrap"], correlation,
            _read("controls.csv", config.METHOD_DIR), not_done)  # fmt: skip
     simulations(page, simulated["history"], simulated["paths"], monthly)

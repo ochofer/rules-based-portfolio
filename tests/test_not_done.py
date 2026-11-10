@@ -40,6 +40,21 @@ def test_the_values_in_the_text_are_computed_from_the_committed_files():
     assert "The US series was added in November 2026, after the first cycle day" in html
 
 
+def test_the_sentence_on_the_us_market_is_written_from_the_committed_periods():
+    periods = pd.read_csv(MANDATE / "allocation_check_us_periods.csv")
+    assert list(periods["first_month"]) == ["2000-01", "2000-01", "2010-01", "2010-01"]
+    assert list(periods["months"]) == [120, 120, 180, 180]
+    figures = {(r.series[:2], r.first_month): site._per_cent(r.cumulative_return_usd) for r in periods.itertuples()}
+    _, html = _section()
+    assert (f"grew popular in the years after 2009, when the US stock market returned {figures[('US', '2010-01')]} in "
+            f"dollars, dividends included, against {figures[('De', '2010-01')]} for the developed markets outside the "
+            f"United States, and over the ten years from 2000 to 2009 the same two series returned "
+            f"{figures[('US', '2000-01')]} and {figures[('De', '2000-01')]}.") in html  # fmt: skip
+    assert site._per_cent(-0.0374) == "minus 3.7 per cent" and site._per_cent(0.296) == "29.6 per cent"
+    sentence = re.search(r"The advice to hold the index alone.*?United States, and over the ten years.*?\.", html).group(0)
+    assert not RANKING.search(sentence) and "the index lost" not in html
+
+
 def test_every_footnote_links_to_one_note_and_every_note_has_one_link():
     _, html = _section()
     marks = re.findall(r'<sup class="fn"><a href="#note-(\d+)"', html)

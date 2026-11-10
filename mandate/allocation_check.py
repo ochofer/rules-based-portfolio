@@ -12,13 +12,20 @@ In November 2026, after the first cycle day, a second run was added to answer
 a question readers ask: the same test with the US stock market in place of the
 global equity series, with the same bonds, the same band rule, the same splits
 and the same months. The split was set on the global series alone, and the US
-run chooses nothing: its table reads no in the column chosen on every row.
+run chooses nothing: its table reads no in the column chosen on every row. The
+same run gives the cumulative return in US dollars, dividends included, of the
+US stock market and of the developed markets outside the United States over
+January 2000 to December 2009 and over January 2010 to December 2024, the
+figures behind one sentence of the dashboard's Method view.
 
 Data, downloaded at run time and cached in cache/ (never committed):
   - Kenneth French's developed-market and emerging-market factor files (the
     market return is Mkt-RF plus RF, in US dollars).
   - Kenneth French's US research factors, monthly (the US market return is
     Mkt-RF plus RF, in US dollars), for the US run only.
+  - Kenneth French's developed-ex-US factor file, monthly (the market return of
+    the developed markets outside the United States is Mkt-RF plus RF, in US
+    dollars), for the two periods of the US run only.
   - The European Central Bank's euro reference rate against the US dollar,
     daily (dataset EXR).
   - The European Central Bank's euro area yield curve for all government
@@ -29,7 +36,8 @@ Data, downloaded at run time and cached in cache/ (never committed):
 Usage:   python3 mandate/allocation_check.py
 Output:  mandate/allocation_check_results.md, the same text on screen, and the table of every split in
          mandate/allocation_check_results.csv. The US run writes its table of every split to
-         mandate/allocation_check_us_results.csv and its figures to the screen.
+         mandate/allocation_check_us_results.csv, the two series' returns over the two periods to
+         mandate/allocation_check_us_periods.csv, and its figures to the screen.
 Requires Python 3.9 or later, pandas and numpy.
 """
 import io
@@ -49,6 +57,8 @@ CACHE = os.path.join(ROOT, "cache")
 OUT = os.path.join(ROOT, "mandate", "allocation_check_results.md")
 OUT_CSV = os.path.join(ROOT, "mandate", "allocation_check_results.csv")
 OUT_US_CSV = os.path.join(ROOT, "mandate", "allocation_check_us_results.csv")
+OUT_US_PERIODS = os.path.join(ROOT, "mandate", "allocation_check_us_periods.csv")
+US_PERIODS = (("2000-01", "2009-12"), ("2010-01", "2024-12"))  # the decade from 2000 and the fifteen years after it
 
 # The mandate's numbers.
 RISK_LIMIT = 0.35        # worst fall allowed in the test: one third, rounded up to the next 5 points
@@ -70,6 +80,7 @@ SOURCES = {
     "developed": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Developed_3_Factors_CSV.zip",
     "emerging": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Emerging_5_Factors_CSV.zip",
     "us_market": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip",
+    "developed_ex_us": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Developed_ex_US_3_Factors_CSV.zip",
     "ecb_usd_per_eur": "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?format=csvdata",
     "ecb_10y": "https://data-api.ecb.europa.eu/service/data/IRS/M.U2.L.L40.CI.0000.EUR.N.Z?format=csvdata",
     "ecb_7y": "https://data-api.ecb.europa.eu/service/data/YC/B.U2.EUR.4F.G_N_C.SV_C_YM.SR_7Y?format=csvdata",
@@ -281,6 +292,23 @@ def results_table(rows, chosen):
     return table
 
 
+def us_periods():
+    """The cumulative return in US dollars, dividends included, of French's US market and of his developed markets
+    outside the United States over each period of US_PERIODS, as a fraction. A period with a missing month stops."""
+    series = (("US stock market", french_market("us_market")[0]),
+              ("Developed markets outside the United States", french_market("developed_ex_us")[0]))
+    rows = []
+    for first, last in US_PERIODS:
+        months = len(pd.period_range(first, last, freq="M"))
+        for name, returns in series:
+            r = returns.loc[first:last]
+            if len(r) != months or (r <= -0.9999).any():
+                raise SystemExit(f"{name}: a month is missing between {first} and {last}.")
+            rows.append({"series": name, "first_month": first, "last_month": last, "months": months,
+                         "cumulative_return_usd": float(np.prod(1 + r.to_numpy()) - 1)})
+    return pd.DataFrame(rows)
+
+
 def csv_text(table):
     """The results table as the text of its file."""
     return table.to_csv(index=False, float_format="%.6f", lineterminator="\n")
@@ -383,6 +411,12 @@ def main():
     us_rows = split_rows(us)
     results_table(us_rows, None).to_csv(OUT_US_CSV, index=False, float_format="%.6f", lineterminator="\n")
     print(us_summary(us_rows, us_header))
+    periods = us_periods()
+    periods.to_csv(OUT_US_PERIODS, index=False, float_format="%.6f", lineterminator="\n")
+    print("")
+    for r in periods.itertuples():
+        print(f"{r.series}, {r.first_month} to {r.last_month}: {r.cumulative_return_usd * 100:.1f} per cent in US dollars, "
+              "dividends included.")
 
 
 if __name__ == "__main__":
