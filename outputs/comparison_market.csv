@@ -1,0 +1,8 @@
+as_of,sleeve,fund,isin,income,ter_per_cent,published,published_as_of,start,start_as_of,current,current_as_of
+2026-11-06,equities,iShares MSCI ACWI UCITS ETF USD (Acc),IE00B6R52259,accumulating,0.2,0.4296415704,2023-12-31,0.5410257651,2026-10-07,0.5223967364,2026-11-06
+2026-11-06,aggregate,iShares Core Global Aggregate Bond UCITS ETF USD (Dist),IE00B3F81409,distributing,0.1,0.3861826138,2023-12-31,0.3047143201,2026-10-07,0.3147116424,2026-11-06
+2026-11-06,private_equity,iShares Listed Private Equity UCITS ETF USD (Acc),IE000D8FCSD8,accumulating,0.75,0.0778279222,2023-12-31,0.0626317022,2026-10-07,0.0675282861,2026-11-06
+2026-11-06,real_estate,SPDR Dow Jones Global Real Estate UCITS ETF (Acc),IE00BH4GR342,accumulating,0.4,0.0404969595,2023-12-31,0.0350597957,2026-10-07,0.0377809778,2026-11-06
+2026-11-06,em_debt,iShares J.P. Morgan EM Local Govt Bond UCITS ETF USD (Acc),IE00BFZPF546,accumulating,0.5,0.0387299613,2023-12-31,0.034108187,2026-10-07,0.0345352864,2026-11-06
+2026-11-06,inflation_linked,iShares Core Global Aggregate Bond UCITS ETF USD (Dist),IE00B3F81409,distributing,0.1,0.0163799836,2023-12-31,0.0129244958,2026-10-07,0.0133485335,2026-11-06
+2026-11-06,high_yield,iShares Global High Yield Corp Bond UCITS ETF USD (Acc),IE00BYWZ0440,accumulating,0.5,0.0107409893,2023-12-31,0.0095357341,2026-10-07,0.0096985374,2026-11-06

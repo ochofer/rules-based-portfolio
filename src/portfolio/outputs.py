@@ -163,7 +163,8 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     compared = comparisons.build(records, navs, values, table, ref_a, ref_b, blend, rate, today, extra)
     for frame, name in ((compared["summary"], "comparisons.csv"), (compared["daily"], "comparisons_daily.csv"),
                         (compared["effects"], "comparison_effects.csv"), (compared["regions"], "comparison_regions.csv"),
-                        (extra["fees"], "comparison_fees.csv")):  # fmt: skip
+                        (extra["fees"], "comparison_fees.csv"),
+                        (_market_table(compared["market"], extra["market_funds"]), "comparison_market.csv")):  # fmt: skip
         written.append(_write(frame, name, as_of, out_dir))
     written.append(_write(metrics.attribution(daily_out), "attribution.csv", as_of, out_dir))
 
@@ -380,10 +381,75 @@ def _comparison_inputs(refresh, today, navs, table, alt_usd, alt_eur, look, equi
         bank = None
     ownership = pd.read_csv(Path(out_dir) / "cost_of_ownership.csv")
     first = spec.pop("first_ranked")
+    market, market_sources, market_funds = _market_inputs(refresh, navs, last, read_on, funds)
+    sources += market_sources
     extra = {"one_fund": spec, "first_ranked": first, "regions": regions, "region_levels": levels,
              "bond": {"spot": spot, "duration": duration}, "unavailable": {"bank_offensief": BANK_STATUS},
-             "fees": comparisons.fees(ownership, table["implementation_cost_bps"], charges, bank)}  # fmt: skip
+             "market_portfolio": market, "market_funds": market_funds,
+             "fees": comparisons.fees(ownership, table["implementation_cost_bps"], charges, bank,
+                                      comparisons.market_fees(market_funds, market["weights"]))}  # fmt: skip
     return extra, sources
+
+
+def _market_table(weights: pd.DataFrame, funds: pd.DataFrame) -> pd.DataFrame:
+    """The global market portfolio's weight table beside each class's fund, its ISIN, its income and its TER."""
+    out = weights.merge(funds.reset_index().rename(columns={"index": "sleeve"}), on="sleeve", how="left")
+    return out[["sleeve", "fund", "isin", "income", "ter_per_cent", "published", "published_as_of", "start", "start_as_of",
+                "current", "current_as_of"]]  # fmt: skip
+
+
+def _market_inputs(refresh, navs, last, read_on, funds) -> tuple:
+    """The global market portfolio's inputs: each asset class fund's net asset values in euro, US dollar values at
+    the ECB's reference rate of the day, a distributing class's with its distributions added back on their ex-dates,
+    and the dollar values of the dollar funds; the published weights and their date; the rows of the sources table;
+    and each class's fund with its TER and factsheet date. A fund whose series cannot be read or stops before the
+    record's last day leaves the comparator n/a with the date."""
+    weights, as_of = comparisons.market_weights()
+    held = funds[funds["comparator"] == "market_portfolio"].set_index("sleeve").reindex(list(comparisons.MARKET_SLEEVES))
+    ranking = pd.read_csv(config.METHOD_DIR / "selection_market_portfolio.csv").drop_duplicates("isin").set_index("isin")
+    equity_ranking = pd.read_csv(config.METHOD_DIR / "selection_tracking_difference.csv").drop_duplicates("isin").set_index("isin")
+    table = held[["fund", "isin", "income"]].copy()
+    table["ter_per_cent"] = [(ranking if i in ranking.index else equity_ranking).loc[i, "ter_per_cent"] for i in table["isin"]]
+    table["factsheet_date"] = [(ranking if i in ranking.index else equity_ranking).loc[i, "factsheet_date"] for i in table["isin"]]
+    source = ("Doeswijk, Lam and Swinkels (2024), Data update: The Global Multi-Asset Market Portfolio, 1959-2012, "
+              "version 6, the eight asset classes' weights at 31 December 2023")  # fmt: skip
+    weights_table = pd.read_csv(config.METHOD_DIR / "market_portfolio_weights.csv")
+    sources = [(source, "method/market_portfolio_weights.csv", as_of, weights_table["read_on"].iloc[0],
+                f"https://doi.org/{weights_table['doi'].iloc[0]}")]  # fmt: skip
+    rate = navs["usd_per_eur"]
+    eur, usd, loaded = {}, {}, {}
+    for sleeve in comparisons.MARKET_SLEEVES:
+        isin = held.loc[sleeve, "isin"]
+        if isin == config.ISIN[config.EQUITY]:
+            eur[sleeve] = navs[config.EQUITY]  # the equity fund held, as the record values it
+            continue
+        if isin not in loaded:
+            try:
+                values, currency = prices.load_comparator(isin, refresh)
+                distributing = held.loc[sleeve, "income"] == "distributing"
+                if distributing:
+                    values = prices.with_distributions(values, prices.load_distributions(isin, refresh))
+            except UNREADABLE:
+                return {"eur": None, "status": f"series not read on {read_on}", "weights": weights}, sources, table
+            if values.index.max() < last:
+                return ({"eur": None, "status": f"net asset values of {isin} only to {values.index.max():%Y-%m-%d}",
+                         "weights": weights}, sources, table)  # fmt: skip
+            loaded[isin] = (values, currency)
+            issuer = prices.ISSUER_NAME[prices.COMPARATOR_FEEDS[isin][0]]
+            label = f"{issuer}, {isin}, net asset values in {'US dollars' if currency == 'USD' else 'euro'}"
+            if distributing:
+                label += ", with the distributions by ex-date from the same file"
+            if issuer == "DWS":
+                label += ", from the product page's historical data after its entry gate for the Netherlands, non-professional investor"
+            sources.append((label, prices.comparator_cache_name(isin), values.index.max()))
+        values, currency = loaded[isin]
+        on_days = values.reindex(values.index.union(navs.index)).ffill().reindex(navs.index)
+        eur[sleeve] = on_days / rate if currency == "USD" else on_days
+        if currency == "USD":
+            usd[sleeve] = on_days
+    market = {"eur": pd.DataFrame(eur)[list(comparisons.MARKET_SLEEVES)], "usd": pd.DataFrame(usd) if usd else None,
+              "weights": weights, "as_of": as_of}  # fmt: skip
+    return market, sources, table
 
 
 def _sources(series, msci, equity_as_of, bonds_as_of, sheet_as_at, daily_factors, vintage, extra=()) -> pd.DataFrame:
@@ -408,11 +474,12 @@ def _sources(series, msci, equity_as_of, bonds_as_of, sheet_as_at, daily_factors
         ("MSCI ACWI net total return in euro, end-of-day levels", "msci/acwi_netr_eur.json", msci.index.max()),
         *extra,
     ]  # fmt: skip
+    # A row may carry its own date read and address, for a source that is not downloaded at each build.
     return pd.DataFrame(
         [
-            {"source": s, "downloaded": downloaded(name), "last_date_covered": pd.Timestamp(last),
-             "address": log.get(name, {}).get("url", "")}
-            for s, name, last in rows
+            {"source": row[0], "downloaded": row[3] if len(row) > 3 else downloaded(row[1]),
+             "last_date_covered": pd.Timestamp(row[2]), "address": row[4] if len(row) > 4 else log.get(row[1], {}).get("url", "")}
+            for row in rows
         ]
     )
 

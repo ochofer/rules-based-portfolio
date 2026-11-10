@@ -299,7 +299,7 @@ def _colophon(now_row) -> str:
     from the committed outputs and a rebuild reproduces the page."""
     built = fmt.day_words(_built(now_row))
     return (f'<p class="colophon">Carlo Hofer &middot; Data: the issuers\' published data &middot; '
-            f'<a href="{config.REPOSITORY_URL}">Code on GitHub</a> &middot; Built {_esc(built)}</p>')
+            f'<a href="{config.REPOSITORY_URL}">Code on GitHub</a> &middot; Last build: {_esc(built)}</p>')
 
 
 def _asof(day, extra="") -> str:
@@ -813,6 +813,7 @@ COMPARATOR_NAME = {
     "lifestrategy_80": ("LifeStrategy 80% Equity", "LifeStrategy 80"),
     "nasdaq100": ("The Nasdaq-100 fund", "Nasdaq-100"),
     "mag7": ("The Mag7 fund", "Mag7"),
+    "market_portfolio": ("The global market portfolio", "Market portfolio"),
     "savings": ("Savings at the euro short-term rate", "Savings"),
     "bank_offensief": ("Rabobank's managed profile Offensief", "Rabobank Offensief"),
 }
@@ -820,9 +821,11 @@ COMPARATOR_ROLE = {"benchmark": "@index_blend", "reference_a": "@reference_a", "
                    "split_100_0": "@comparator_1", "split_90_10": "@comparator_2", "split_80_20": "@comparator_3",
                    "split_60_40": "@comparator_4", "first_ranked": "@comparator_7", "sp500": "@sp500_alternative",
                    "msci_world": "@comparator_5", "lifestrategy_60": "@comparator_3", "lifestrategy_80": "@comparator_4",
-                   "nasdaq100": "@comparator_2", "mag7": "@comparator_6", "savings": "@savings"}  # fmt: skip
+                   "nasdaq100": "@comparator_2", "mag7": "@comparator_6", "market_portfolio": "@comparator_7",
+                   "savings": "@savings"}  # fmt: skip
 EFFECT_NAME = {"implementation": "Implementation", "drift": "Drift", "split": "Split", "dollar": "The dollar",
                "cash": "Cash", "regions": "Regions", "within_regions": "Within each region",
+               "equity_classes": "Equity classes", "bond_classes": "Bond classes",
                "rate_against_yield": "The rate against the bonds' yield", "change_in_yield": "The change in yield",
                "bonds_rest": "The rest of the bond return", "timing": "Timing of contributions",
                "compounding": "Compounding"}  # fmt: skip
@@ -833,9 +836,35 @@ PANES = (
      ("split_100_0", "split_90_10", "split_80_20", "split_60_40", "first_ranked"), "comparisons-splits"),
     ("one_fund", "One fund instead of two", ("sp500", "msci_world", "lifestrategy_60", "lifestrategy_80", "nasdaq100", "mag7"),
      "comparisons-one-fund"),
+    ("market_portfolio", "Every asset class at its market value", ("market_portfolio",), "comparisons-market"),
     ("bank", "The money left in the bank", ("savings",), "comparisons-savings"),
     ("managed", "Not like for like: a bank's managed profile", ("bank_offensief",), "comparisons-managed"),
 )  # fmt: skip
+MARKET_NOTE = (
+    "The global market portfolio is a comparator the portfolio's design names, and the benchmark remains the index blend. "
+    "It holds every asset class at its share of the world's invested market value, by the weights at 31 December 2023 "
+    "in the data update of Doeswijk, Lam and Swinkels, version 6 (doi.org/10.25397/eur.9371741, licence CC BY 4.0), "
+    "which updates their paper The Global Multi-Asset Market Portfolio, 1959-2012, Financial Analysts Journal 70(2), "
+    "26-41, 2014 (doi.org/10.2469/faj.v70.n2.1).",
+    "It takes the same contributions on the same days. It bought the published weights carried to the day before the "
+    "first purchase by each class fund's return in euro, holds them as they move with prices, as the market holds them, "
+    "and invests each top-up in proportion to what it holds. The carried weights are not the market's weights of that "
+    "day. When the authors publish a new set, the comparator moves to it on the first cycle day after, carried from its "
+    "own date.",
+    "Each class is held through one ETF, the first in the rules' ranking for its class that the account offers, at its "
+    "net asset value in euro, US dollar values at the ECB's reference rate of the day, without costs. Government bonds "
+    "and investment-grade credits share one global aggregate bond fund. The account offers that fund only in its "
+    "distributing class, so the distributing class stands in for the accumulating one and its distributions are added "
+    "back on their ex-dates. No fund the account offers holds inflation-linked bonds without hedging their currencies, "
+    "so that class is held in the aggregate fund. Private equity is held through listed private equity companies on "
+    "developed-market exchanges, the widest index a fund of the class tracks, and they are not the private funds the "
+    "dataset counts. Real estate is held through listed property companies, which are not the invested real estate the "
+    "dataset counts. Emerging-market debt is held through local-currency government bonds, 55 per cent of the class in "
+    "the dataset beside dollar government bonds (18), corporate bonds (16) and inflation-linked bonds (11).",
+)  # fmt: skip
+MARKET_SHARE = ("Its equity-like share, equities, private equity and real estate together, is {published} per cent in the "
+                "published weights, {start} per cent at the start and {current} per cent on {day}, against the "
+                "portfolio's {target}, and nothing scales the comparator to the portfolio's risk.")  # fmt: skip
 SELECTIONS = (("S&P 500", "selection_sp500.csv"), ("MSCI World", "selection_msci_world.csv"),
               ("Nasdaq-100", "selection_nasdaq100.csv"))  # fmt: skip
 CHANCE = ("Volatility, worst falls and correlations become informative within months, and differences of return over "
@@ -1048,8 +1077,9 @@ def _pane_chart(cid: str, daily: pd.DataFrame, keys) -> tuple:
 def _effects(summary: pd.DataFrame, effects: pd.DataFrame, keys: list) -> tuple:
     """The waterfall from the portfolio's money-weighted return through each effect to the comparator's, one per
     comparator, and the table of every comparator's effects."""
-    record = effects[effects["period"] == "record"].pivot(index="comparator", columns="effect", values="value")
     order = list(comparisons_module.EFFECTS)
+    record = effects[effects["period"] == "record"].pivot(index="comparator", columns="effect", values="value")
+    record = record.reindex(columns=order)
     start = summary.loc["portfolio", "return_money_weighted"] * 100
     traces = []
     for i, k in enumerate(keys):
@@ -1119,10 +1149,52 @@ def _selection_card(as_of) -> str:
                  wide=True, extra=table + f'<p class="note">{_esc(note)}</p>')  # fmt: skip
 
 
+# The asset classes of the global market portfolio, in the order of its weight table.
+MARKET_CLASS = {"equities": "Equities", "aggregate": "Government bonds and investment-grade credits",
+                "private_equity": "Private equity", "real_estate": "Real estate", "em_debt": "Emerging-market debt",
+                "inflation_linked": "Inflation-linked bonds", "high_yield": "High-yield bonds"}  # fmt: skip
+
+
+def _share(x) -> str:
+    """A weight in per cent to two decimals, as the dataset gives its weights: 42.96%."""
+    return "n/a" if pd.isna(x) else f"{round(float(x) * 100, 2):.2f}%"
+
+
+def _market_card(market: pd.DataFrame, fees: pd.DataFrame, as_of) -> str:
+    """The global market portfolio's weights by asset class: as published, carried to the comparator's start and at
+    the last close, each class's fund with its ISIN and TER, and the TERs weighted by the published weights."""
+    if not len(market):
+        return ""
+    first = market.iloc[0]
+    rows = []
+    for _, r in market.iterrows():
+        fund = "In the aggregate fund" if r["sleeve"] == "inflation_linked" else r["fund"]
+        rows.append([MARKET_CLASS[r["sleeve"]], fund, r["isin"], f"{float(r['ter_per_cent']):.2f}", _share(r["published"]),
+                     _share(r["start"]), _share(r["current"])])  # fmt: skip
+    weighted = fees[(fees["comparator"] == "market_portfolio") & fees["item"].str.startswith("TERs weighted")] if len(fees) else fees
+    if len(weighted):
+        rows.append(["All classes", "TERs weighted by the published weights", "", f"{float(weighted['bps_low'].iloc[0]) / 100:.2f}",
+                     _share(market["published"].sum()), _share(market["start"].sum()), _share(market["current"].sum())])  # fmt: skip
+    columns = ["Asset class", "Fund", "ISIN", "TER", f"Published, {fmt.day_short(first['published_as_of'])}",
+               f"At the start, {fmt.day_short(first['start_as_of'])}", f"On {fmt.day_short(first['current_as_of'])}"]  # fmt: skip
+    table = _table(columns, rows, numeric=tuple(columns[3:]), wrap_first=True, wrap_head=True, prose=True)
+    note = ("Weights in per cent of the comparator, TER in per cent a year. The published weights are the dataset's at the "
+            "end of 2023, with government bonds and investment-grade credits summed into the class the aggregate fund holds. "
+            "The weights at the start are the published ones carried to the day before the first purchase by each class "
+            "fund's return in euro, and the comparator bought them on the first purchase day. The current weights have "
+            "moved with the funds' prices since. Each fund is the first in its class's ranking that the account offers "
+            "(method/selection_market_portfolio.csv). The account offers no inflation-linked fund that passes the "
+            "criteria, so that class is held in the aggregate fund.")  # fmt: skip
+    return _card("comparisons-market-weights", "The global market portfolio's weights and funds, by asset class",
+                 _asof(as_of), ("outputs/comparison_market.csv", "method/market_portfolio_weights.csv",
+                 "method/selection_market_portfolio.csv"), plot=False, kind="table", wide=True,
+                 extra=table + f'<p class="note">{_esc(note)}</p>')  # fmt: skip
+
+
 def _managed_card(summary: pd.DataFrame, fees: pd.DataFrame, as_of) -> str:
     """The bank's managed profile beside the portfolio: its published costs, and no return, since none is published."""
     rows = []
-    for _, r in fees.iterrows():
+    for _, r in (fees[fees["comparator"] != "market_portfolio"] if len(fees) else fees).iterrows():
         low, high = float(r["bps_low"]), float(r["bps_high"])
         value = f"{low:.0f}" if round(low) == round(high) else f"{low:.0f} to {high:.0f}"
         if r["comparator"] == "portfolio" and "Implementation" in r["item"]:
@@ -1147,7 +1219,8 @@ def _managed_card(summary: pd.DataFrame, fees: pd.DataFrame, as_of) -> str:
 
 
 def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: pd.DataFrame,
-                     fees: pd.DataFrame = pd.DataFrame(), regions: pd.DataFrame = pd.DataFrame()) -> None:  # fmt: skip
+                     fees: pd.DataFrame = pd.DataFrame(), regions: pd.DataFrame = pd.DataFrame(),
+                     market: pd.DataFrame = pd.DataFrame()) -> None:  # fmt: skip
     """The record beside its comparators: the summary table, the differences and the risk ladder, then the panes."""
     if not len(summary):
         return
@@ -1212,6 +1285,12 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
                  if isinstance(dated, str) else "") + ".")  # fmt: skip
     first_ranked = "first_ranked" in summary.index and pd.notna(summary.loc["first_ranked", "return_time_weighted"])
     panes = []
+    market_share = ""
+    if len(market):
+        like = market[market["sleeve"].isin(comparisons_module.EQUITY_LIKE)]
+        share = {k: f"{float(like[k].sum()) * 100:.1f}" for k in ("published", "start", "current")}
+        market_share = MARKET_SHARE.format(**share, day=fmt.day_words(market["current_as_of"].iloc[0]),
+                                           target=f"{config.TARGET[config.EQUITY] * 100:.0f}")  # fmt: skip
     pane_notes = {
         "same_rules": ("Reference portfolio A follows the rules at net asset value without costs, so its difference to the "
                        "portfolio is the implementation cost with the opposite sign. Reference portfolio B goes back to "
@@ -1228,6 +1307,7 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
                      "alternative of the Method view is. The Mag7 fund publishes net asset values from 4 November 2026, "
                      "so it holds the portfolio's value at that day's close, bought at that net asset value, and takes the "
                      "contributions after it. Each of its figures runs over that window." + mixed),
+        "market_portfolio": (*MARKET_NOTE, market_share) if market_share else MARKET_NOTE,
         "bank": ("The contributions held at the euro short-term rate, compounded daily on calendar days at the rate over "
                  "360. Its volatility comes from interest landing in three-day steps over weekends, and its correlation "
                  "with the portfolio is not shown, since the rate barely moves from day to day."),
@@ -1242,12 +1322,15 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
             body = _managed_card(summary, fees, as_of)
         else:
             chart, chart_table = _pane_chart(cid, daily, keys)
+            note = pane_notes[pane] if isinstance(pane_notes[pane], tuple) else (pane_notes[pane],)
             body = _card(cid, f"{headline}: the difference to the portfolio over time", _asof(as_of, "Points, comparator minus the portfolio"),
                          ("outputs/comparisons_daily.csv", "outputs/comparisons.csv"), table=chart_table, wide=True,
-                         height=300, note=(pane_notes[pane], BAND_NOTE), extra=_comparison_rows(summary, keys))  # fmt: skip
+                         height=300, note=(*note, BAND_NOTE), extra=_comparison_rows(summary, keys))  # fmt: skip
             page.charts.append(chart)
             if pane == "one_fund":
                 body += _selection_card(as_of)
+            if pane == "market_portfolio":
+                body += _market_card(market, fees, as_of)
         panes.append(f'<details class="ch-pane"><summary>{_esc(headline)}</summary><div class="ch-pane__body">{body}</div></details>')
 
     with_effects = set(effects.loc[effects["period"] == "record", "comparator"]) if len(effects) else set()
@@ -1284,6 +1367,13 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
         "a FTSE All-World fund taking the held fund's and a FTSE Developed World fund the MSCI World fund's "
         "(method/lifestrategy_underlying.csv), and the SPDR funds' come from their holdings by country through "
         "method/msci_regions.csv.",
+        "For the global market portfolio, the difference runs through the two funds held at its equity-like share, "
+        "equities, private equity and real estate together, which gives cash, split and the dollar by the same "
+        "definitions. Equity classes is the weight of private equity and of real estate times each fund's return in euro "
+        "minus the equity fund's, and bond classes is the weight of each bond class times its fund's return in euro minus "
+        "the bond fund's. Each dollar fund's conversion to euro goes to the dollar, less the equity fund's for an "
+        "equity-like class, so the currencies inside a bond fund's dollar return stay in bond classes. Regions and within "
+        "each region are zero for it.",
         "For savings, the bond fund's return against the rate is split three ways at the ECB curve's spot rate at the "
         "bond fund's duration in whole years: the rate against the bonds' yield earned over the days, the duration times "
         "the change in that yield, and the rest of the bond return. The LifeStrategy funds hold global bonds hedged to the "
@@ -2984,7 +3074,7 @@ def build(out_dir: Path = None) -> Path:
     contributions(page, daily, monthly)
     comparisons_part(page, out.get("comparisons.csv", pd.DataFrame()), out.get("comparisons_daily.csv", pd.DataFrame()),
                      out.get("comparison_effects.csv", pd.DataFrame()), out.get("comparison_fees.csv", pd.DataFrame()),
-                     out.get("comparison_regions.csv", pd.DataFrame()))
+                     out.get("comparison_regions.csv", pd.DataFrame()), out.get("comparison_market.csv", pd.DataFrame()))
     lookthrough(page, out)
     risk_view(page, out, _read("simulation_bootstrap.csv", config.ROOT / "mandate"), monthly)
     factor_view(page, out["factor_loadings.csv"], out["factor_rolling.csv"], daily["date"].iloc[-1])
@@ -3056,7 +3146,7 @@ def build(out_dir: Path = None) -> Path:
 <p class="ch-over">Portfolio in practice</p>
 <h1>Rules-based portfolio</h1>
 <p class="ch-lead">{_esc(lead)}</p>
-<div class="ch-meta"><span>{_esc(_stamp(now_row))}</span><span>Built {_esc(fmt.day_words(_built(now_row)))}</span></div>
+<div class="ch-meta"><span>{_esc(_stamp(now_row))}</span><span>Last build: {_esc(fmt.day_words(_built(now_row)))}</span></div>
 <div class="ch-docs">{documents}</div>
 </div></header>
 <div class="ch-tabs" role="navigation" aria-label="Views"><div>{tabs}</div></div>

@@ -6,6 +6,8 @@ as_of,comparator,period,effect,value
 2026-11-06,reference_a,2026-10,cash,0
 2026-11-06,reference_a,2026-10,regions,0
 2026-11-06,reference_a,2026-10,within_regions,0
+2026-11-06,reference_a,2026-10,equity_classes,0
+2026-11-06,reference_a,2026-10,bond_classes,0
 2026-11-06,reference_a,2026-10,rate_against_yield,0
 2026-11-06,reference_a,2026-10,change_in_yield,0
 2026-11-06,reference_a,2026-10,bonds_rest,0
@@ -18,6 +20,8 @@ as_of,comparator,period,effect,value
 2026-11-06,reference_a,2026-11,cash,0
 2026-11-06,reference_a,2026-11,regions,0
 2026-11-06,reference_a,2026-11,within_regions,0
+2026-11-06,reference_a,2026-11,equity_classes,0
+2026-11-06,reference_a,2026-11,bond_classes,0
 2026-11-06,reference_a,2026-11,rate_against_yield,0
 2026-11-06,reference_a,2026-11,change_in_yield,0
 2026-11-06,reference_a,2026-11,bonds_rest,0
@@ -30,6 +34,8 @@ as_of,comparator,period,effect,value
 2026-11-06,reference_a,record,cash,0
 2026-11-06,reference_a,record,regions,0
 2026-11-06,reference_a,record,within_regions,0
+2026-11-06,reference_a,record,equity_classes,0
+2026-11-06,reference_a,record,bond_classes,0
 2026-11-06,reference_a,record,rate_against_yield,0
 2026-11-06,reference_a,record,change_in_yield,0
 2026-11-06,reference_a,record,bonds_rest,0
@@ -42,6 +48,8 @@ as_of,comparator,period,effect,value
 2026-11-06,reference_b,2026-10,cash,0
 2026-11-06,reference_b,2026-10,regions,0
 2026-11-06,reference_b,2026-10,within_regions,0
+2026-11-06,reference_b,2026-10,equity_classes,0
+2026-11-06,reference_b,2026-10,bond_classes,0
 2026-11-06,reference_b,2026-10,rate_against_yield,0
 2026-11-06,reference_b,2026-10,change_in_yield,0
 2026-11-06,reference_b,2026-10,bonds_rest,0
@@ -54,6 +62,8 @@ as_of,comparator,period,effect,value
 2026-11-06,reference_b,2026-11,cash,0
 2026-11-06,reference_b,2026-11,regions,0
 2026-11-06,reference_b,2026-11,within_regions,0
+2026-11-06,reference_b,2026-11,equity_classes,0
+2026-11-06,reference_b,2026-11,bond_classes,0
 2026-11-06,reference_b,2026-11,rate_against_yield,0
 2026-11-06,reference_b,2026-11,change_in_yield,0
 2026-11-06,reference_b,2026-11,bonds_rest,0
@@ -66,6 +76,8 @@ as_of,comparator,period,effect,value
 2026-11-06,reference_b,record,cash,0
 2026-11-06,reference_b,record,regions,0
 2026-11-06,reference_b,record,within_regions,0
+2026-11-06,reference_b,record,equity_classes,0
+2026-11-06,reference_b,record,bond_classes,0
 2026-11-06,reference_b,record,rate_against_yield,0
 2026-11-06,reference_b,record,change_in_yield,0
 2026-11-06,reference_b,record,bonds_rest,0
@@ -78,6 +90,8 @@ as_of,comparator,period,effect,value
 2026-11-06,split_100_0,2026-10,cash,0
 2026-11-06,split_100_0,2026-10,regions,0
 2026-11-06,split_100_0,2026-10,within_regions,0
+2026-11-06,split_100_0,2026-10,equity_classes,0
+2026-11-06,split_100_0,2026-10,bond_classes,0
 2026-11-06,split_100_0,2026-10,rate_against_yield,0
 2026-11-06,split_100_0,2026-10,change_in_yield,0
 2026-11-06,split_100_0,2026-10,bonds_rest,0
@@ -90,6 +104,8 @@ as_of,comparator,period,effect,value
 2026-11-06,split_100_0,2026-11,cash,4.7937e-06
 2026-11-06,split_100_0,2026-11,regions,0
 2026-11-06,split_100_0,2026-11,within_regions,0
+2026-11-06,split_100_0,2026-11,equity_classes,0
+2026-11-06,split_100_0,2026-11,bond_classes,0
 2026-11-06,split_100_0,2026-11,rate_against_yield,0
 2026-11-06,split_100_0,2026-11,change_in_yield,0
 2026-11-06,split_100_0,2026-11,bonds_rest,0
@@ -102,6 +118,8 @@ as_of,comparator,period,effect,value
 2026-11-06,split_100_0,record,cash,4.7937e-06
 2026-11-06,split_100_0,record,regions,0
 2026-11-06,split_100_0,record,within_regions,0
+2026-11-06,split_100_0,record,equity_classes,0
+2026-11-06,split_100_0,record,bond_classes,0
 2026-11-06,split_100_0,record,rate_against_yield,0
 2026-11-06,split_100_0,record,change_in_yield,0
 2026-11-06,split_100_0,record,bonds_rest,0
@@ -114,6 +132,8 @@ as_of,comparator,period,effect,value
 2026-11-06,split_90_10,2026-10,cash,0
 2026-11-06,split_90_10,2026-10,regions,0
 2026-11-06,split_90_10,2026-10,within_regions,0
+2026-11-06,split_90_10,2026-10,equity_classes,0
+2026-11-06,split_90_10,2026-10,bond_classes,0
 2026-11-06,split_90_10,2026-10,rate_against_yield,0
 2026-11-06,split_90_10,2026-10,change_in_yield,0
 2026-11-06,split_90_10,2026-10,bonds_rest,0
@@ -126,6 +146,8 @@ as_of,comparator,period,effect,value
 2026-11-06,split_90_10,2026-11,cash,3.1872e-06
 2026-11-06,split_90_10,2026-11,regions,0
 2026-11-06,split_90_10,2026-11,within_regions,0
+2026-11-06,split_90_10,2026-11,equity_classes,0
+2026-11-06,split_90_10,2026-11,bond_classes,0
 2026-11-06,split_90_10,2026-11,rate_against_yield,0
 2026-11-06,split_90_10,2026-11,change_in_yield,0
 2026-11-06,split_90_10,2026-11,bonds_rest,0
@@ -138,6 +160,8 @@ as_of,comparator,period,effect,value
 2026-11-06,split_90_10,record,cash,3.1872e-06
 2026-11-06,split_90_10,record,regions,0
 2026-11-06,split_90_10,record,within_regions,0
+2026-11-06,split_90_10,record,equity_classes,0
+2026-11-06,split_90_10,record,bond_classes,0
 2026-11-06,split_90_10,record,rate_against_yield,0
 2026-11-06,split_90_10,record,change_in_yield,0
 2026-11-06,split_90_10,record,bonds_rest,0
@@ -150,6 +174,8 @@ as_of,comparator,period,effect,value
 2026-11-06,split_80_20,2026-10,cash,0
 2026-11-06,split_80_20,2026-10,regions,0
 2026-11-06,split_80_20,2026-10,within_regions,0
+2026-11-06,split_80_20,2026-10,equity_classes,0
+2026-11-06,split_80_20,2026-10,bond_classes,0
 2026-11-06,split_80_20,2026-10,rate_against_yield,0
 2026-11-06,split_80_20,2026-10,change_in_yield,0
 2026-11-06,split_80_20,2026-10,bonds_rest,0
@@ -162,6 +188,8 @@ as_of,comparator,period,effect,value
 2026-11-06,split_80_20,2026-11,cash,1.5888e-06
 2026-11-06,split_80_20,2026-11,regions,0
 2026-11-06,split_80_20,2026-11,within_regions,0
+2026-11-06,split_80_20,2026-11,equity_classes,0
+2026-11-06,split_80_20,2026-11,bond_classes,0
 2026-11-06,split_80_20,2026-11,rate_against_yield,0
 2026-11-06,split_80_20,2026-11,change_in_yield,0
 2026-11-06,split_80_20,2026-11,bonds_rest,0
@@ -174,6 +202,8 @@ as_of,comparator,period,effect,value
 2026-11-06,split_80_20,record,cash,1.5888e-06
 2026-11-06,split_80_20,record,regions,0
 2026-11-06,split_80_20,record,within_regions,0
+2026-11-06,split_80_20,record,equity_classes,0
+2026-11-06,split_80_20,record,bond_classes,0
 2026-11-06,split_80_20,record,rate_against_yield,0
 2026-11-06,split_80_20,record,change_in_yield,0
 2026-11-06,split_80_20,record,bonds_rest,0
@@ -186,6 +216,8 @@ as_of,comparator,period,effect,value
 2026-11-06,split_60_40,2026-10,cash,0
 2026-11-06,split_60_40,2026-10,regions,0
 2026-11-06,split_60_40,2026-10,within_regions,0
+2026-11-06,split_60_40,2026-10,equity_classes,0
+2026-11-06,split_60_40,2026-10,bond_classes,0
 2026-11-06,split_60_40,2026-10,rate_against_yield,0
 2026-11-06,split_60_40,2026-10,change_in_yield,0
 2026-11-06,split_60_40,2026-10,bonds_rest,0
@@ -198,6 +230,8 @@ as_of,comparator,period,effect,value
 2026-11-06,split_60_40,2026-11,cash,-1.5792e-06
 2026-11-06,split_60_40,2026-11,regions,0
 2026-11-06,split_60_40,2026-11,within_regions,0
+2026-11-06,split_60_40,2026-11,equity_classes,0
+2026-11-06,split_60_40,2026-11,bond_classes,0
 2026-11-06,split_60_40,2026-11,rate_against_yield,0
 2026-11-06,split_60_40,2026-11,change_in_yield,0
 2026-11-06,split_60_40,2026-11,bonds_rest,0
@@ -210,6 +244,8 @@ as_of,comparator,period,effect,value
 2026-11-06,split_60_40,record,cash,-1.5792e-06
 2026-11-06,split_60_40,record,regions,0
 2026-11-06,split_60_40,record,within_regions,0
+2026-11-06,split_60_40,record,equity_classes,0
+2026-11-06,split_60_40,record,bond_classes,0
 2026-11-06,split_60_40,record,rate_against_yield,0
 2026-11-06,split_60_40,record,change_in_yield,0
 2026-11-06,split_60_40,record,bonds_rest,0
@@ -222,6 +258,8 @@ as_of,comparator,period,effect,value
 2026-11-06,first_ranked,2026-10,cash,0
 2026-11-06,first_ranked,2026-10,regions,2.92571e-05
 2026-11-06,first_ranked,2026-10,within_regions,-8.8222e-06
+2026-11-06,first_ranked,2026-10,equity_classes,0
+2026-11-06,first_ranked,2026-10,bond_classes,0
 2026-11-06,first_ranked,2026-10,rate_against_yield,0
 2026-11-06,first_ranked,2026-10,change_in_yield,0
 2026-11-06,first_ranked,2026-10,bonds_rest,0
@@ -234,6 +272,8 @@ as_of,comparator,period,effect,value
 2026-11-06,first_ranked,2026-11,cash,3.71e-08
 2026-11-06,first_ranked,2026-11,regions,9.255e-07
 2026-11-06,first_ranked,2026-11,within_regions,8.92468e-05
+2026-11-06,first_ranked,2026-11,equity_classes,0
+2026-11-06,first_ranked,2026-11,bond_classes,0
 2026-11-06,first_ranked,2026-11,rate_against_yield,0
 2026-11-06,first_ranked,2026-11,change_in_yield,0
 2026-11-06,first_ranked,2026-11,bonds_rest,0
@@ -246,6 +286,8 @@ as_of,comparator,period,effect,value
 2026-11-06,first_ranked,record,cash,3.71e-08
 2026-11-06,first_ranked,record,regions,3.01826e-05
 2026-11-06,first_ranked,record,within_regions,8.04246e-05
+2026-11-06,first_ranked,record,equity_classes,0
+2026-11-06,first_ranked,record,bond_classes,0
 2026-11-06,first_ranked,record,rate_against_yield,0
 2026-11-06,first_ranked,record,change_in_yield,0
 2026-11-06,first_ranked,record,bonds_rest,0
@@ -258,6 +300,8 @@ as_of,comparator,period,effect,value
 2026-11-06,sp500,2026-10,cash,0
 2026-11-06,sp500,2026-10,regions,-0.0016887917
 2026-11-06,sp500,2026-10,within_regions,-0.0009614685
+2026-11-06,sp500,2026-10,equity_classes,0
+2026-11-06,sp500,2026-10,bond_classes,0
 2026-11-06,sp500,2026-10,rate_against_yield,0
 2026-11-06,sp500,2026-10,change_in_yield,0
 2026-11-06,sp500,2026-10,bonds_rest,0
@@ -270,6 +314,8 @@ as_of,comparator,period,effect,value
 2026-11-06,sp500,2026-11,cash,-0.0005208165
 2026-11-06,sp500,2026-11,regions,-0.000297051
 2026-11-06,sp500,2026-11,within_regions,0.0011628967
+2026-11-06,sp500,2026-11,equity_classes,0
+2026-11-06,sp500,2026-11,bond_classes,0
 2026-11-06,sp500,2026-11,rate_against_yield,0
 2026-11-06,sp500,2026-11,change_in_yield,0
 2026-11-06,sp500,2026-11,bonds_rest,0
@@ -282,6 +328,8 @@ as_of,comparator,period,effect,value
 2026-11-06,sp500,record,cash,-0.0005208165
 2026-11-06,sp500,record,regions,-0.0019858428
 2026-11-06,sp500,record,within_regions,0.0002014282
+2026-11-06,sp500,record,equity_classes,0
+2026-11-06,sp500,record,bond_classes,0
 2026-11-06,sp500,record,rate_against_yield,0
 2026-11-06,sp500,record,change_in_yield,0
 2026-11-06,sp500,record,bonds_rest,0
@@ -294,6 +342,8 @@ as_of,comparator,period,effect,value
 2026-11-06,msci_world,2026-10,cash,0
 2026-11-06,msci_world,2026-10,regions,0.0071964606
 2026-11-06,msci_world,2026-10,within_regions,0.0004715255
+2026-11-06,msci_world,2026-10,equity_classes,0
+2026-11-06,msci_world,2026-10,bond_classes,0
 2026-11-06,msci_world,2026-10,rate_against_yield,0
 2026-11-06,msci_world,2026-10,change_in_yield,0
 2026-11-06,msci_world,2026-10,bonds_rest,0
@@ -306,6 +356,8 @@ as_of,comparator,period,effect,value
 2026-11-06,msci_world,2026-11,cash,-0.0005208165
 2026-11-06,msci_world,2026-11,regions,0.0018606351
 2026-11-06,msci_world,2026-11,within_regions,6.7084e-05
+2026-11-06,msci_world,2026-11,equity_classes,0
+2026-11-06,msci_world,2026-11,bond_classes,0
 2026-11-06,msci_world,2026-11,rate_against_yield,0
 2026-11-06,msci_world,2026-11,change_in_yield,0
 2026-11-06,msci_world,2026-11,bonds_rest,0
@@ -318,6 +370,8 @@ as_of,comparator,period,effect,value
 2026-11-06,msci_world,record,cash,-0.0005208165
 2026-11-06,msci_world,record,regions,0.0090570958
 2026-11-06,msci_world,record,within_regions,0.0005386095
+2026-11-06,msci_world,record,equity_classes,0
+2026-11-06,msci_world,record,bond_classes,0
 2026-11-06,msci_world,record,rate_against_yield,0
 2026-11-06,msci_world,record,change_in_yield,0
 2026-11-06,msci_world,record,bonds_rest,0
@@ -330,6 +384,8 @@ as_of,comparator,period,effect,value
 2026-11-06,lifestrategy_60,2026-10,cash,0
 2026-11-06,lifestrategy_60,2026-10,regions,0.000206133
 2026-11-06,lifestrategy_60,2026-10,within_regions,0.0037028676
+2026-11-06,lifestrategy_60,2026-10,equity_classes,0
+2026-11-06,lifestrategy_60,2026-10,bond_classes,0
 2026-11-06,lifestrategy_60,2026-10,rate_against_yield,
 2026-11-06,lifestrategy_60,2026-10,change_in_yield,
 2026-11-06,lifestrategy_60,2026-10,bonds_rest,
@@ -342,6 +398,8 @@ as_of,comparator,period,effect,value
 2026-11-06,lifestrategy_60,2026-11,cash,-0.0005208165
 2026-11-06,lifestrategy_60,2026-11,regions,-0.0002086579
 2026-11-06,lifestrategy_60,2026-11,within_regions,-6.6695e-05
+2026-11-06,lifestrategy_60,2026-11,equity_classes,0
+2026-11-06,lifestrategy_60,2026-11,bond_classes,0
 2026-11-06,lifestrategy_60,2026-11,rate_against_yield,
 2026-11-06,lifestrategy_60,2026-11,change_in_yield,
 2026-11-06,lifestrategy_60,2026-11,bonds_rest,
@@ -354,6 +412,8 @@ as_of,comparator,period,effect,value
 2026-11-06,lifestrategy_60,record,cash,-0.0005208165
 2026-11-06,lifestrategy_60,record,regions,-2.525e-06
 2026-11-06,lifestrategy_60,record,within_regions,0.0036361726
+2026-11-06,lifestrategy_60,record,equity_classes,0
+2026-11-06,lifestrategy_60,record,bond_classes,0
 2026-11-06,lifestrategy_60,record,rate_against_yield,
 2026-11-06,lifestrategy_60,record,change_in_yield,
 2026-11-06,lifestrategy_60,record,bonds_rest,
@@ -366,6 +426,8 @@ as_of,comparator,period,effect,value
 2026-11-06,lifestrategy_80,2026-10,cash,0
 2026-11-06,lifestrategy_80,2026-10,regions,0.0003622601
 2026-11-06,lifestrategy_80,2026-10,within_regions,0.002880931
+2026-11-06,lifestrategy_80,2026-10,equity_classes,0
+2026-11-06,lifestrategy_80,2026-10,bond_classes,0
 2026-11-06,lifestrategy_80,2026-10,rate_against_yield,
 2026-11-06,lifestrategy_80,2026-10,change_in_yield,
 2026-11-06,lifestrategy_80,2026-10,bonds_rest,
@@ -378,6 +440,8 @@ as_of,comparator,period,effect,value
 2026-11-06,lifestrategy_80,2026-11,cash,-0.0005208165
 2026-11-06,lifestrategy_80,2026-11,regions,-0.0004281712
 2026-11-06,lifestrategy_80,2026-11,within_regions,0.0011066301
+2026-11-06,lifestrategy_80,2026-11,equity_classes,0
+2026-11-06,lifestrategy_80,2026-11,bond_classes,0
 2026-11-06,lifestrategy_80,2026-11,rate_against_yield,
 2026-11-06,lifestrategy_80,2026-11,change_in_yield,
 2026-11-06,lifestrategy_80,2026-11,bonds_rest,
@@ -390,6 +454,8 @@ as_of,comparator,period,effect,value
 2026-11-06,lifestrategy_80,record,cash,-0.0005208165
 2026-11-06,lifestrategy_80,record,regions,-6.59111e-05
 2026-11-06,lifestrategy_80,record,within_regions,0.0039875612
+2026-11-06,lifestrategy_80,record,equity_classes,0
+2026-11-06,lifestrategy_80,record,bond_classes,0
 2026-11-06,lifestrategy_80,record,rate_against_yield,
 2026-11-06,lifestrategy_80,record,change_in_yield,
 2026-11-06,lifestrategy_80,record,bonds_rest,
@@ -402,6 +468,8 @@ as_of,comparator,period,effect,value
 2026-11-06,nasdaq100,2026-10,cash,0
 2026-11-06,nasdaq100,2026-10,regions,-0.0016887917
 2026-11-06,nasdaq100,2026-10,within_regions,-0.0545356867
+2026-11-06,nasdaq100,2026-10,equity_classes,0
+2026-11-06,nasdaq100,2026-10,bond_classes,0
 2026-11-06,nasdaq100,2026-10,rate_against_yield,0
 2026-11-06,nasdaq100,2026-10,change_in_yield,0
 2026-11-06,nasdaq100,2026-10,bonds_rest,0
@@ -414,6 +482,8 @@ as_of,comparator,period,effect,value
 2026-11-06,nasdaq100,2026-11,cash,-0.0005208165
 2026-11-06,nasdaq100,2026-11,regions,-0.000297051
 2026-11-06,nasdaq100,2026-11,within_regions,-0.0211690685
+2026-11-06,nasdaq100,2026-11,equity_classes,0
+2026-11-06,nasdaq100,2026-11,bond_classes,0
 2026-11-06,nasdaq100,2026-11,rate_against_yield,0
 2026-11-06,nasdaq100,2026-11,change_in_yield,0
 2026-11-06,nasdaq100,2026-11,bonds_rest,0
@@ -426,11 +496,55 @@ as_of,comparator,period,effect,value
 2026-11-06,nasdaq100,record,cash,-0.0005208165
 2026-11-06,nasdaq100,record,regions,-0.0019858428
 2026-11-06,nasdaq100,record,within_regions,-0.0757047552
+2026-11-06,nasdaq100,record,equity_classes,0
+2026-11-06,nasdaq100,record,bond_classes,0
 2026-11-06,nasdaq100,record,rate_against_yield,0
 2026-11-06,nasdaq100,record,change_in_yield,0
 2026-11-06,nasdaq100,record,bonds_rest,0
 2026-11-06,nasdaq100,record,timing,-0.0002832112
 2026-11-06,nasdaq100,record,compounding,0.0033693728
+2026-11-06,market_portfolio,2026-10,implementation,-0.0009609157
+2026-11-06,market_portfolio,2026-10,drift,0
+2026-11-06,market_portfolio,2026-10,split,0.0018218702
+2026-11-06,market_portfolio,2026-10,dollar,0.0003931599
+2026-11-06,market_portfolio,2026-10,cash,0
+2026-11-06,market_portfolio,2026-10,regions,0
+2026-11-06,market_portfolio,2026-10,within_regions,0
+2026-11-06,market_portfolio,2026-10,equity_classes,0.0061420901
+2026-11-06,market_portfolio,2026-10,bond_classes,0.001334242
+2026-11-06,market_portfolio,2026-10,rate_against_yield,0
+2026-11-06,market_portfolio,2026-10,change_in_yield,0
+2026-11-06,market_portfolio,2026-10,bonds_rest,0
+2026-11-06,market_portfolio,2026-10,timing,0
+2026-11-06,market_portfolio,2026-10,compounding,0
+2026-11-06,market_portfolio,2026-11,implementation,0.0004155514
+2026-11-06,market_portfolio,2026-11,drift,0
+2026-11-06,market_portfolio,2026-11,split,0.0020836336
+2026-11-06,market_portfolio,2026-11,dollar,0.0001828037
+2026-11-06,market_portfolio,2026-11,cash,-0.0005208165
+2026-11-06,market_portfolio,2026-11,regions,0
+2026-11-06,market_portfolio,2026-11,within_regions,0
+2026-11-06,market_portfolio,2026-11,equity_classes,0.0050236088
+2026-11-06,market_portfolio,2026-11,bond_classes,-0.0016975676
+2026-11-06,market_portfolio,2026-11,rate_against_yield,0
+2026-11-06,market_portfolio,2026-11,change_in_yield,0
+2026-11-06,market_portfolio,2026-11,bonds_rest,0
+2026-11-06,market_portfolio,2026-11,timing,0
+2026-11-06,market_portfolio,2026-11,compounding,0
+2026-11-06,market_portfolio,record,implementation,-0.0005453643
+2026-11-06,market_portfolio,record,drift,0
+2026-11-06,market_portfolio,record,split,0.0039055038
+2026-11-06,market_portfolio,record,dollar,0.0005759637
+2026-11-06,market_portfolio,record,cash,-0.0005208165
+2026-11-06,market_portfolio,record,regions,0
+2026-11-06,market_portfolio,record,within_regions,0
+2026-11-06,market_portfolio,record,equity_classes,0.011165699
+2026-11-06,market_portfolio,record,bond_classes,-0.0003633256
+2026-11-06,market_portfolio,record,rate_against_yield,0
+2026-11-06,market_portfolio,record,change_in_yield,0
+2026-11-06,market_portfolio,record,bonds_rest,0
+2026-11-06,market_portfolio,record,timing,0.0001165703
+2026-11-06,market_portfolio,record,compounding,-0.0001589378
 2026-11-06,savings,2026-10,implementation,-0.0009609157
 2026-11-06,savings,2026-10,drift,0
 2026-11-06,savings,2026-10,split,0.0207630544
@@ -438,6 +552,8 @@ as_of,comparator,period,effect,value
 2026-11-06,savings,2026-10,cash,0
 2026-11-06,savings,2026-10,regions,0
 2026-11-06,savings,2026-10,within_regions,0
+2026-11-06,savings,2026-10,equity_classes,0
+2026-11-06,savings,2026-10,bond_classes,0
 2026-11-06,savings,2026-10,rate_against_yield,-0.0008054244
 2026-11-06,savings,2026-10,change_in_yield,-0.0046182959
 2026-11-06,savings,2026-10,bonds_rest,-0.0016968319
@@ -450,6 +566,8 @@ as_of,comparator,period,effect,value
 2026-11-06,savings,2026-11,cash,9.8082e-06
 2026-11-06,savings,2026-11,regions,0
 2026-11-06,savings,2026-11,within_regions,0
+2026-11-06,savings,2026-11,equity_classes,0
+2026-11-06,savings,2026-11,bond_classes,0
 2026-11-06,savings,2026-11,rate_against_yield,-0.0002349187
 2026-11-06,savings,2026-11,change_in_yield,-0.0095439973
 2026-11-06,savings,2026-11,bonds_rest,0.0016410218
@@ -462,6 +580,8 @@ as_of,comparator,period,effect,value
 2026-11-06,savings,record,cash,9.8082e-06
 2026-11-06,savings,record,regions,0
 2026-11-06,savings,record,within_regions,0
+2026-11-06,savings,record,equity_classes,0
+2026-11-06,savings,record,bond_classes,0
 2026-11-06,savings,record,rate_against_yield,-0.0010403431
 2026-11-06,savings,record,change_in_yield,-0.0141622933
 2026-11-06,savings,record,bonds_rest,-5.58101e-05

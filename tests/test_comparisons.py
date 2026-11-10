@@ -183,8 +183,14 @@ def test_the_comparisons_part_on_the_page():
     # E10: the panes are the browser's disclosure element, closed by default, each under the question it answers.
     assert re.findall(r'<details class="ch-pane"><summary>([^<]+)</summary>', part) == [
         "The same rules without costs", "The same rules with other funds or splits", "One fund instead of two",
-        "The money left in the bank", "Not like for like: a bank&#x27;s managed profile", "Where each difference came from"]
+        "Every asset class at its market value", "The money left in the bank",
+        "Not like for like: a bank&#x27;s managed profile", "Where each difference came from"]
     assert "4 Nov to" in summary_rows(part, "The Mag7 fund") and "How the one-fund comparators&#x27; funds were chosen" in part
+    # The market portfolio's pane: the note opens on what the comparator is, and its weight table follows the chart.
+    pane = part.split("<summary>Every asset class at its market value</summary>", 1)[1].split('<details class="ch-pane">', 1)[0]
+    assert pane.index("is a comparator the portfolio&#x27;s design names, and the benchmark remains the index blend") \
+        < pane.index("The global market portfolio&#x27;s weights and funds, by asset class")
+    assert "10.25397/eur.9371741" in pane and "10.2469/faj.v70.n2.1" in pane and "inside the band" in pane
     assert '<details class="ch-pane" open' not in part
     summary = part.split('<div class="ch-pair">', 1)[0] if '<div class="ch-pair">' in part else part.split('ch-pair', 1)[0]
     names = re.findall(r"<tr><td>([^<]+)</td>", summary)
@@ -348,7 +354,7 @@ def test_the_second_stage_rows(record):
     extra = _extra(record["navs"])
     out = _build(record, extra=extra)
     summary = out["summary"].set_index("comparator")
-    keys = [k for k, _, _ in comparisons.ROWS if k not in ("sp500", "lifestrategy_80")]
+    keys = [k for k, _, _ in comparisons.ROWS if k not in ("sp500", "lifestrategy_80", "market_portfolio")]
     assert list(summary.index) == keys
     # A fund held alone: its time-weighted return is its net asset value's, in euro.
     unit = extra["one_fund"]["msci_world"]["eur"]
@@ -478,3 +484,144 @@ def test_on_the_first_purchase_day_every_effect_but_implementation_is_zero(recor
         if key == "mag7":
             continue  # its window has its own money-weighted return for the portfolio
         assert rows.loc[key].sum() == pytest.approx(summary.loc[key, "return_money_weighted"] - own, abs=1e-12), key
+
+
+def _market(navs, as_of="2023-12-29"):
+    """Invented inputs of the global market portfolio: the held equity fund's series run back to the end of 2023, five
+    dollar funds and one euro fund, and the published weights."""
+    history = pd.bdate_range(as_of, navs.index[0] - pd.Timedelta(days=1))
+    days = history.append(navs.index)
+    rate = pd.concat([pd.Series(1.10, index=history), navs["usd_per_eur"]])
+    equity_before = _walk(history, 40, 8.0)
+    equity = pd.concat([equity_before * navs["equity"].iloc[0] / equity_before.iloc[-1] / 1.001, navs["equity"]])
+    usd = {k: _walk(days, 50 + i, 20.0, 0.006) for i, k in enumerate(["aggregate", "private_equity", "real_estate", "em_debt", "high_yield"])}
+    eur = pd.DataFrame({k: v / rate for k, v in usd.items()})
+    eur["equities"] = equity
+    eur["inflation_linked"] = _walk(days, 60, 30.0, 0.004)
+    weights = pd.Series([0.43, 0.386, 0.078, 0.04, 0.039, 0.016, 0.011], index=list(comparisons.MARKET_SLEEVES))
+    return {"eur": eur[list(comparisons.MARKET_SLEEVES)], "usd": pd.DataFrame(usd), "weights": weights / weights.sum(),
+            "as_of": pd.Timestamp(as_of)}
+
+
+def test_the_market_weights_are_the_dataset_s_eight_summed_by_class_fund():
+    weights, as_of = comparisons.market_weights()
+    assert list(weights.index) == list(comparisons.MARKET_SLEEVES) and weights.sum() == pytest.approx(1.0)
+    assert as_of == pd.Timestamp("2023-12-31")
+    table = pd.read_csv(comparisons.config.METHOD_DIR / "market_portfolio_weights.csv")
+    assert len(table) == 8 and set(table["held_in"]) == set(comparisons.MARKET_SLEEVES)
+    assert (table["doi"] == "10.25397/eur.9371741").all() and (table["version"] == 6).all()
+    # Government bonds and investment-grade credits share the aggregate fund.
+    assert weights["aggregate"] == pytest.approx(table.loc[table["held_in"] == "aggregate", "weight"].sum() / table["weight"].sum())
+    assert weights[list(comparisons.EQUITY_LIKE)].sum() == pytest.approx(0.548, abs=0.001)
+
+
+def test_a_second_version_of_the_weights_stops_the_build_until_its_move_is_written(tmp_path):
+    table = pd.read_csv(comparisons.config.METHOD_DIR / "market_portfolio_weights.csv")
+    later = table.assign(version=7, as_of="2024-12-31", published="2026-12-01")
+    pd.concat([table, later]).to_csv(tmp_path / "weights.csv", index=False)
+    with pytest.raises(ValueError, match="more than one version"):
+        comparisons.market_weights(tmp_path / "weights.csv")
+
+
+def test_the_weights_are_carried_by_each_class_fund_s_return():
+    days = pd.bdate_range("2023-12-28", "2024-01-05")
+    values = pd.DataFrame({"a": [1, 1, 1, 1.1, 1.1, 1.1, 1.1], "b": [2, 2, 2, 2, 2, 2, 1.0]}, index=days)
+    carried = comparisons.carried_weights(pd.Series({"a": 0.5, "b": 0.5}), values, "2023-12-31", "2024-01-04")
+    assert carried["a"] == pytest.approx(0.55 / 1.05) and carried.sum() == pytest.approx(1.0)
+    with pytest.raises(ValueError):
+        comparisons.carried_weights(pd.Series({"a": 0.5, "b": 0.5}), values, "2023-12-01", "2024-01-04")
+
+
+def test_the_market_portfolio_drifts_and_tops_up_in_proportion(record):
+    r, market = record, _market(record["navs"])
+    days = r["table"].index
+    held, turnover = comparisons.market_portfolio(r["records"], market["eur"], market["weights"], days[1:])
+    assert turnover == []
+    weights = held[list(comparisons.MARKET_SLEEVES)]
+    assert weights.iloc[0].to_numpy() == pytest.approx(market["weights"].to_numpy())
+    # Prices move the weights, and a top-up leaves them where it found them.
+    level = market["eur"].reindex(days[1:])
+    grown = market["weights"] * level.iloc[-1] / level.iloc[0]
+    assert weights.iloc[-1].to_numpy() == pytest.approx((grown / grown.sum()).to_numpy())
+    top_up = pd.Timestamp("2026-11-02")
+    assert held.loc[top_up, "value"] == pytest.approx(
+        (held.loc[top_up - pd.offsets.BDay(), "value"] * (weights.loc[top_up - pd.offsets.BDay()] * level.loc[top_up]
+         / level.loc[top_up - pd.offsets.BDay()]).sum()) + 50)  # fmt: skip
+    # A later weight set: the comparator moves to it on its day, and the turnover is half the weight changes.
+    new = pd.Series([0.5, 0.3, 0.08, 0.04, 0.05, 0.02, 0.01], index=list(comparisons.MARKET_SLEEVES))
+    moved, turnover = comparisons.market_portfolio(r["records"], market["eur"], market["weights"], days[1:],
+                                                   ((pd.Timestamp("2026-11-05"), new),))  # fmt: skip
+    assert moved.loc["2026-11-05", list(comparisons.MARKET_SLEEVES)].to_numpy() == pytest.approx(new.to_numpy())
+    before = weights.loc["2026-11-05"]
+    assert turnover[0][1] == pytest.approx(0.5 * (new - before).abs().sum())
+
+
+def test_the_market_portfolio_s_effects_sum_to_each_daily_difference_exactly(record):
+    """Through the two funds held at the comparator's equity-like share: cash, split and the dollar by the first
+    stage's definitions, then each equity-like class against the equity fund and each bond class against the bond
+    fund, with every dollar fund's conversion in the dollar row."""
+    r, extra = record, _extra(record["navs"])
+    extra["market_portfolio"] = _market(r["navs"])
+    sims, values, growth, windows, missing = comparisons.simulations(r["records"], r["navs"], r["values"], r["table"],
+                                                                     r["ref_a"], r["ref_b"], r["rate"], END, extra)  # fmt: skip
+    market = extra["market_portfolio"]
+    # The published weights at the end of 2023, carried to the base day by the funds' returns in euro.
+    days = r["table"].index
+    expected = comparisons.carried_weights(market["weights"], market["eur"], market["as_of"], days[0])
+    assert market["carried"].to_numpy() == pytest.approx(expected.to_numpy()) and market["start_as_of"] == days[0]
+    returns = pd.DataFrame({k: comparisons._returns(g) for k, g in growth.items()})
+    funds = comparisons._fund_returns(r["navs"], days)
+    state = {"reference_a": comparisons._state(sims["reference_a"], r["navs"], days)}
+    ctx = comparisons._context(extra, days, sims, r["navs"])
+    effects = comparisons.daily_effects("market_portfolio", returns, funds, state, ctx)
+    gap = returns["market_portfolio"] - returns["portfolio"]
+    assert np.abs(effects.sum(axis=1) - gap).max() < 1e-12
+    assert effects["equity_classes"].abs().sum() > 0 and effects["bond_classes"].abs().sum() > 0
+    assert (effects[["regions", "within_regions"]] == 0).all().all()
+    assert (effects.loc[days[1]].drop("implementation") == 0).all()
+    out = _build(r, extra=extra)
+    summary = out["summary"].set_index("comparator")
+    rows = out["effects"][out["effects"]["period"] == "record"].pivot(index="comparator", columns="effect", values="value")
+    assert rows.loc["market_portfolio"].drop("timing").sum() == pytest.approx(summary.loc["market_portfolio", "difference"], abs=1e-12)
+    table = out["market"].set_index("sleeve")
+    assert table["published"].sum() == pytest.approx(1.0) and table["start"].sum() == pytest.approx(1.0)
+    assert table["current"].sum() == pytest.approx(1.0) and table.loc["equities", "current_as_of"] == days[-1]
+
+
+def test_a_distributing_fund_s_total_return_adds_each_distribution_on_its_ex_date():
+    from portfolio import prices
+
+    days = pd.bdate_range("2026-01-12", "2026-01-16")
+    navs = pd.Series([10.0, 10.1, 9.9, 10.0, 10.2], index=days)
+    paid = pd.Series([0.2], index=[pd.Timestamp("2026-01-14")])
+    index = prices.with_distributions(navs, paid)
+    returns = index / index.shift(1) - 1
+    assert returns.loc["2026-01-14"] == pytest.approx((9.9 + 0.2) / 10.1 - 1)
+    assert returns.loc["2026-01-15"] == pytest.approx(10.0 / 9.9 - 1)
+    assert index.iloc[0] == navs.iloc[0]
+    with pytest.raises(ValueError):
+        prices.with_distributions(navs, pd.Series([0.2], index=[pd.Timestamp("2026-01-17")]))
+
+
+def test_the_ishares_fund_file_s_history_and_distributions(tmp_path):
+    from portfolio import prices
+
+    def cells(*texts):
+        return "<ss:Row>" + "".join(f'<ss:Cell><ss:Data ss:Type="String">{t}</ss:Data></ss:Cell>' for t in texts) + "</ss:Row>"
+
+    body = ('<?xml version="1.0"?><ss:Workbook xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'
+            '<ss:Worksheet ss:Name="Overview"><ss:Table>' + cells("Index", "S&P LISTED PRIVATE EQUITY") + "</ss:Table></ss:Worksheet>"
+            '<ss:Worksheet ss:Name="Historical"><ss:Table>' + cells("As Of", "Currency", "Value", "Securities In Issue")
+            + cells("09/Nov/2026", "USD", "4.28", "1") + cells("06/Nov/2026", "USD", "4.27", "1") + cells("05/Jun/2018", "USD", "--", "1")
+            + "</ss:Table></ss:Worksheet>"
+            '<ss:Worksheet ss:Name="Distributions"><ss:Table>' + cells("Record Date", "Ex-Date", "Payable Date", "Total Distribution")
+            + cells("17/Jul/2026", "16/Jul/2026", "29/Jul/2026", "0.065") + "</ss:Table></ss:Worksheet></ss:Workbook>")  # fmt: skip
+    path = tmp_path / "fund.xml"
+    path.write_text(body)
+    history = prices.parse_ishares_history(path, "USD")
+    assert list(history.index) == [pd.Timestamp("2026-11-06"), pd.Timestamp("2026-11-09")] and history.iloc[-1] == 4.28
+    assert prices.parse_ishares_distributions(path).to_dict() == {pd.Timestamp("2026-07-16"): 0.065}
+    with pytest.raises(ValueError):
+        prices.parse_ishares_history(path, "EUR")
+    assert prices.COMPARATOR_FEEDS["IE00B3F81409"] == ("ishares", "291773", "USD")
+    assert prices.comparator_cache_name("IE00B3F81409") == "ishares/IE00B3F81409_fund.xml"

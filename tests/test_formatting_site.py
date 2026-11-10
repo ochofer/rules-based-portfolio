@@ -61,7 +61,7 @@ def test_the_page_has_one_theme_light():
 
 def test_the_footer_ends_with_the_author_the_data_the_code_and_the_build_date():
     line = site._colophon({"positions_as_of": "2026-10-09"})
-    assert line.startswith('<p class="colophon">') and line.endswith("Built 9 October 2026</p>")
+    assert line.startswith('<p class="colophon">') and line.endswith("Last build: 9 October 2026</p>")
     assert f'<a href="{config.REPOSITORY_URL}">Code on GitHub</a>' in line
 
 
@@ -167,7 +167,7 @@ def test_the_record_has_one_date_and_names_what_came_after_it():
     now = {"weights_as_of": "2026-11-04", "positions_as_of": "2026-11-04", "built": "2026-11-05", "contributions_after": ""}
     assert site._two_dates(now) == "As of 4 November 2026"
     assert site._two_dates({"weights_as_of": "2026-11-04", "positions_as_of": "2026-11-05"}).startswith("Prices as of")
-    assert site._colophon(now).endswith("Built 5 November 2026</p>")
+    assert site._colophon(now).endswith("Last build: 5 November 2026</p>")
     assert site._next_cycle_day(now) == "5 November 2026"
     orders = pd.DataFrame({"date": ["2026-10-08", "2026-10-08", "2026-11-05", "2026-11-05"]})
     assert site._after_record(orders, now) == ("The two orders of 5 November 2026 came after the last net asset values, "
@@ -226,7 +226,7 @@ def test_the_page_opens_with_the_site_menu_the_hero_and_five_views():
     hero = re.search(r'<header class="ch-hero">(.*?)</header>', page, flags=re.S).group(1)
     assert f'<a href="{site.PROJECT_PAGE_URL}">&larr; Rules-based portfolio</a>' in hero
     assert '<p class="ch-over">Portfolio in practice</p>' in hero and "<h1>Rules-based portfolio</h1>" in hero
-    assert re.search(r"<span>Figures as of \d{1,2} [A-Z][a-z]+ \d{4}</span><span>Built \d{1,2} [A-Z][a-z]+ \d{4}</span>", hero)
+    assert re.search(r"<span>Figures as of \d{1,2} [A-Z][a-z]+ \d{4}</span><span>Last build: \d{1,2} [A-Z][a-z]+ \d{4}</span>", hero)
     assert re.findall(r">([^<]+)</a>", re.search(r'<div class="ch-docs">(.*?)</div>', hero).group(1)) == [
         "Rules", "Mandate", "Guide to the dashboard (PDF)", "Code on GitHub"]
     assert [v for v, _ in site.VIEWS] == ["overview", "performance", "portfolio", "risk", "method"]

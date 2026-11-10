@@ -88,13 +88,18 @@ ROWS = (
     ("lifestrategy_80", "LifeStrategy 80% Equity", "one_fund"),
     ("nasdaq100", "The Nasdaq-100 fund", "one_fund"),
     ("mag7", "The Mag7 fund", "one_fund"),
+    ("market_portfolio", "The global market portfolio", "market_portfolio"),
     ("savings", "Savings at the euro short-term rate", "bank"),
     ("bank_offensief", "Rabobank's managed profile Offensief", "managed"),
 )
 ONE_FUND = tuple(key for key, _, pane in ROWS if pane == "one_fund")
-EFFECTS = ("implementation", "drift", "split", "dollar", "cash", "regions", "within_regions", "rate_against_yield",
-           "change_in_yield", "bonds_rest", "timing", "compounding")  # fmt: skip
+EFFECTS = ("implementation", "drift", "split", "dollar", "cash", "regions", "within_regions", "equity_classes",
+           "bond_classes", "rate_against_yield", "change_in_yield", "bonds_rest", "timing", "compounding")  # fmt: skip
 BOND_EFFECTS = ("rate_against_yield", "change_in_yield", "bonds_rest")
+# The global market portfolio's asset classes, each held through one fund (method/comparator_funds.csv), and those
+# of them that count as equity: listed private equity and listed real estate are companies' shares.
+MARKET_SLEEVES = ("equities", "aggregate", "private_equity", "real_estate", "em_debt", "inflation_linked", "high_yield")
+EQUITY_LIKE = ("equities", "private_equity", "real_estate")
 
 
 def split_target(equity: float) -> dict:
@@ -242,6 +247,29 @@ def daily_effects(key: str, r: pd.DataFrame, funds: pd.DataFrame, state: dict, c
         _fund_part(out, key, pd.Series(1.0, index=r.index), r[key] - held, funds, ctx, share)
         if ctx[key].get("bonds_na"):
             out[list(BOND_EFFECTS)] = float("nan")
+    elif key == "market_portfolio":
+        a = state["reference_a"].shift(1).reindex(r.index)
+        own = ctx[key]
+        weight = own["weights"].shift(1).reindex(r.index)  # each class's weight at the previous close
+        share = weight[list(EQUITY_LIKE)].sum(axis=1)
+        inv_a = a["equity"] * funds["r_e"] + (1 - a["equity"]) * funds["r_b"]
+        tilt = share - a["equity"]
+        out["cash"] = a["cash"] * inv_a
+        out["split"] = tilt * (funds["r_d"] - funds["r_b"])
+        out["dollar"] = tilt * (funds["r_e"] - funds["r_d"])
+        # Each class against the held fund of its kind: the equity-like classes against the equity fund, the bond
+        # classes against the bond fund. A dollar fund's conversion to euro goes to the dollar row, less the equity
+        # fund's for an equity-like class, whose conversion the split's dollar row already carries.
+        held_gap = funds["r_e"] - funds["r_d"]
+        for sleeve in MARKET_SLEEVES:
+            equity_like = sleeve in EQUITY_LIKE
+            gap = weight[sleeve] * (own["r_eur"][sleeve].reindex(r.index) - (funds["r_e"] if equity_like else funds["r_b"]))
+            conversion = pd.Series(0.0, index=r.index)
+            if own["r_usd"] is not None and sleeve in own["r_usd"] and sleeve != "equities":
+                own_gap = (own["r_eur"][sleeve] - own["r_usd"][sleeve]).reindex(r.index)
+                conversion = weight[sleeve] * (own_gap - (held_gap if equity_like else 0.0))
+            out["dollar"] += conversion
+            out["equity_classes" if equity_like else "bond_classes"] += gap - conversion
     # Every effect but implementation starts on the first day on which reference portfolio A held its funds at the
     # previous close. On the first purchase day the comparators and reference portfolio A buy at that day's net asset
     # values, so their returns are zero and the portfolio's difference is implementation alone. A comparator whose
@@ -310,6 +338,69 @@ def _flows_after(ledger: Ledger, days: pd.DatetimeIndex, base_day) -> pd.Series:
         if day > pd.Timestamp(base_day) and len(later[later >= day]):
             flows[later[later >= day][0]] += c.amount_eur
     return flows
+
+
+def market_weights(path=None) -> tuple:
+    """The global market portfolio's weights (method/market_portfolio_weights.csv): the dataset's eight asset classes
+    summed by the class fund that holds each, in MARKET_SLEEVES' order and scaled to sum to one, and the date they
+    describe. The table holds one version of the dataset. A later version moves the comparator on the first cycle
+    day after its publication, carried from its own date, and until that move is written the build stops."""
+    table = pd.read_csv(path or config.METHOD_DIR / "market_portfolio_weights.csv")
+    if table["version"].nunique() != 1:
+        raise ValueError("method/market_portfolio_weights.csv holds more than one version of the weights, and the "
+                         "move to a later version is not written")
+    weights = table.groupby("held_in")["weight"].sum().reindex(list(MARKET_SLEEVES))
+    if weights.isna().any():
+        raise ValueError("method/market_portfolio_weights.csv: an asset class fund holds no weight")
+    return weights / weights.sum(), pd.Timestamp(table["as_of"].iloc[0])
+
+
+def carried_weights(weights: pd.Series, unit_values: pd.DataFrame, since, until) -> pd.Series:
+    """Weights carried from since to until by each class fund's return in euro: each weight times its fund's value
+    on until over its value on since, scaled to sum to one. A fund's value on a day is its last net asset value on or
+    before it, and every fund must have one on or before since."""
+    level = unit_values.reindex(columns=list(weights.index)).sort_index().ffill()
+    before = level.loc[:pd.Timestamp(since)]
+    if not len(before) or before.iloc[-1].isna().any():
+        raise ValueError(f"a class fund has no net asset value on or before {pd.Timestamp(since):%Y-%m-%d}")
+    grown = weights * level.loc[:pd.Timestamp(until)].iloc[-1] / before.iloc[-1]
+    return grown / grown.sum()
+
+
+def market_portfolio(ledger: Ledger, unit_values: pd.DataFrame, weights: pd.Series, days: pd.DatetimeIndex,
+                     moves: tuple = ()) -> tuple:  # fmt: skip
+    """Daily values in euro of the contributions held in the asset classes' funds as the market holds them, on days
+    from the first purchase.
+
+    The starting amount buys the weights at the net asset values of the first day. The weights then move with the
+    funds' prices, with no rebalancing, and each top-up buys every fund in proportion to its value in the comparator on
+    the first day on or after its date, so a top-up leaves the weights as they were. moves holds a later weight set as
+    (day, weights): on that day the comparator sells and buys to the new set at the day's net asset values. Returns the
+    value and each class's weight at each close, and each move's day with its turnover, half the sum of the weight
+    changes."""
+    names = list(weights.index)
+    prices = unit_values.reindex(columns=names).reindex(days).ffill()
+    contributions = ledger.contributions
+    start = days[0]
+    units = weights / weights.sum() * float(contributions.iloc[0]["amount_eur"]) / prices.loc[start]
+    flows = [(pd.Timestamp(c.moment.date()), float(c.amount_eur)) for c in contributions.iloc[1:].itertuples()]
+    moves = {pd.Timestamp(day): w / w.sum() for day, w in moves}
+    rows, turnover, previous = [], [], None
+    for day in days:
+        price = prices.loc[day]
+        paid = sum(a for d, a in flows if (previous is None or d > previous) and d <= day)
+        held = units * price
+        if paid:
+            units = units + paid * (held / held.sum()) / price
+            held = units * price
+        if day in moves:
+            total = held.sum()
+            turnover.append((day, 0.5 * float((moves[day] - held / total).abs().sum())))
+            units = moves[day] * total / price
+            held = units * price
+        rows.append({"date": day, "value": float(held.sum()), **(held / held.sum()).to_dict()})
+        previous = day
+    return pd.DataFrame(rows).set_index("date"), turnover
 
 
 def region_shares(weights: pd.Series) -> pd.Series:
@@ -436,6 +527,20 @@ def simulations(ledger: Ledger, navs: pd.DataFrame, values: pd.DataFrame, table:
         values_eur[key] = held
         growth[key] = metrics.growth_index(held.iloc[1:], _flows_after(ledger, days, day), base_value, day).reindex(days)
         windows[key] = day
+    market = extra.get("market_portfolio")
+    if market is not None and market.get("eur") is None:
+        missing["market_portfolio"] = market.get("status", "")
+    elif market is not None:
+        # The published weights describe the market at their date: carried to the base day by the class funds'
+        # returns, they are the market's weights as the comparator starts.
+        market["carried"] = carried_weights(market["weights"], market["eur"], market["as_of"], base)
+        market["start_as_of"] = base
+        market["held"], market["turnover"] = market_portfolio(ledger, market["eur"], market["carried"], days[1:],
+                                                              market.get("moves", ()))  # fmt: skip
+        held = market["held"]["value"]
+        values_eur["market_portfolio"] = held
+        growth["market_portfolio"] = metrics.growth_index(held, metrics.flows_on_days(ledger, held.index), start,
+                                                          base).reindex(days)  # fmt: skip
     return sims, values_eur, growth, windows, missing
 
 
@@ -477,6 +582,16 @@ def _context(extra: dict, days: pd.DatetimeIndex, sims: dict, navs: pd.DataFrame
             usd = spec["usd"].reindex(spec["usd"].index.union(days)).ffill().reindex(days)
             own["r_usd"] = (usd / usd.shift(1) - 1).iloc[1:]
         ctx[key] = own
+    market = extra.get("market_portfolio")
+    if market is not None and market.get("held") is not None:
+        eur = market["eur"].reindex(columns=list(MARKET_SLEEVES))
+        eur = eur.reindex(eur.index.union(days)).ffill().reindex(days)
+        usd = market.get("usd")
+        if usd is not None:
+            usd = usd.reindex(usd.index.union(days)).ffill().reindex(days)
+        ctx["market_portfolio"] = {"weights": market["held"].reindex(columns=list(MARKET_SLEEVES)),
+                                   "r_eur": (eur / eur.shift(1) - 1).iloc[1:],
+                                   "r_usd": None if usd is None else (usd / usd.shift(1) - 1).iloc[1:]}  # fmt: skip
     bond = extra.get("bond")
     if bond is not None:
         spot = bond["spot"].reindex(bond["spot"].index.union(days)).ffill().reindex(days)
@@ -572,13 +687,44 @@ def build(ledger: Ledger, navs: pd.DataFrame, values: pd.DataFrame, table: pd.Da
     regions = extra.get("regions")
     return {"summary": summary, "daily": daily_table.reset_index(),
             "effects": pd.DataFrame(effects, columns=["comparator", "period", "effect", "value"]),
-            "regions": regions if regions is not None else pd.DataFrame(columns=["comparator", "snapshot", "region", "weight"])}  # fmt: skip
+            "regions": regions if regions is not None else pd.DataFrame(columns=["comparator", "snapshot", "region", "weight"]),
+            "market": market_table(extra.get("market_portfolio"))}  # fmt: skip
 
 
-def fees(ownership: pd.DataFrame, implementation: pd.Series, charges: dict, bank: dict) -> pd.DataFrame:
+def market_table(market: dict) -> pd.DataFrame:
+    """The global market portfolio's weights by asset class fund: as published at their date, carried to the
+    comparator's start, and at the last close, with the day of each."""
+    columns = ["sleeve", "published", "published_as_of", "start", "start_as_of", "current", "current_as_of"]
+    if not market or market.get("held") is None:
+        return pd.DataFrame(columns=columns)
+    held = market["held"]
+    current = held.iloc[-1].reindex(list(MARKET_SLEEVES))
+    out = pd.DataFrame({"sleeve": list(MARKET_SLEEVES), "published": market["weights"].reindex(list(MARKET_SLEEVES)).values,
+                        "published_as_of": pd.Timestamp(market["as_of"]), "start": market["carried"].reindex(list(MARKET_SLEEVES)).values,
+                        "start_as_of": pd.Timestamp(market["start_as_of"]), "current": current.values,
+                        "current_as_of": held.index[-1]})  # fmt: skip
+    return out[columns]
+
+
+def market_fees(funds: pd.DataFrame, weights: pd.Series) -> list:
+    """The global market portfolio's costs: each class fund's TER a year, from its factsheet as the ranking records
+    it, and the TERs weighted by the published weights, with a class held in its parent's fund weighted with the
+    parent. funds has one row per class: fund, ter_per_cent and factsheet_date."""
+    rows = []
+    for _, fund in funds.drop_duplicates("isin").iterrows():
+        rows.append(("market_portfolio", f"TER of {fund['fund']}", float(fund["ter_per_cent"]) * 100, None, "a year",
+                     "The fund's factsheet, method/selection_market_portfolio.csv", fund["factsheet_date"]))  # fmt: skip
+    ter = funds["ter_per_cent"].astype(float).reindex(weights.index)
+    rows.append(("market_portfolio", "TERs weighted by the published weights", float((ter * weights).sum()) * 100, None,
+                 "a year", "method/market_portfolio_weights.csv", pd.to_datetime(funds["factsheet_date"]).max()))  # fmt: skip
+    return rows
+
+
+def fees(ownership: pd.DataFrame, implementation: pd.Series, charges: dict, bank: dict, market: list = ()) -> pd.DataFrame:
     """The costs beside the comparisons, in basis points: the portfolio's ongoing costs a year at its weights and its
-    implementation cost since the first purchase, the LifeStrategy funds' ongoing charges, and the published costs
-    of the bank's managed profile on the first 100,000 euro invested, each with its source and date."""
+    implementation cost since the first purchase, the LifeStrategy funds' ongoing charges, the published costs of the
+    bank's managed profile on the first 100,000 euro invested and the market portfolio's funds' TERs, each with its
+    source and date."""
     rows = []
     if len(ownership):
         weighted = ownership[ownership["sleeve"] == "portfolio"].iloc[0]
@@ -599,6 +745,7 @@ def fees(ownership: pd.DataFrame, implementation: pd.Series, charges: dict, bank
                  ("bank_offensief", "Portfolio management, four quarters", managed, None, per, source, bank["dated"]),
                  ("bank_offensief", "The funds' own costs", low, high, "a year", source, bank["dated"]),
                  ("bank_offensief", "All in", basic + managed + low, basic + managed + high, per, source, bank["dated"])]  # fmt: skip
+    rows += list(market)
     out = pd.DataFrame(rows, columns=["comparator", "item", "bps_low", "bps_high", "per", "source", "dated"])
     out["bps_high"] = out["bps_high"].fillna(out["bps_low"]).astype(float)
     out["dated"] = pd.to_datetime(out["dated"])

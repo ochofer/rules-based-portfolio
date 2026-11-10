@@ -13,7 +13,10 @@ Sources, all published by the issuers or by the European Central Bank:
     Street's spreadsheet of net asset values for the SPDR funds, Vanguard's data service for the LifeStrategy
     funds, HANetf's spreadsheet for the Mag7 fund, and the historical data spreadsheet that DWS's product page
     offers for the Nasdaq-100 fund, read after answering the page's entry gate for the Netherlands as a
-    non-professional investor.
+    non-professional investor. The global market portfolio's funds come from their issuers' files: the fund data
+    file of each iShares fund from iShares' document service, whose Historical sheet holds the daily net asset
+    value and whose Distributions sheet holds each distribution by ex-date, and State Street's spreadsheet for the
+    real estate fund.
 Files are cached locally, never committed and never redistributed. cache/sources.json records each
 download's URL, time and size.
 """
@@ -36,11 +39,13 @@ import pandas as pd
 from . import config
 
 USER_AGENT = "rules-based-portfolio/0.1"
-ISHARES_DOCUMENT = (
+# iShares' document service: a fund's data file by the fund's portfolio number on the iShares site.
+ISHARES_SERVICE = (
     "https://www.blackrock.com/varnish-api/uk-retail01-product-data/product-data/api/v1/"
     "get-fund-document?appType=PRODUCT_PAGE&appSubType=ISHARES&targetSite=ishares-uk&locale=en_GB"
-    "&portfolioId=251850&component={component}&userType=individual"
+    "&portfolioId={portfolio}&component={component}&userType=individual"
 )
+ISHARES_DOCUMENT = ISHARES_SERVICE.replace("{portfolio}", "251850")  # the equity ETF held
 VANGUARD_SERVICE = "https://www.vanguard.co.uk/gpx/graphql"
 VANGUARD_PORT_ID = "9591"
 ECB_USD_PER_EUR = "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?format=csvdata"
@@ -66,6 +71,13 @@ COMPARATOR_FEEDS = {
     "IE00BMVB5R75": ("vanguard", "9496", "EUR"),
     "IE000NFL4BX4": ("hanetf", "MAGZ", "USD"),
     "IE00BMFKG444": ("dws", "nl-nl", "USD"),
+    # The global market portfolio's funds, one per asset class (method/selection_market_portfolio.csv). An iShares
+    # fund's name here is its portfolio number on the iShares site.
+    "IE00B3F81409": ("ishares", "291773", "USD"),
+    "IE000D8FCSD8": ("ishares", "325781", "USD"),
+    "IE00BFZPF546": ("ishares", "297676", "USD"),
+    "IE00BYWZ0440": ("ishares", "291404", "USD"),
+    "IE00BH4GR342": ("ssga", "spy2", "USD"),
 }
 DWS_SITE = "https://etf.deutsche-am.com"
 # The entry gate of DWS's Dutch site, answered as its product page answers it when a reader picks the
@@ -171,6 +183,81 @@ def parse_ishares_navs(path: Path) -> pd.Series:
             raise ValueError(f"{path}: the Historical NAVs sheet has no dated rows")
         return pd.Series(values, name="nav_usd").sort_index()
     raise ValueError(f"{path}: no sheet named Historical NAVs")
+
+
+def _ishares_sheet(path: Path, name: str) -> list:
+    """The rows of one sheet of an iShares fund data file, each a list of cell texts. Some files carry a bare
+    ampersand in a name (S&P), which is escaped before the file is read."""
+    text = Path(path).read_text(encoding="utf-8", errors="replace")
+    text = re.sub(r"&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)", "&amp;", text)
+    root = ET.fromstring(text)
+    for sheet in root.findall(f"{{{SS}}}Worksheet"):
+        if sheet.get(f"{{{SS}}}Name") == name:
+            rows = []
+            for row in sheet.iter(f"{{{SS}}}Row"):
+                cells = [c.find(f"{{{SS}}}Data") for c in row.findall(f"{{{SS}}}Cell")]
+                rows.append([(d.text or "").strip() if d is not None else "" for d in cells])
+            return rows
+    raise ValueError(f"{path}: no sheet named {name}")
+
+
+def _ishares_day(text: str):
+    m = re.fullmatch(r"(\d{2})/([A-Za-z]+)/(\d{4})", text)
+    if not m or m.group(2) not in MONTHS:
+        return None
+    return pd.Timestamp(int(m.group(3)), MONTHS[m.group(2)], int(m.group(1)))
+
+
+def parse_ishares_history(path: Path, currency: str) -> pd.Series:
+    """The "Historical" sheet of an iShares fund data file (the service's fundDownload component): net asset value
+    by date, in its third column, as the held fund's file has it in its second. Every row must be in the given
+    currency."""
+    rows = _ishares_sheet(path, "Historical")
+    heads = rows[0][:2] if rows else []
+    if heads != ["As Of", "Currency"]:
+        raise ValueError(f"{path}: the Historical sheet is not headed As Of, Currency")
+    values = {}
+    for texts in rows[1:]:
+        day = _ishares_day(texts[0]) if texts else None
+        if day is None or len(texts) < 3 or texts[2] in ("", "--"):  # "--" marks a day without a published value
+            continue
+        if texts[1] != currency:
+            raise ValueError(f"{path}: a net asset value is in {texts[1]}, not {currency}")
+        values[day] = _number(texts[2])
+    if not values:
+        raise ValueError(f"{path}: the Historical sheet has no dated rows")
+    return pd.Series(values, name="unit_value").sort_index()
+
+
+def parse_ishares_distributions(path: Path) -> pd.Series:
+    """The "Distributions" sheet of an iShares fund data file: each distribution by its ex-date, in the share
+    class's currency."""
+    rows = _ishares_sheet(path, "Distributions")
+    heads = rows[0] if rows else []
+    if "Ex-Date" not in heads or "Total Distribution" not in heads:
+        raise ValueError(f"{path}: the Distributions sheet has no Ex-Date and Total Distribution")
+    ex, amount = heads.index("Ex-Date"), heads.index("Total Distribution")
+    values = {}
+    for texts in rows[1:]:
+        day = _ishares_day(texts[ex]) if len(texts) > amount else None
+        if day is not None and texts[amount]:
+            values[day] = _number(texts[amount])
+    return pd.Series(values, name="distribution", dtype=float).sort_index()
+
+
+def with_distributions(unit_value: pd.Series, distributions: pd.Series) -> pd.Series:
+    """A distributing fund's total return as an index of its net asset values: on an ex-date the return is the net
+    asset value plus the distribution over the previous day's net asset value, and on every other day the change in
+    the net asset value. Each ex-date must be a day with a net asset value."""
+    unit_value = unit_value.sort_index()
+    paid = distributions[distributions.index > unit_value.index[0]]
+    missing = paid.index.difference(unit_value.index)
+    if len(missing):
+        raise ValueError(f"ex-dates without a net asset value: {[d.strftime('%Y-%m-%d') for d in missing]}")
+    added = paid.reindex(unit_value.index).fillna(0.0)
+    returns = (unit_value + added) / unit_value.shift(1)
+    index = returns.fillna(1.0).cumprod() * unit_value.iloc[0]
+    return index.rename("unit_value")
 
 
 def parse_vanguard_navs(path: Path) -> pd.Series:
@@ -456,14 +543,28 @@ def load_rabobank_costs(refresh: bool = False, cache_dir: Path = config.CACHE_DI
     return parse_rabobank_costs(_pdf_text(path))
 
 
-ISSUER_NAME = {"ssga": "State Street", "vanguard": "Vanguard", "hanetf": "HANetf", "dws": "DWS"}
+ISSUER_NAME = {"ssga": "State Street", "vanguard": "Vanguard", "hanetf": "HANetf", "dws": "DWS", "ishares": "iShares"}
 
 
 def comparator_cache_name(isin: str) -> str:
     """The cache file of a comparator fund's published series."""
     issuer = COMPARATOR_FEEDS[isin][0]
     return {"ssga": f"ssga/{isin}_navhist.xlsx", "hanetf": f"hanetf/{isin}_nav.xlsx", "vanguard": f"vanguard/{isin}_nav.json",
-            "dws": f"dws/{isin}_history.xlsx"}[issuer]  # fmt: skip
+            "dws": f"dws/{isin}_history.xlsx", "ishares": f"ishares/{isin}_fund.xml"}[issuer]  # fmt: skip
+
+
+def _ishares_fund_file(isin: str, refresh: bool, cache_dir: Path) -> Path:
+    _, portfolio, _ = COMPARATOR_FEEDS[isin]
+    url = ISHARES_SERVICE.format(portfolio=portfolio, component="fundDownload")
+    return fetch(comparator_cache_name(isin), url, refresh, cache_dir=cache_dir)
+
+
+def load_distributions(isin: str, refresh: bool = False, cache_dir: Path = config.CACHE_DIR) -> pd.Series:
+    """A distributing iShares fund's distributions by ex-date, in its share class's currency, from the
+    Distributions sheet of its fund data file."""
+    if COMPARATOR_FEEDS.get(isin, ("",))[0] != "ishares":
+        raise ValueError(f"no distribution file is written for {isin}")
+    return parse_ishares_distributions(_ishares_fund_file(isin, refresh, cache_dir))
 
 
 def load_comparator(isin: str, refresh: bool = False, cache_dir: Path = config.CACHE_DIR) -> tuple:
@@ -482,6 +583,8 @@ def load_comparator(isin: str, refresh: bool = False, cache_dir: Path = config.C
         series, stated = _sheet_series(path, "%d.%m.%Y", column=2, beside={1: "Asset Under Management", 3: "Index Level"})
         if stated != currency:
             raise ValueError(f"{path}: the net asset values are in {stated}, not {currency}")
+    elif issuer == "ishares":
+        series = parse_ishares_history(_ishares_fund_file(isin, refresh, cache_dir), currency)
     elif issuer == "hanetf":
         path = fetch(f"hanetf/{isin}_nav.xlsx", HANETF_NAVHIST.format(key=key, isin=isin), refresh, cache_dir=cache_dir)
         series, _ = _sheet_series(path)

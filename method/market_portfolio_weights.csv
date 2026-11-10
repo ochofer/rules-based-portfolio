@@ -1,0 +1,9 @@
+asset_class,weight,held_in,as_of,source,version,published,doi,licence,read_on
+equities,0.429642,equities,2023-12-31,"Doeswijk, Lam and Swinkels (2024), Data update: The Global Multi-Asset Market Portfolio, 1959-2012, Table A1",6,2024-03-06,10.25397/eur.9371741,CC BY 4.0,2026-11-10
+government_bonds,0.238683,aggregate,2023-12-31,"Doeswijk, Lam and Swinkels (2024), Data update: The Global Multi-Asset Market Portfolio, 1959-2012, Table A1",6,2024-03-06,10.25397/eur.9371741,CC BY 4.0,2026-11-10
+investment_grade_credits,0.147500,aggregate,2023-12-31,"Doeswijk, Lam and Swinkels (2024), Data update: The Global Multi-Asset Market Portfolio, 1959-2012, Table A1",6,2024-03-06,10.25397/eur.9371741,CC BY 4.0,2026-11-10
+private_equity,0.077828,private_equity,2023-12-31,"Doeswijk, Lam and Swinkels (2024), Data update: The Global Multi-Asset Market Portfolio, 1959-2012, Table A1",6,2024-03-06,10.25397/eur.9371741,CC BY 4.0,2026-11-10
+real_estate,0.040497,real_estate,2023-12-31,"Doeswijk, Lam and Swinkels (2024), Data update: The Global Multi-Asset Market Portfolio, 1959-2012, Table A1",6,2024-03-06,10.25397/eur.9371741,CC BY 4.0,2026-11-10
+emerging_debt,0.038730,em_debt,2023-12-31,"Doeswijk, Lam and Swinkels (2024), Data update: The Global Multi-Asset Market Portfolio, 1959-2012, Table A1",6,2024-03-06,10.25397/eur.9371741,CC BY 4.0,2026-11-10
+inflation_linked_bonds,0.016380,inflation_linked,2023-12-31,"Doeswijk, Lam and Swinkels (2024), Data update: The Global Multi-Asset Market Portfolio, 1959-2012, Table A1",6,2024-03-06,10.25397/eur.9371741,CC BY 4.0,2026-11-10
+high_yield_bonds,0.010741,high_yield,2023-12-31,"Doeswijk, Lam and Swinkels (2024), Data update: The Global Multi-Asset Market Portfolio, 1959-2012, Table A1",6,2024-03-06,10.25397/eur.9371741,CC BY 4.0,2026-11-10

@@ -7,3 +7,10 @@ as_of,comparator,item,bps_low,bps_high,per,source,dated
 2026-11-06,bank_offensief,"Portfolio management, four quarters",40,40,"a year, on the first 100,000 euro invested",Rabobank's cost overview of Rabo Beheerd Beleggen Basis,2025-05-01
 2026-11-06,bank_offensief,The funds' own costs,10,15,a year,Rabobank's cost overview of Rabo Beheerd Beleggen Basis,2025-05-01
 2026-11-06,bank_offensief,All in,74,79,"a year, on the first 100,000 euro invested",Rabobank's cost overview of Rabo Beheerd Beleggen Basis,2025-05-01
+2026-11-06,market_portfolio,TER of iShares MSCI ACWI UCITS ETF USD (Acc),20,20,a year,"The fund's factsheet, method/selection_market_portfolio.csv",2026-07-31
+2026-11-06,market_portfolio,TER of iShares Core Global Aggregate Bond UCITS ETF USD (Dist),10,10,a year,"The fund's factsheet, method/selection_market_portfolio.csv",2026-10-31
+2026-11-06,market_portfolio,TER of iShares Listed Private Equity UCITS ETF USD (Acc),75,75,a year,"The fund's factsheet, method/selection_market_portfolio.csv",2026-10-31
+2026-11-06,market_portfolio,TER of SPDR Dow Jones Global Real Estate UCITS ETF (Acc),40,40,a year,"The fund's factsheet, method/selection_market_portfolio.csv",2026-10-31
+2026-11-06,market_portfolio,TER of iShares J.P. Morgan EM Local Govt Bond UCITS ETF USD (Acc),50,50,a year,"The fund's factsheet, method/selection_market_portfolio.csv",2026-10-31
+2026-11-06,market_portfolio,TER of iShares Global High Yield Corp Bond UCITS ETF USD (Acc),50,50,a year,"The fund's factsheet, method/selection_market_portfolio.csv",2026-10-31
+2026-11-06,market_portfolio,TERs weighted by the published weights,22.54897745,22.54897745,a year,method/market_portfolio_weights.csv,2026-10-31
