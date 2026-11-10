@@ -185,8 +185,8 @@ def _note(key: str) -> str:
 
 
 def _note_text(text: str, url: str, title: str = None) -> str:
-    """A note of the Notes list. A published work is followed by its address. A page or file of the author's own
-    carries its link on its title, given as title, and its address is not written out."""
+    """A note of the Notes list. A paper or a dataset with a DOI is followed by the DOI's address. A web page without
+    a DOI carries its link on its title, given as title, and its address is not written out."""
     if title is None:
         return f'{_esc(text)} <a href="{_esc(url)}">{_esc(url)}</a>'
     if text.count(title) != 1:
@@ -2226,8 +2226,8 @@ NOTES = (
      "1/N portfolio strategy? Review of Financial Studies 22(5), 1915 to 1953.", "https://doi.org/10.1093/rfs/hhm075"),
     ("Optimal versus naive diversification, the replication and the index-tracking study, with its dashboard, note "
      "and code.", STUDY_URL, "Optimal versus naive diversification"),
-    ("Kenneth French's data library, the US market return and the developed markets outside the United States:",
-     "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html"),
+    ("Kenneth French's data library, the US market return and the developed markets outside the United States.",
+     "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html", "Kenneth French's data library"),
     ("Black, F. and Litterman, R. (1992). Global portfolio optimization. Financial Analysts Journal 48(5), 28 to 43.",
      "https://doi.org/10.2469/faj.v48.n5.28"),
     ("Grinold, R. C. (1989). The fundamental law of active management. Journal of Portfolio Management 15(3), 30 to "
