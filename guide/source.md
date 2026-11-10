@@ -82,7 +82,7 @@ The key facts set out the portfolio's terms in ten rows: the two sleeves with th
 
 ## ⟦view:performance⟧ Performance
 
-The Performance view answers what the portfolio has returned since the first purchase, what was paid in and what running it costs. It opens with the growth of 100, followed by two parts, Contributions and Costs.
+The Performance view answers what the portfolio has returned since the first purchase, how that sets against its comparators, what was paid in and what running it costs. It opens with the growth of 100, followed by three parts, Comparisons, Contributions and Costs.
 
 ### ⟦c3⟧ Growth of 100: the portfolio, the reference portfolios and the index blend
 
@@ -91,6 +91,42 @@ The Performance view answers what the portfolio has returned since the first pur
 Three comparisons sit on this chart, and each answers its own question. The gap between the portfolio and reference portfolio A is the implementation cost, which ⟦c8⟧ follows. The gap between reference portfolio A and reference portfolio B is the drift effect, the effect on returns of letting the weights drift inside the band, before costs. The gap between the portfolio and the index blend adds the tracking difference of the two ETFs, each fund's calendar-year return minus its index's, and from the twelfth month end ⟦attribution⟧ splits it into these three parts. Over a record this short, none of the gaps says whether the rules are good ones.
 
 The line under the figure links to the part of the Method view that explains [what the portfolio does not do](#method-not-done): why it has no optimiser, no single market index as its benchmark, no views and no signal.
+
+### ⟦#comparisons⟧ Comparisons
+
+The Comparisons part sets the record beside comparators: portfolios that receive the same contributions on the same days, valued in euro at the issuers' net asset values or at a published rate, without costs. Each comparator answers one question about the portfolio's choices, and every return or difference in the part stands beside its volatility, its worst fall and the band chance alone produces over the same span. The part opens with a summary table and a pair of charts, always shown, and four panes below them open on a tap and print open. The benchmark, the index blend, has values at month ends only, so its statistics, its difference and its place on the charts start at the sixth month end.
+
+### ⟦comparisons⟧ The portfolio and its comparators since the first purchase
+
+⟦comparisons⟧ gives one row for the portfolio and one for each comparator: the benchmark, reference portfolios A and B, the same two ETFs at 100/0, 90/10, 80/20 and 60/40 under the same rules, and savings at the euro short-term rate, the rate at which banks borrow euro overnight without collateral, which the European Central Bank publishes each working day. For each row it gives the time-weighted return since the first purchase, cumulative and not annualised, the volatility, the worst fall, the difference to the portfolio's return in percentage points, the band chance alone produces, and the window of days both series cover. The volatility here is the standard deviation of daily returns times the square root of 252, so a figure for a year.
+
+The band answers whether a difference is larger than chance alone would make it over the same span. The tracking error is the standard deviation of the daily differences between the two series' returns times the square root of 252, and the band's half-width is two tracking errors times the square root of the years. It ignores compounding and treats the daily differences as independent. A difference inside the band is one that chance alone produces often over a span this long. Volatility, worst falls and correlations become informative within months, and differences of return over years, so over the record's first months a difference says nothing about either rule set.
+
+### ⟦comparisons-differences⟧ The difference of each comparator to the portfolio, and its band
+
+⟦comparisons-differences⟧ shows each comparator's difference as a navy bar from zero, over a light bar for its band, centred on zero. A navy bar that ends inside its light bar is a difference chance alone would produce over the same span. The table gives each difference with its band, the comparator's volatility and its worst fall.
+
+### ⟦comparisons-ladder⟧ Volatility against return since the first purchase
+
+⟦comparisons-ladder⟧ places each comparator by its volatility on the horizontal axis and its return since the first purchase on the vertical axis. The splits under the same rules lie on one grey line, from 60/40 through reference portfolio A, which is 70/30, to 100/0, and the navy dot is the portfolio. Savings sit near zero volatility. More equity always means more volatility, while the return of these few weeks can fall as equity rises, as it does when stock markets fall, so the chart shows the risk each split took and the return it earned over these days. The return to expect from a split is a question for decades of data, which the allocation test in the Method view holds. The table adds each worst fall and band.
+
+### ⟦comparisons-same-rules⟧ The same rules without costs
+
+The first pane holds reference portfolios A and B. ⟦comparisons-same-rules⟧ shows each one's return minus the portfolio's over time, in percentage points, with the portfolio at zero. Reference portfolio A's line is the implementation cost of ⟦c8⟧ with the opposite sign and in percentage points, and the gap between the lines of A and B is the drift effect. The rows under the chart give every measure, with the dates of each worst fall and each comparator's correlation of daily returns with the portfolio's. The benchmark joins this pane at the sixth month end.
+
+### ⟦comparisons-splits⟧ The same rules with other funds or splits
+
+The second pane runs the portfolio's own rules around other target weights: 100/0, 90/10, 80/20 and 60/40, each with the band of rule 5 five points either side of its target, which never binds for 100/0, on the same two ETFs, contributions and cycle days, without costs. ⟦comparisons-splits⟧ shows each one's difference to the portfolio over time, and the rows under it give every measure. A split with more equity moves further from the portfolio whenever equities move.
+
+### ⟦comparisons-savings⟧ The money left in the bank
+
+The third pane holds the contributions at the euro short-term rate, compounded daily on calendar days at the rate divided by 360, the convention of the money market. ⟦comparisons-savings⟧ shows its difference to the portfolio over time. Its volatility is above zero only because interest lands in three-day steps over weekends, and its correlation with the portfolio is not shown, since the rate barely moves from day to day.
+
+### ⟦comparisons-effects⟧ Where each difference came from
+
+The fourth pane splits each comparator's difference into named effects. ⟦comparisons-effects⟧ starts at the portfolio's money-weighted return, adds each effect as a bar to the right or to the left, and ends at the comparator's money-weighted return. The selector above it picks the comparator, and the table under it gives every comparator's effects side by side, with both returns of both and each comparator's difference, band, volatility and worst fall.
+
+The effects are computed day by day and summed by month and over the record. Implementation is reference portfolio A's return minus the portfolio's, the cost of running the portfolio with the opposite sign. Drift is reference portfolio B's return minus reference portfolio A's. The invested part of a portfolio is its value less its cash. Split is the difference in the share of equity in the invested part times the equity ETF's return in US dollars minus the bond ETF's return, and the dollar is the same difference times the gap between the equity ETF's return in euro and in US dollars, so the two together are the split in euro. Cash is the difference in cash weight times the return of the invested part. For savings, bonds against the rate is the invested part's bond return against the rate. Timing of contributions is the comparator's money-weighted return minus its time-weighted return, less the portfolio's, and compounding is what the daily sums leave of the difference over the whole record. On each day the effects sum exactly to the difference of that day's returns. An effect that does not apply to a comparator is zero.
 
 ### ⟦#contributions⟧ Contributions
 
@@ -310,11 +346,13 @@ The bands say what the test's sample implies and assume nothing beyond it. The r
 
 The Method view answers how the portfolio was set up: how the split and the two ETFs were chosen and what the portfolio does not do, with the data sources, the controls and the rules. It then holds the terms the dashboard uses and the Log, the written record of each quarter and month. Its exhibits use history, and each says which history.
 
-### ⟦c21⟧ The allocation test: growth per year against the worst fall of each split
+### ⟦c21⟧ The allocation test: growth per year against the worst fall of each split, on the global and the US equity series
 
 ⟦c21⟧ shows how the split was chosen. The allocation test, in `mandate/allocation_check.py`, runs every split from 40/60 to 100/0, in steps of five points, through monthly euro returns from February 1999 to December 2025. The equity series combines Kenneth French's developed-market and emerging-market returns, 90 and 10 per cent, converted to euro, and the bond series is a seven-year euro area government bond priced from the European Central Bank's yields. Each split is rebalanced by its band, and for each the test measures the growth per year and the worst fall.
 
 Each grey dot is a split, placed by its worst fall on the horizontal axis and its growth per year on the vertical axis, and the curve joins the splits from 40/60 to 100/0. The navy dot is 70/30, the split held, and the red lines are the risk limit of 35 per cent and the outer bound of 40 per cent. The mandate's rule is the largest equity target weight whose worst fall stayed within 35 per cent, and on this history that is 70/30, with a worst fall of 34.7 per cent from August 2000 to March 2003. With two assets every split lies on this one curve, so the limit picks the point and no estimate of future returns enters. The test is in-sample, that is, computed on the data on which the choice was made: the split was chosen on the returns the chart shows.
+
+The teal curve repeats the test with the US stock market in euro in place of the global equity series, with the same bonds, band rule, splits and months, and its 70/30 point is marked as well. On this history the US series grew more per year at every split, and fell further at every split from 60/40 to 100/0. The split was set on the global series alone.
 
 ### ⟦c25⟧ Simulated worst fall of each split over resampled ten-year paths
 

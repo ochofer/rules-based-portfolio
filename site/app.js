@@ -55,12 +55,16 @@
 
   function draw(chart) {
     var el = document.getElementById(chart.id);
-    if (!el || !window.Plotly) return;
+    // A chart inside a closed pane has no width yet; it is drawn when its pane opens.
+    if (!el || !window.Plotly || el.clientWidth === 0) return;
     var p = DATA.palette.light;
     var narrow = el.clientWidth < 520;
     var layout = merge(baseLayout(p, narrow), resolve(chart.layout || {}, p));
     if (narrow && chart.layout_narrow) layout = merge(layout, resolve(chart.layout_narrow, p));
     var traces = resolve(chart.traces, p);
+    // A chart with a selector shows the one series chosen in it.
+    var select = chart.select && document.getElementById(chart.select);
+    if (select) traces.forEach(function (t, i) { t.visible = i === Number(select.value); });
     window.Plotly.react(el, traces, layout, { displayModeBar: false, scrollZoom: false, responsive: true, staticPlot: false });
     drawn[chart.id] = true;
   }
@@ -162,6 +166,24 @@
       var id = (location.hash || "").replace("#", "");
       if (views.indexOf(id) < 0 && viewOf(id)) setTimeout(function () { scrollToPart(id); }, 0);
     });
+  });
+
+  // A pane draws its charts when it opens, a selector redraws its chart, and every pane opens before printing.
+  document.querySelectorAll("details.ch-pane").forEach(function (d) {
+    d.addEventListener("toggle", function () {
+      if (!d.open) return;
+      d.querySelectorAll(".plot").forEach(function (el) {
+        DATA.charts.forEach(function (c) { if (c.id === el.id) draw(c); });
+      });
+    });
+  });
+  document.querySelectorAll("select[data-chart]").forEach(function (s) {
+    s.addEventListener("change", function () {
+      DATA.charts.forEach(function (c) { if (c.id === s.getAttribute("data-chart")) draw(c); });
+    });
+  });
+  window.addEventListener("beforeprint", function () {
+    document.querySelectorAll("details.ch-pane").forEach(function (d) { d.open = true; });
   });
 
   // A table wider than its column scrolls sideways; a fade at the right edge shows while more of it lies there.

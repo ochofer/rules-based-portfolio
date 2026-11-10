@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from . import comparisons as comparisons_module
 from . import config, references, trading_days
 from . import risk as risk_module
 from . import formatting as fmt
@@ -42,6 +43,7 @@ VIEWS = [
 PARTS = [
     ("overview", "overview", None),
     ("growth", "performance", None),
+    ("comparisons", "performance", "Comparisons"),
     ("contributions", "performance", "Contributions"),
     ("costs", "performance", "Costs"),
     ("rebalancing", "portfolio", "Rebalancing"),
@@ -114,7 +116,7 @@ def _esc(text) -> str:
 ROUNDING = "Due to rounding, the parts may not sum to 100 per cent."
 
 
-def _table(columns, rows, numeric=(), prose=False, wrap_first=None, rounding=False) -> str:
+def _table(columns, rows, numeric=(), prose=False, wrap_first=None, rounding=False, wrap_head=False) -> str:
     head = "".join(f'<th class="num">{_esc(c)}</th>' if c in numeric else f"<th>{_esc(c)}</th>" for c in columns)
     body = []
     for r in rows:
@@ -126,7 +128,7 @@ def _table(columns, rows, numeric=(), prose=False, wrap_first=None, rounding=Fal
     # the column never covers the columns that scroll behind it.
     longest = max((len(str(r[0])) for r in rows), default=0)
     wrap_first = longest > WRAP_FIRST_ABOVE if wrap_first is None else wrap_first
-    classes = (["wrapfirst"] if wrap_first else []) + (["prose"] if prose else [])
+    classes = (["wrapfirst"] if wrap_first else []) + (["prose"] if prose else []) + (["headwrap"] if wrap_head else [])
     wrap = f' class="{" ".join(classes)}"' if classes else ""
     note = f'<p class="rounding">{ROUNDING}</p>' if rounding else ""
     return (f'<div class="tw"><div class="tablewrap"><table{wrap}><thead><tr>{head}</tr></thead>'
@@ -781,7 +783,8 @@ def costs(page, monthly, implementation, daily):
             for i, (_, r) in enumerate(data.iterrows())]  # fmt: skip
     table = _table(["Date", "Implementation cost"], rows, numeric=("Implementation cost",))
     page.add("costs", _card("c8", "Implementation cost, cumulative: reference portfolio A against the portfolio",
-             _asof(daily["date"].iloc[-1], "Positive when the portfolio trails reference portfolio A"),
+             _asof(daily["date"].iloc[-1], "Positive when the portfolio's value is below reference portfolio A's and negative "
+                                          "when it is above"),
              "outputs/implementation_cost.csv", table=None if empty else table, height=280, empty=empty,
              note="Reference portfolio A applies the same rules at net asset value and without costs, so the gap "
                   "between reference portfolio A and the portfolio is the cumulative cost of running the portfolio. "
@@ -789,6 +792,337 @@ def costs(page, monthly, implementation, daily):
                   "month."),
              None if empty else {"id": "c8", "traces": traces, "layout": layout,
                                  "layout_narrow": {**narrow, "yaxis": {"title": {"text": "Basis points"}}}})  # fmt: skip
+
+
+# Comparisons ---------------------------------------------------------------------------------------
+
+# The name of each row of the comparisons in a table, and in a chart where room is short.
+COMPARATOR_NAME = {
+    "portfolio": ("The portfolio", "The portfolio"),
+    "benchmark": ("The benchmark, the index blend", "Benchmark"),
+    "reference_a": ("Reference A, the same rules without costs", "Reference A"),
+    "reference_b": ("Reference B, 70/30 every cycle day", "Reference B"),
+    "split_100_0": ("100/0, the same rules", "100/0"),
+    "split_90_10": ("90/10, the same rules", "90/10"),
+    "split_80_20": ("80/20, the same rules", "80/20"),
+    "split_60_40": ("60/40, the same rules", "60/40"),
+    "savings": ("Savings at the euro short-term rate", "Savings"),
+}
+COMPARATOR_ROLE = {"benchmark": "@index_blend", "reference_a": "@reference_a", "reference_b": "@reference_b",
+                   "split_100_0": "@comparator_1", "split_90_10": "@comparator_2", "split_80_20": "@comparator_3",
+                   "split_60_40": "@comparator_4", "savings": "@savings"}  # fmt: skip
+EFFECT_NAME = {"implementation": "Implementation", "drift": "Drift", "split": "Split", "dollar": "The dollar",
+               "cash": "Cash", "bonds_against_rate": "Bonds against the rate", "timing": "Timing of contributions",
+               "compounding": "Compounding"}  # fmt: skip
+PANES = (
+    ("same_rules", "The same rules without costs", ("reference_a", "reference_b"), "comparisons-same-rules"),
+    ("other_funds_or_splits", "The same rules with other funds or splits",
+     ("split_100_0", "split_90_10", "split_80_20", "split_60_40"), "comparisons-splits"),
+    ("bank", "The money left in the bank", ("savings",), "comparisons-savings"),
+)  # fmt: skip
+CHANCE = ("Volatility, worst falls and correlations become informative within months, and differences of return over "
+          "years. Over the record's {days} trading days a difference says nothing about either rule set.")  # fmt: skip
+BAND_NOTE = ("The band is the one chance alone produces over the same span: plus or minus two tracking errors times the "
+             "square root of the years, where the tracking error is the standard deviation of the daily differences "
+             "between the two series times the square root of 252.")  # fmt: skip
+
+
+def _points(x, decimals: int = 1) -> str:
+    """A difference of two returns in percentage points, signed: minus 1.9 points."""
+    if pd.isna(x):
+        return "n/a"
+    if decimals == 1:
+        return fmt.points(float(x) * 100)
+    value = round(float(x) * 100, decimals) + 0.0
+    return (f"{value:+.{decimals}f}" if value else f"{0:.{decimals}f}").replace("-", fmt.MINUS)
+
+
+def _diff(x) -> str:
+    """A difference in a table whose heading gives the unit, points: minus 1.9."""
+    return _points(x).replace(" points", "")
+
+
+def _band(row, unit: bool = False) -> str:
+    """The band chance alone produces, and whether the difference lies inside it, in those words."""
+    if pd.isna(row["band"]):
+        return "n/a"
+    inside = "inside the band" if row["inside_band"] == "yes" else "outside the band"
+    return f"±{round(float(row['band']) * 100, 1):.1f}{' points' if unit else ''}, {inside}"
+
+
+def _window(row) -> str:
+    if row["comparator"] == "benchmark":
+        first = row["first_day"]
+        return f"Month ends from {fmt.day_short(first)}" if isinstance(first, str) else "From the first month end"
+    first, last = pd.Timestamp(row["first_day"]), pd.Timestamp(row["last_day"])
+    start = f"{first.day} {first.strftime('%b')}" if first.year == last.year else fmt.day_short(first)
+    return f"{start} to {fmt.day_short(last)}, {int(row['periods'])} days"
+
+
+def _fall(row, dates: bool = False) -> str:
+    if pd.isna(row["worst_fall"]):
+        return "n/a"
+    text = fmt.pct(row["worst_fall"])
+    if dates and isinstance(row["worst_fall_peak"], str):
+        peak, low = pd.Timestamp(row["worst_fall_peak"]), pd.Timestamp(row["worst_fall_low"])
+        start = f"{peak.day} {peak.strftime('%b')}" if peak.year == low.year else fmt.day_short(peak)
+        text += f", {start} to {fmt.day_short(low)}"
+    return text
+
+
+def _ratio(x) -> str:
+    return "n/a" if pd.isna(x) else fmt.loading(x)
+
+
+def _comparison_rows(summary: pd.DataFrame, keys) -> str:
+    """Every measure of the comparators of a pane, the portfolio first."""
+    columns = ["Comparator", "Time-weighted return", "Money-weighted return", "Volatility", "Worst fall",
+               "Correlation", "Difference, points", "Band, points"]  # fmt: skip
+    rows = []
+    for key in ("portfolio", *keys):
+        r = summary.loc[key]
+        rows.append([COMPARATOR_NAME[key][0], fmt.pct(r["return_time_weighted"], True),
+                     fmt.pct(r["return_money_weighted"], True), fmt.pct(r["volatility"]), _fall(r, dates=True),
+                     _ratio(r["correlation"]), _diff(r["difference"]), _band(r)])  # fmt: skip
+    return _table(columns, rows, numeric=tuple(columns[1:]), wrap_first=True, wrap_head=True)
+
+
+def _differences(summary: pd.DataFrame, shown: list) -> tuple:
+    """One bar per comparator from zero to its difference, over the band chance alone produces, a light bar centred
+    on zero."""
+    names = [COMPARATOR_NAME[k][1] for k in shown]
+    band = [fmt.rounded(summary.loc[k, "band"] * 100, 2) for k in shown]
+    diff = [fmt.rounded(summary.loc[k, "difference"] * 100, 2) for k in shown]
+    hover = [f"{COMPARATOR_NAME[k][1]}: {_points(summary.loc[k, 'difference'])}<br>Band: {_band(summary.loc[k], True)}<br>"
+             f"Volatility {fmt.pct(summary.loc[k, 'volatility'])}, worst fall {_fall(summary.loc[k])}" for k in shown]  # fmt: skip
+    traces = [{"type": "bar", "orientation": "h", "name": "Band chance alone produces", "y": names,
+               "x": [2 * b for b in band], "base": [-b for b in band], "width": 0.62, "marker": {"color": "@band"},
+               **_hover(hover)},
+              {"type": "bar", "orientation": "h", "name": "Difference to the portfolio", "y": names, "x": diff,
+               "width": 0.26, "marker": {"color": "@accent"}, **_hover(hover)}]  # fmt: skip
+    layout = {"barmode": "overlay", "showlegend": True, "legend": {"traceorder": "normal"},
+              "xaxis": {"title": {"text": "Points, comparator minus the portfolio"}, "zeroline": False},
+              "yaxis": {"type": "category", "autorange": "reversed"}, "shapes": [_vline(0, "@ink")],
+              "margin": {"t": 8}}  # fmt: skip
+    rows = [[COMPARATOR_NAME[k][0], _diff(summary.loc[k, "difference"]), _band(summary.loc[k]),
+             fmt.pct(summary.loc[k, "volatility"]), _fall(summary.loc[k])] for k in shown]  # fmt: skip
+    headers = ["Comparator", "Difference, points", "Band chance alone produces, points", "Volatility", "Worst fall"]
+    table = _table(headers, rows, numeric=tuple(headers[1:]))
+    return traces, layout, table
+
+
+def _ladder(summary: pd.DataFrame, shown: list) -> tuple:
+    """Realised volatility against the return since the first purchase: the splits on one line through reference
+    portfolio A, which is 70/30 under the same rules, the portfolio marked."""
+    def point(k):
+        return fmt.rounded(summary.loc[k, "volatility"] * 100, 2), fmt.rounded(summary.loc[k, "return_time_weighted"] * 100, 2)
+
+    def hover(k):
+        r = summary.loc[k]
+        return (f"{COMPARATOR_NAME[k][1]}: volatility {fmt.pct(r['volatility'])}, return {fmt.pct(r['return_time_weighted'], True)}"
+                f"<br>Worst fall {_fall(r)}, band {_band(r, True)}")  # fmt: skip
+
+    ladder = [k for k in ("split_60_40", "reference_a", "split_80_20", "split_90_10", "split_100_0") if k in shown]
+    traces = [{"type": "scatter", "mode": "lines+markers", "name": "Splits under the same rules",
+               "x": [point(k)[0] for k in ladder], "y": [point(k)[1] for k in ladder],
+               "line": {"color": "@other", "width": 2}, "marker": {"size": 8, "color": "@ink2"},
+               **_hover([hover(k) for k in ladder])}]  # fmt: skip
+    for k in [k for k in shown if k not in ladder] + ["portfolio"]:
+        role = "@accent" if k == "portfolio" else COMPARATOR_ROLE[k]
+        x, y = point(k)
+        traces.append({"type": "scatter", "mode": "markers", "name": COMPARATOR_NAME[k][1], "x": [x], "y": [y],
+                       "marker": {"size": 13 if k == "portfolio" else 9, "color": role}, **_hover([hover(k)])})  # fmt: skip
+    annotations = []
+    for k, anchor, shift in (("split_60_40", "right", -10), ("split_100_0", "right", -10), ("portfolio", "left", 10),
+                             ("savings", "left", 10)):  # fmt: skip
+        if k in shown or k == "portfolio":
+            x, y = point(k)
+            label = "The portfolio, 70/30" if k == "portfolio" else COMPARATOR_NAME[k][1]
+            annotations.append(_label(x, y, label, anchor=anchor, role="@accent" if k == "portfolio" else "@ink2",
+                                      xshift=shift, yshift=8 if k != "portfolio" else 14))  # fmt: skip
+    layout = {"xaxis": {"title": {"text": "Volatility, per cent a year"}, "rangemode": "tozero"},
+              "yaxis": {"title": {"text": "Return since the first purchase, per cent"}},
+              "annotations": annotations, "shapes": [_hline(0, "@axis")], "margin": {"t": 16}}  # fmt: skip
+    rows = [[COMPARATOR_NAME[k][0], fmt.pct(summary.loc[k, "volatility"]), fmt.pct(summary.loc[k, "return_time_weighted"], True),
+             _fall(summary.loc[k]), _band(summary.loc[k])] for k in ["portfolio", *shown]]  # fmt: skip
+    headers = ["Comparator", "Volatility", "Return, time-weighted", "Worst fall", "Band chance alone produces, points"]
+    table = _table(headers, rows, numeric=tuple(headers[1:]))
+    return traces, layout, table
+
+
+def _pane_chart(cid: str, daily: pd.DataFrame, keys) -> tuple:
+    """The cumulative difference of each comparator to the portfolio over time, in points; zero is the portfolio."""
+    traces, annotations, rows = [], [], []
+    dates = list(daily["date"])
+    for k in keys:
+        gap = daily[f"growth_{k}"] - daily["growth_portfolio"]
+        role = COMPARATOR_ROLE[k]
+        traces.append({"type": "scatter", "mode": "lines", "name": COMPARATOR_NAME[k][1], "x": dates,
+                       "y": [fmt.rounded(v, 2) for v in gap], "line": {"color": role, "width": 2,
+                       "dash": "dot" if k == "reference_b" else "solid"},
+                       **_hover([f"{fmt.day_words(d)}<br>{COMPARATOR_NAME[k][1]}: {_points(v / 100)}" for d, v in zip(dates, gap)])})  # fmt: skip
+        ends = {round(float((daily[f"growth_{j}"] - daily["growth_portfolio"]).iloc[-1]), 2) for j in keys}
+        if len(keys) > 1:
+            label = COMPARATOR_NAME[k][1]
+            if len(ends) == 1:  # every line ends at the same point, so one label names them all
+                if k != keys[0]:
+                    continue
+                label = _and([COMPARATOR_NAME[j][1] for j in keys])
+            annotations.append({**_label(dates[-1], fmt.rounded(gap.iloc[-1], 2), label, role=role), "xshift": 6})
+    for i, (_, r) in enumerate(daily.iterrows()):
+        rows.append([_start_label(r["date"], i)] + [_points((r[f"growth_{k}"] - r["growth_portfolio"]) / 100) for k in keys])
+    wide, narrow = _date_axes(daily["date"])
+    layout = {"showlegend": len(keys) == 1, "yaxis": {"title": {"text": "Points, comparator minus the portfolio"}}, **wide,
+              "shapes": [_hline(0, "@ink")], "annotations": annotations, "margin": {"r": 64 if len(keys) > 1 else 24}}  # fmt: skip
+    headers = ["Date"] + [COMPARATOR_NAME[k][1] for k in keys]
+    table = _table(headers, rows, numeric=tuple(headers[1:]))
+    chart = {"id": cid, "view": "comparisons", "traces": traces, "layout": layout,
+             "layout_narrow": {**narrow, "yaxis": {"title": {"text": "Points"}}}}  # fmt: skip
+    return chart, table
+
+
+def _effects(summary: pd.DataFrame, effects: pd.DataFrame, keys: list) -> tuple:
+    """The waterfall from the portfolio's money-weighted return through each effect to the comparator's, one per
+    comparator, and the table of every comparator's effects."""
+    record = effects[effects["period"] == "record"].pivot(index="comparator", columns="effect", values="value")
+    order = list(comparisons_module.EFFECTS)
+    start = summary.loc["portfolio", "return_money_weighted"] * 100
+    traces = []
+    for i, k in enumerate(keys):
+        values = [record.loc[k, e] * 100 for e in order]
+        bases, level = [], start
+        for v in values:
+            bases.append(level if v >= 0 else level + v)
+            level += v
+        end = summary.loc[k, "return_money_weighted"] * 100
+        labels = ["The portfolio, money-weighted"] + [EFFECT_NAME[e] for e in order] + [f"{COMPARATOR_NAME[k][1]}, money-weighted"]
+        x = [abs(start)] + [abs(v) for v in values] + [abs(end)]
+        base = [min(0.0, start)] + bases + [min(0.0, end)]
+        colours = ["@accent"] + ["@cost_2" if v >= 0 else "@cost_3" for v in values] + ["@accent"]
+        text = [fmt.pct(start / 100, True)] + [_points(v / 100, 2) for v in values] + [fmt.pct(end / 100, True)]
+        traces.append({"type": "bar", "orientation": "h", "name": COMPARATOR_NAME[k][1], "y": labels,
+                       "x": [fmt.rounded(v, 4) for v in x], "base": [fmt.rounded(v, 4) for v in base],
+                       "marker": {"color": colours}, "visible": i == 0, "width": 0.6,
+                       **_hover([f"{label}: {t}" for label, t in zip(labels, text)])})  # fmt: skip
+    layout = {"barmode": "overlay", "yaxis": {"type": "category", "autorange": "reversed"},
+              "xaxis": {"title": {"text": "Per cent, and points for each effect"}}, "shapes": [_vline(0, "@ink")],
+              "margin": {"t": 8}}  # fmt: skip
+    columns = [""] + [COMPARATOR_NAME[k][1] for k in keys]
+    rows = [["The portfolio, money-weighted"] + [fmt.pct(start / 100, True)] * len(keys),
+            ["The portfolio, time-weighted"] + [fmt.pct(summary.loc["portfolio", "return_time_weighted"], True)] * len(keys)]
+    rows += [[EFFECT_NAME[e]] + [_points(record.loc[k, e], 2) for k in keys] for e in order]
+    rows += [["The comparator, time-weighted"] + [fmt.pct(summary.loc[k, "return_time_weighted"], True) for k in keys],
+             ["The comparator, money-weighted"] + [fmt.pct(summary.loc[k, "return_money_weighted"], True) for k in keys],
+             ["Difference, time-weighted, points"] + [_diff(summary.loc[k, "difference"]) for k in keys],
+             ["Band chance alone produces, points"] + [_band(summary.loc[k]) for k in keys],
+             ["The comparator's volatility"] + [fmt.pct(summary.loc[k, "volatility"]) for k in keys],
+             ["The comparator's worst fall"] + [_fall(summary.loc[k]) for k in keys]]
+    table = _table(columns, rows, numeric=tuple(columns[1:]), wrap_first=True, wrap_head=True)
+    # Seven comparators side by side: a band and its words wrap within the cell.
+    table = table.replace('<table class="wrapfirst headwrap">', '<table class="wrapfirst headwrap cellwrap">', 1)
+    return traces, layout, table
+
+
+def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: pd.DataFrame) -> None:
+    """The record beside its comparators: the summary table, the differences and the risk ladder, then the panes."""
+    if not len(summary):
+        return
+    summary = summary.set_index("comparator")
+    portfolio = summary.loc["portfolio"]
+    days = int(portfolio["periods"])
+    as_of = portfolio["last_day"]
+    shown = [k for k in summary.index if k != "portfolio" and not pd.isna(summary.loc[k, "band"])]
+    rows = []
+    for key in summary.index:
+        r = summary.loc[key]
+        rows.append([COMPARATOR_NAME[key][0], fmt.pct(r["return_time_weighted"], True), fmt.pct(r["volatility"]),
+                     _fall(r), _diff(r["difference"]), _band(r), _window(r.to_dict() | {"comparator": key})])  # fmt: skip
+    columns = ["Comparator", "Return, time-weighted", "Volatility", "Worst fall", "Difference, points",
+               "Band chance alone produces, points", "Window"]  # fmt: skip
+    table = _table(columns, rows, numeric=tuple(columns[1:6]), wrap_first=True, wrap_head=True)
+    bench_note = ("The benchmark has values at month ends only, because the bond index has no public daily series. Its "
+                  "return runs from the first month end and is shown from the second, and its volatility, worst fall, "
+                  "correlation, difference and band come from monthly values times the square root of 12 and are shown "
+                  f"from the sixth month end, since a tracking error from fewer monthly differences is not an estimate.")  # fmt: skip
+    notes = ("In euro, on the same contributions on the same days, at the issuers' net asset values or the published "
+             "rate. The comparators carry no costs, and the portfolio's costs are in the Costs part. Returns since the first "
+             "purchase are cumulative and not annualised. Differences are the comparator's return minus the portfolio's, "
+             "in percentage points.", BAND_NOTE, bench_note, CHANCE.format(days=days))  # fmt: skip
+    page.add("comparisons", _card("comparisons", "The portfolio and its comparators since the first purchase",
+             _asof(as_of), "outputs/comparisons.csv", plot=False, kind="table", wide=True,
+             extra=table + "".join(f'<p class="note">{_esc(n)}</p>' for n in notes)))  # fmt: skip
+
+    traces, layout, diff_table = _differences(summary, shown)
+    diff_card = _card("comparisons-differences", "The difference of each comparator to the portfolio, and its band",
+                      _asof(as_of, "Points, comparator minus the portfolio"), "outputs/comparisons.csv", table=diff_table,
+                      height=40 * len(shown) + 90,
+                      note="The navy bar is the difference and the light bar the band chance alone produces over the same "
+                           "span, centred on zero. The benchmark joins at the sixth month end.")  # fmt: skip
+    traces_l, layout_l, ladder_table = _ladder(summary, shown)
+    ladder_card = _card("comparisons-ladder", "Volatility against return since the first purchase",
+                        _asof(as_of), "outputs/comparisons.csv", table=ladder_table, height=340,
+                        note=("The splits under the same rules lie on one line through reference portfolio A, which is 70/30. "
+                              "The benchmark joins at the sixth month end. " + CHANCE.format(days=days)))  # fmt: skip
+    page.add("comparisons", f'<div class="wide ch-pair">{diff_card}{ladder_card}</div>')
+    page.charts += [{"id": "comparisons-differences", "view": "comparisons", "traces": traces, "layout": layout,
+                     "layout_narrow": {"xaxis": {"title": {"text": "Points"}}}},
+                    {"id": "comparisons-ladder", "view": "comparisons", "traces": traces_l, "layout": layout_l,
+                     "layout_narrow": {"xaxis": {"title": {"text": "Volatility, per cent"}},
+                                       "yaxis": {"title": {"text": "Return, per cent"}}}}]  # fmt: skip
+
+    panes = []
+    pane_notes = {
+        "same_rules": ("Reference portfolio A follows the rules at net asset value without costs, so its difference to the "
+                       "portfolio is the implementation cost with the opposite sign. Reference portfolio B goes back to "
+                       "70/30 on every cycle day, so its difference to reference portfolio A is the drift effect. "
+                       "The benchmark joins this pane at the sixth month end."),
+        "other_funds_or_splits": ("The same two ETFs at other target weights, under rules 3 to 6 with the band of rule 5 "
+                                  "five points either side of each target, which never binds for 100/0."),
+        "bank": ("The contributions held at the euro short-term rate, compounded daily on calendar days at the rate over "
+                 "360. Its volatility comes from interest landing in three-day steps over weekends, and its correlation "
+                 "with the portfolio is not shown, since the rate barely moves from day to day."),
+    }  # fmt: skip
+    for pane, headline, keys, cid in PANES:
+        chart, chart_table = _pane_chart(cid, daily, keys)
+        card = _card(cid, f"{headline}: the difference to the portfolio over time", _asof(as_of, "Points, comparator minus the portfolio"),
+                     ("outputs/comparisons_daily.csv", "outputs/comparisons.csv"), table=chart_table, wide=True,
+                     height=300, note=(pane_notes[pane], BAND_NOTE), extra=_comparison_rows(summary, keys))  # fmt: skip
+        page.charts.append(chart)
+        panes.append(f'<details class="ch-pane"><summary>{_esc(headline)}</summary><div class="ch-pane__body">{card}</div></details>')
+
+    keys = [k for k in summary.index if k not in ("portfolio", "benchmark")]
+    traces_w, layout_w, effects_table = _effects(summary, effects, keys)
+    default = keys.index("split_100_0") if "split_100_0" in keys else 0
+    for i, t in enumerate(traces_w):
+        t["visible"] = i == default
+    options = "".join(f'<option value="{i}"{" selected" if i == default else ""}>{_esc(COMPARATOR_NAME[k][1])}</option>'
+                      for i, k in enumerate(keys))  # fmt: skip
+    select = (f'<p class="ch-select"><label for="comparisons-effects-select">Comparator</label> '
+              f'<select id="comparisons-effects-select" data-chart="comparisons-effects">{options}</select></p>')  # fmt: skip
+    effect_notes = (
+        "Each difference is split into effects computed day by day, summed by month and then over the months. Implementation "
+        "is reference portfolio A's return minus the portfolio's. Drift is reference portfolio B's return minus reference "
+        "portfolio A's. Split is the difference in the equity share of the invested part times the equity fund's return in "
+        "US dollars minus the bond fund's return, and the dollar is the same difference times the gap between the equity "
+        "fund's return in euro and in US dollars, at the ECB's reference rates, so the two sum to the split in euro. The "
+        "fund's other currencies stay inside its dollar return. Cash is the difference in cash weight times the return of "
+        "the invested part. For savings, bonds against the rate is the invested part's bond return against the rate.",
+        "Timing of contributions is the comparator's money-weighted return minus its time-weighted return, less the "
+        "portfolio's. Compounding is the difference of the cumulative returns minus the sum of the daily effects. An "
+        "effect that does not apply to a comparator is zero: drift applies to reference portfolio B only, and bonds "
+        "against the rate to savings only. Effects are in percentage points to two decimals, since most are below a "
+        "tenth of a point over the record's months. The table carries each comparator's difference, band, volatility and "
+        "worst fall beside its effects.")  # fmt: skip
+    card = _card("comparisons-effects", "Where each difference came from: from the portfolio's money-weighted return to "
+                 "the comparator's", _asof(as_of), ("outputs/comparison_effects.csv", "outputs/comparisons.csv"),
+                 table=None, wide=True, height=420, note=effect_notes,
+                 extra=effects_table + f'<p class="rounding">{ROUNDING.replace("100 per cent", "the difference")}</p>')  # fmt: skip
+    card = card.replace('<div class="plot"', select + '<div class="plot"', 1)
+    page.charts.append({"id": "comparisons-effects", "view": "comparisons", "traces": traces_w, "layout": layout_w,
+                        "select": "comparisons-effects-select", "layout_narrow": {"xaxis": {"title": {"text": "Per cent and points"}}}})  # fmt: skip
+    panes.append('<details class="ch-pane"><summary>Where each difference came from</summary>'
+                 f'<div class="ch-pane__body">{card}</div></details>')
+    page.add("comparisons", f'<div class="wide ch-panes">{"".join(panes)}</div>')
 
 
 # Contributions -------------------------------------------------------------------------------------
@@ -1224,7 +1558,8 @@ def _cost_of_ownership(page, costs, implementation, monthly, orders, now=None):
     if len(data):
         latest = float(data["implementation_cost_bps"].iloc[-1])
         impl = (f"Beside them, the implementation cost of {_ref('c8')} is {fmt.bps(latest)}, cumulative since "
-                f"{fmt.day_words(data['date'].iloc[0])} and positive when the portfolio trails reference portfolio A. ")
+                f"{fmt.day_words(data['date'].iloc[0])}, positive when the portfolio's value is below reference portfolio A's "
+                "and negative when it is above. ")
         against = (orders["price_against_nav"].fillna("").astype(str) if len(orders) and "price_against_nav" in orders
                    else pd.Series(dtype=str))  # fmt: skip
         valued = against[against.isin(["below", "above", "at"])]
@@ -1234,8 +1569,6 @@ def _cost_of_ownership(page, costs, implementation, monthly, orders, now=None):
                      else "the one order valued so far was")  # fmt: skip
             impl += (f"It is negative because {which} executed below its day's net asset value ({_ref('c7')}). An order "
                      "fills at a price during the day and the net asset value is set at the close, so the gap can go either way. ")
-        elif round(latest) < 0:
-            impl += "It is negative while the portfolio is ahead of reference portfolio A. "
         pending = _after_record(orders, now)
         if pending:
             impl += f"{pending} "
@@ -1280,8 +1613,8 @@ def _attribution(page, attribution, as_of):
     page.add("factors", _card("attribution", "The difference to the index blend in three parts",
              f"{_span(r['period_start'], r['period_end'])}, {int(r['months'])} months", "outputs/attribution.csv",
              plot=False, wide=True, kind="table", note="Differences of the returns over the period, so the three parts sum to the total. The "
-             f"first part is negative when the portfolio trails reference portfolio A, where the implementation cost of {_ref('c8')} "
-             "is positive.").replace('<p class="note">', table + '<p class="note">', 1))  # fmt: skip
+             f"first part is negative when the portfolio's value is below reference portfolio A's and positive when it is above, "
+             f"the opposite sign to the implementation cost of {_ref('c8')}.").replace('<p class="note">', table + '<p class="note">', 1))  # fmt: skip
 
 
 # Factor exposures ----------------------------------------------------------------------------------
@@ -1365,7 +1698,7 @@ def factor_view(page, loadings, rolling, as_of):
 # Method --------------------------------------------------------------------------------------------
 
 
-def _allocation_curve(page, allocation: pd.DataFrame):
+def _allocation_curve(page, allocation: pd.DataFrame, us: pd.DataFrame = None):
     """The allocation test as the curve of the splits: growth per year against the worst fall, one point per split."""
     splits = list(allocation["split"])
     x = [fmt.rounded(v * 100, 2) for v in allocation["worst_fall"]]
@@ -1378,8 +1711,27 @@ def _allocation_curve(page, allocation: pd.DataFrame):
               {"type": "scatter", "mode": "markers", "name": "70/30, held", "showlegend": False,
                "x": [v for v, h in zip(x, held) if h], "y": [v for v, h in zip(y, held) if h],
                "marker": {"size": 13, "color": "@accent"}, **_hover([t for t, h in zip(hover, held) if h])}]  # fmt: skip
+    us = us if us is not None and len(us) else None
+    if us is not None:
+        # The same test on the US stock market in euro: the second curve of the ladder, 70/30 marked on it as well.
+        ux = [fmt.rounded(v * 100, 2) for v in us["worst_fall"]]
+        uy = [fmt.rounded(v * 100, 2) for v in us["growth_per_year"]]
+        uhover = [f"US series, {s}: worst fall {fmt.pct(f)}, growth per year {fmt.pct(g)}"
+                  for s, f, g in zip(us["split"], us["worst_fall"], us["growth_per_year"])]  # fmt: skip
+        at = list(us["split"]).index("70/30") if "70/30" in list(us["split"]) else None
+        traces.append({"type": "scatter", "mode": "lines+markers", "name": "US series", "x": ux, "y": uy,
+                       "showlegend": False, "line": {"color": "@us_series", "width": 2},
+                       "marker": {"size": 7, "color": "@us_series"}, **_hover(uhover)})  # fmt: skip
+        if at is not None:
+            traces.append({"type": "scatter", "mode": "markers", "name": "70/30 on the US series", "showlegend": False,
+                           "x": [ux[at]], "y": [uy[at]], "marker": {"size": 12, "color": "@us_series",
+                           "line": {"color": "@surface", "width": 2}}, **_hover([uhover[at]])})  # fmt: skip
     annotations = [_label(35, 1, "35%", yref="paper", anchor="right", role="@status_breach", xshift=-4, yshift=8),
                    _label(40, 1, "40%", yref="paper", anchor="left", role="@status_breach", xshift=4, yshift=8)]  # fmt: skip
+    if us is not None:
+        last = len(ux) - 1
+        annotations += [_label(x[-1], y[-1], "Global", anchor="left", role="@ink2", xshift=8, yshift=-10),
+                        _label(ux[last], uy[last], "US", anchor="left", role="@us_series", xshift=8, yshift=-10)]  # fmt: skip
     for split, anchor, shift in (("40/60", "left", 10), ("70/30", "right", -10), ("100/0", "right", -10)):
         if split in splits:
             i = splits.index(split)
@@ -1391,12 +1743,25 @@ def _allocation_curve(page, allocation: pd.DataFrame):
               "margin": {"t": 24}}  # fmt: skip
     rows = [[r["split"], fmt.pct(r["worst_fall"]), fmt.pct(r["growth_per_year"]), r["within_limit"], r["chosen"]]
             for _, r in allocation.iterrows()]  # fmt: skip
-    table = _table(["Split", "Worst fall", "Growth per year", "Within 35%", "Held"], rows, numeric=("Worst fall", "Growth per year"))
-    page.add("method", _card("c21", "The allocation test: growth per year against the worst fall of each split",
+    headers = ["Split", "Worst fall", "Growth per year", "Within 35%", "Held"]
+    numeric = ("Worst fall", "Growth per year")
+    title = "The allocation test: growth per year against the worst fall of each split"
+    source = "mandate/allocation_check_results.csv"
+    note = ("The split held is the largest equity target weight whose worst fall stayed within 35 per cent. With "
+            "two assets every split lies on this curve, and the limit picks the point.")  # fmt: skip
+    if us is not None:
+        by_split = us.set_index("split")
+        rows = [r + [fmt.pct(by_split.loc[r[0], "worst_fall"]), fmt.pct(by_split.loc[r[0], "growth_per_year"])] for r in rows]
+        headers += ["Worst fall, US series", "Growth per year, US series"]
+        numeric += ("Worst fall, US series", "Growth per year, US series")
+        title += ", on the global and the US equity series"
+        source = (source, "mandate/allocation_check_us_results.csv")
+        note += (" The second curve, in teal, repeats the test with the US stock market in euro in place of the global "
+                 "equity series, with the same bonds, band rule, splits and months.")  # fmt: skip
+    table = _table(headers, rows, numeric=numeric)
+    page.add("method", _card("c21", title,
              "Monthly euro returns, February 1999 to December 2025, rebalanced by the band, splits from 40/60 to 100/0",
-             "mandate/allocation_check_results.csv", table=table, wide=True, height=360, anchor="method-allocation",
-             note="The split held is the largest equity target weight whose worst fall stayed within 35 per cent. With "
-                  "two assets every split lies on this curve, and the limit picks the point."),
+             source, table=table, wide=True, height=360, anchor="method-allocation", note=note),
              {"id": "c21", "traces": traces, "layout": layout})  # fmt: skip
 
 
@@ -1451,7 +1816,7 @@ def _controls(page, controls: pd.DataFrame):
 def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: str, sources: pd.DataFrame,
            bootstrap: pd.DataFrame, correlation: tuple = (pd.DataFrame(), pd.DataFrame()),
            controls: pd.DataFrame = pd.DataFrame(), not_done: dict = None):  # fmt: skip
-    _allocation_curve(page, allocation)
+    _allocation_curve(page, allocation, (not_done or {}).get("us_test"))
     if len(bootstrap):
         _bootstrap(page, bootstrap)
     if any(len(c) for c in correlation):
@@ -2186,7 +2551,8 @@ def terms() -> list:
 # Each view opens with the question it answers.
 VIEW_LEADS = {
     "overview": "Where the portfolio stands against its rules.",
-    "performance": "What the portfolio has returned since the first purchase, what was paid in and what running it costs.",
+    "performance": "What the portfolio has returned since the first purchase, how that sets against its comparators, "
+                   "what was paid in and what running it costs.",
     "portfolio": "What the portfolio holds, and how the rules keep the equity weight in its band.",
     "risk": "How far the portfolio could fall, estimated on index returns and simulated under the rules.",
     "method": "How the split and the two ETFs were chosen, the terms the dashboard uses, and the record of each month.",
@@ -2196,6 +2562,8 @@ VIEW_LEADS = {
 def _part_leads() -> dict:
     """The line under each part's heading, as HTML, some with links to the part's sections."""
     leads = {
+        "comparisons": _esc("The record beside comparators that receive the same contributions on the same days, each "
+                            "with its volatility, its worst fall and the band chance alone produces over the same span."),
         "contributions": _esc("Money paid in against gains and losses, in units of the starting amount."),
         "costs": _esc("What running the portfolio costs, measured against reference portfolio A, which follows the same "
                       "rules at net asset value without costs."),
@@ -2288,6 +2656,8 @@ def build(out_dir: Path = None) -> Path:
     _cost_of_ownership(page, out.get("cost_of_ownership.csv", pd.DataFrame()), out["implementation_cost.csv"], monthly, orders,
                        now_row)  # fmt: skip
     contributions(page, daily, monthly)
+    comparisons_part(page, out.get("comparisons.csv", pd.DataFrame()), out.get("comparisons_daily.csv", pd.DataFrame()),
+                     out.get("comparison_effects.csv", pd.DataFrame()))
     lookthrough(page, out)
     risk_view(page, out, _read("simulation_bootstrap.csv", config.ROOT / "mandate"), monthly)
     factor_view(page, out["factor_loadings.csv"], out["factor_rolling.csv"], daily["date"].iloc[-1])

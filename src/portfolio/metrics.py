@@ -171,7 +171,7 @@ def daily(
     out["contributions_in_units"] = values["contributions_eur"].reindex(out.index) / start * 100
     out.loc[base, "contributions_in_units"] = 100.0
     ref = out["growth_reference_a"]
-    # Reference portfolio A's value relative to the portfolio's, positive when the portfolio trails.
+    # Reference portfolio A's value relative to the portfolio's, positive when the portfolio's value is below A's.
     out["implementation_cost_bps"] = (ref / out["growth_portfolio"] - 1) * 1e4
     out.index.name = "date"
     return out.sort_index()
@@ -525,7 +525,7 @@ def sleeve_correlation(navs_eur: pd.DataFrame, months: int = 36) -> pd.DataFrame
 def attribution(daily: pd.DataFrame, months: int = 12) -> pd.DataFrame:
     """The difference to the index blend in three parts that sum to it, from the first month end of the index
     blend to its last, once twelve months lie between: the portfolio against reference portfolio A (negative
-    when the portfolio trails, as the implementation cost is then positive), the drift effect (reference A
+    when the portfolio's value is below A's, as the implementation cost is then positive), the drift effect (reference A
     against reference B, the weights left to drift inside the band against restored on every cycle day) and
     the tracking difference of the two ETFs with the day mismatch (reference B against the index blend). Each
     is a difference of returns over the period, in shares."""

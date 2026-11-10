@@ -15,6 +15,9 @@ come first and the top-up waits for the next cycle day.
 
 Amounts are in euro, rounded down to the cent so that purchases never exceed the cash. An order below
 the broker's minimum of one euro is not placed, and its cash waits for the next cycle day.
+
+The target weights and the band are the rules' own unless a caller passes others: the comparisons run the same
+rules around other splits.
 """
 
 from __future__ import annotations
@@ -59,10 +62,11 @@ def _cents_down(x: float) -> float:
     return math.floor(round(x * 100, 6)) / 100
 
 
-def rule_4(values: dict, cash: float) -> dict:
+def rule_4(values: dict, cash: float, target: dict = None) -> dict:
     """Purchases with the cash, by sleeve, in euro (before rounding)."""
+    target = target or config.TARGET
     total = values[E] + values[B] + cash
-    shortfall = {s: config.TARGET[s] * total - values[s] for s in config.SLEEVES}
+    shortfall = {s: target[s] * total - values[s] for s in config.SLEEVES}
     buys = {s: 0.0 for s in config.SLEEVES}
     remaining = cash
     for sleeve in sorted(config.SLEEVES, key=lambda s: shortfall[s], reverse=True):
@@ -72,20 +76,21 @@ def rule_4(values: dict, cash: float) -> dict:
     return buys
 
 
-def rule_5(values: dict, cash: float, invest_cash: bool = True) -> dict:
+def rule_5(values: dict, cash: float, invest_cash: bool = True, target: dict = None, band: tuple = None) -> dict:
     """Band orders by sleeve, in euro (purchases positive, sales negative), or zeros inside the band.
 
     The equity weight counts the cash not yet invested in the value of the portfolio, as RULES.md defines
     a weight. When the top-up waits under rule 6 (invest_cash False), the band orders bring the two ETFs
     to 70/30 of their combined value and the cash stays for the next cycle day.
     """
+    target = target or config.TARGET
     total = values[E] + values[B] + cash
     weight = values[E] / total
-    low, high = config.BAND
+    low, high = band or config.BAND
     if low <= weight <= high:
         return {s: 0.0 for s in config.SLEEVES}
     base = total if invest_cash else values[E] + values[B]
-    return {s: config.TARGET[s] * base - values[s] for s in config.SLEEVES}
+    return {s: target[s] * base - values[s] for s in config.SLEEVES}
 
 
 def _orders(top_up: dict, band: dict, cash: float) -> list:
@@ -113,13 +118,16 @@ def _orders(top_up: dict, band: dict, cash: float) -> list:
     return orders
 
 
-def plan(equity_eur: float, bonds_eur: float, cash_eur: float, orders_used_this_month: int = 0) -> Plan:
-    """The cycle day's orders from the values at the last net asset values and the cash not yet invested."""
+def plan(equity_eur: float, bonds_eur: float, cash_eur: float, orders_used_this_month: int = 0, target: dict = None,
+         band: tuple = None) -> Plan:  # fmt: skip
+    """The cycle day's orders from the values at the last net asset values and the cash not yet invested. target and
+    band, when given, replace the rules' 70/30 and its band, for the comparisons."""
     before = {E: equity_eur, B: bonds_eur, "cash": cash_eur}
     values = {E: equity_eur, B: bonds_eur}
-    top_up = rule_4(values, cash_eur)
+    limits = band
+    top_up = rule_4(values, cash_eur, target)
     after_4 = {s: values[s] + top_up[s] for s in config.SLEEVES}
-    band = rule_5(after_4, cash_eur - sum(top_up.values()))
+    band = rule_5(after_4, cash_eur - sum(top_up.values()), target=target, band=limits)
     notes = []
     orders = _orders(top_up, band, cash_eur)
     small = [o for o in orders if o.amount_eur < config.MIN_ORDER_EUR]
@@ -133,7 +141,7 @@ def plan(equity_eur: float, bonds_eur: float, cash_eur: float, orders_used_this_
     top_up_waits = False
     if len(orders) > left:
         top_up_waits = True
-        band_only = rule_5(values, cash_eur, invest_cash=False)
+        band_only = rule_5(values, cash_eur, invest_cash=False, target=target, band=limits)
         orders = [
             o
             for o in _orders({s: 0.0 for s in config.SLEEVES}, band_only, 0.0)

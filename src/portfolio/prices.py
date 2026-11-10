@@ -5,7 +5,8 @@ Sources, all published by the issuers or by the European Central Bank:
     the daily net asset value in US dollars since 2011-10-21).
   - Vanguard: the daily net asset value of IE00BH04GL39 in euro, from the data service behind
     vanguard.co.uk.
-  - ECB: the euro reference rate against the US dollar (dataset EXR), daily.
+  - ECB: the euro reference rate against the US dollar (dataset EXR), daily, and the euro short-term rate
+    (dataset EST), daily, for the savings comparator.
   - HSBC: the daily net asset value of IE000JZ473P7 in US dollars, the fund of the S&P 500 alternative, from
     the price history on its page at assetmanagement.hsbc.co.uk.
 Files are cached locally, never committed and never redistributed. cache/sources.json records each
@@ -36,6 +37,7 @@ ISHARES_DOCUMENT = (
 VANGUARD_SERVICE = "https://www.vanguard.co.uk/gpx/graphql"
 VANGUARD_PORT_ID = "9591"
 ECB_USD_PER_EUR = "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?format=csvdata"
+ECB_ESTR = "https://data-api.ecb.europa.eu/service/data/EST/B.EU000A2X2A25.WT?format=csvdata"
 HSBC_SITE = "https://www.assetmanagement.hsbc.co.uk"
 HSBC_FUND_PAGE = HSBC_SITE + "/en/individual-investor/funds/{isin}"
 HSBC_EXCHANGE = "XLON"  # the listing whose base-currency price history the page shows as the net asset value
@@ -159,6 +161,18 @@ def parse_ecb(path: Path) -> pd.Series:
         name="usd_per_eur",
     )
     return series.sort_index()
+
+
+def parse_estr(path: Path) -> pd.Series:
+    """The ECB's euro short-term rate, volume-weighted, in per cent a year, by the day it applies to."""
+    frame = pd.read_csv(path, usecols=["TIME_PERIOD", "OBS_VALUE"]).dropna()
+    return pd.Series(frame["OBS_VALUE"].astype(float).values, index=pd.to_datetime(frame["TIME_PERIOD"]),
+                     name="estr").sort_index()  # fmt: skip
+
+
+def load_estr(refresh: bool = False, cache_dir: Path = config.CACHE_DIR) -> pd.Series:
+    """The euro short-term rate, from the cache or freshly downloaded."""
+    return parse_estr(fetch("ecb/estr.csv", ECB_ESTR, refresh, cache_dir=cache_dir))
 
 
 def _hsbc_post(path: str, body, component: str, token: str = None) -> str:

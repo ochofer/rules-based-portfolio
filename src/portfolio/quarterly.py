@@ -406,7 +406,7 @@ class Issue:
                  f"{int(r['orders_since_start'])} of {int(r['allowance_since_start'])}"]]  # fmt: skip
         caption = ("The quarter and the record since the first purchase, to the last valuation day of the quarter, in per "
                    "cent unless stated. The worst fall is in per cent below the previous peak, and the implementation cost "
-                   "is positive when the portfolio trails reference portfolio A.")  # fmt: skip
+                   "is positive when the portfolio's value is below reference portfolio A's and negative when it is above.")  # fmt: skip
         return Exhibit("table", f"Key figures, {self.period_words()}", caption,
                        _table(["", "The quarter", "Since the first purchase"], rows),
                        ("outputs/quarters.csv",), "Real money. Time-weighted unless stated, net of trading costs, not "

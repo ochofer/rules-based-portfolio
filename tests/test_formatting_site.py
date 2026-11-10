@@ -200,7 +200,9 @@ def test_the_cost_sentence_reads_each_order_against_its_own_day_and_names_the_la
     assert "The order of 5 November 2026 came after the last net asset values" in text
     assert "the net asset value is set at the close, so the gap can go either way" in text
     text = _ownership_text(["below", "above", ""], now)
-    assert "It is negative while the portfolio is ahead of reference portfolio A." in text and "valued so far" not in text
+    assert ("positive when the portfolio&#x27;s value is below reference portfolio A&#x27;s and negative when it is above."
+            in text or "positive when the portfolio's value is below reference portfolio A's and negative when it is above." in text)
+    assert "valued so far" not in text and "ahead" not in text and "trails" not in text
     assert ">Cash<" not in text
     # Cash not yet invested has its own row, so the weights add up to the portfolio.
     text = _ownership_text(["below", "below", ""], now, invested=0.952)

@@ -49,11 +49,15 @@ def _cycle_days(first: date, last: date) -> list:
     return out
 
 
-def simulate(ledger: Ledger, navs_eur: pd.DataFrame, end: date, mode: str) -> pd.DataFrame:
+def simulate(ledger: Ledger, navs_eur: pd.DataFrame, end: date, mode: str, target: dict = None,
+             band: tuple = None) -> pd.DataFrame:  # fmt: skip
     """Daily values in euro of a reference portfolio: mode "rules" for A, "calendar" for B.
 
-    Returns one row per valuation day from the first purchase: units of each sleeve, cash and value.
+    target and band, when given, replace 70/30 and its band, so that the same rules run around another split
+    for the comparisons. Returns one row per valuation day from the first purchase: units of each sleeve, cash
+    and value.
     """
+    target = target or config.TARGET
     if mode not in ("rules", "calendar"):
         raise ValueError(mode)
     contributions = ledger.contributions
@@ -76,7 +80,7 @@ def simulate(ledger: Ledger, navs_eur: pd.DataFrame, end: date, mode: str) -> pd
         if previous is None:
             amount = float(start["amount_eur"])
             for sleeve in (E, B):
-                units[sleeve] += amount * config.TARGET[sleeve] / unit_value.loc[day, sleeve]
+                units[sleeve] += amount * target[sleeve] / unit_value.loc[day, sleeve]
         cash += sum(a for d, a in flows if (previous is None or d > previous) and d <= day)
         for cycle, execution in cycles:
             if execution != day:
@@ -85,11 +89,11 @@ def simulate(ledger: Ledger, navs_eur: pd.DataFrame, end: date, mode: str) -> pd
             before = navs_eur.loc[:last_close, [E, B]].iloc[-1]
             values = {s: units[s] * before[s] for s in (E, B)}
             if mode == "rules":
-                plan = rules_engine.plan(values[E], values[B], cash)
+                plan = rules_engine.plan(values[E], values[B], cash, target=target, band=band)
                 signed = {o.sleeve: (o.amount_eur if o.side == "buy" else -o.amount_eur) for o in plan.orders}
             else:
                 total = values[E] + values[B] + cash
-                signed = {s: config.TARGET[s] * total - values[s] for s in (E, B)}
+                signed = {s: target[s] * total - values[s] for s in (E, B)}
             for sleeve, amount in signed.items():
                 units[sleeve] += amount / unit_value.loc[day, sleeve]
                 cash -= amount

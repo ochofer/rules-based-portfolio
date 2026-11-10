@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import config, factors, ledger as ledger_module, lookthrough, metrics, positions, prices, risk
+from . import comparisons, config, factors, ledger as ledger_module, lookthrough, metrics, positions, prices, risk
 from . import references, valuations
 
 E, B = config.EQUITY, config.BONDS
@@ -79,6 +79,8 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
                                   metrics.start_amount(records), base)  # fmt: skip
     blend = references.index_blend(growth.iloc[1:], msci, bond_month, today)
     table = metrics.daily(records, values, ref_a, ref_b, blend, base, alternative)
+    rate = prices.load_estr(refresh)
+    compared = comparisons.build(records, navs, values, table, ref_a, ref_b, blend, rate, today)
     placed = metrics.orders(records, navs)
     band, issues = metrics.compliance(records, navs, today)
     monthly = metrics.monthly(records, table, values, placed, today)
@@ -123,6 +125,9 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
         written.append(_write(pd.DataFrame(columns=["month"]), "metrics_monthly.csv", as_of, out_dir))
     written.append(_write(costs, "costs_monthly.csv", as_of, out_dir))
     written.append(_write(metrics.quarters(records, table, values, placed, today), "quarters.csv", as_of, out_dir))
+    written.append(_write(compared["summary"], "comparisons.csv", as_of, out_dir))
+    written.append(_write(compared["daily"], "comparisons_daily.csv", as_of, out_dir))
+    written.append(_write(compared["effects"], "comparison_effects.csv", as_of, out_dir))
     impl = table[["implementation_cost_bps"]].dropna().reset_index()
     written.append(_write(impl, "implementation_cost.csv", as_of, out_dir))
     later = records.contributions[records.contributions["moment"].dt.normalize() > positions_day]
@@ -161,8 +166,9 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     checks = _checks(records, navs, look, weights_now, loadings)
     written.append(_write(checks, "checks.csv", as_of, out_dir))
     alt_source = (f"{alt_name}, {alt_isin}, net asset values in US dollars", f"hsbc/{alt_isin}_nav.json", alt_usd.index.max())
+    rate_source = ("ECB, euro short-term rate, volume-weighted", "ecb/estr.csv", rate.index.max())
     sources = _sources(series, msci, equity_as_of, bonds_as_of, latest_sheet.name, daily_factors, vintage,
-                       [alt_source, *risk_sources])  # fmt: skip
+                       [alt_source, rate_source, *risk_sources])  # fmt: skip
     written.append(_write(sources, "sources.csv", as_of, out_dir))
     privacy(records, out_dir)
     return {"as_of": as_of, "files": written}

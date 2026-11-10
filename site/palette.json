@@ -39,6 +39,11 @@
   "cost_3": "#7f98c2",
   "cost_4": "#c5d1e6",
   "us_series": "#12929f",
-  "sp500_alternative": "#12929f"
+  "sp500_alternative": "#12929f",
+  "comparator_1": "#12929f",
+  "comparator_2": "#c8423b",
+  "comparator_3": "#6b45b8",
+  "comparator_4": "#7c9a12",
+  "savings": "#a87b00"
  }
 }
