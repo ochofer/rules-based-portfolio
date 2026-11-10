@@ -157,3 +157,22 @@ def test_the_comparisons_part_on_the_page():
     assert all(charts[c]["view"] == "performance" for c in charts if c.startswith("comparisons"))
     assert sum(t["visible"] for t in charts["comparisons-effects"]["traces"]) == 1
     assert [t["name"] for t in charts["c21"]["traces"]][2] == "US series"
+
+
+def test_the_comparator_funds_are_fixed_with_their_dates_and_the_ranked_ones_are_the_first_offered():
+    from portfolio import config
+
+    funds = references.comparator_funds()
+    assert sorted(set(funds["comparator"])) == ["first_ranked", "lifestrategy_60", "lifestrategy_80", "mag7", "msci_world", "nasdaq100"]
+    assert (funds["fixed_on"] == "2026-11-10").all() and funds["isin"].str.fullmatch(r"[A-Z]{2}[A-Z0-9]{9}\d").all()
+    by = funds.set_index(["comparator", "sleeve"])["isin"]
+    assert by[("first_ranked", "equity")] == "IE00B44Z5B48" and by[("first_ranked", "bonds")] == "IE00BH04GL39"
+    assert by[("lifestrategy_60", "mixed")] == "IE00BMVB5P51" and by[("lifestrategy_80", "mixed")] == "IE00BMVB5R75"
+    mag7 = funds[funds["comparator"] == "mag7"].iloc[0]
+    assert mag7["isin"] == "IE000NFL4BX4" and mag7["series_from"] == "2026-11-04" and mag7["condition"]
+    assert references.first_offered(config.METHOD_DIR / "selection_msci_world.csv")[1] == by[("msci_world", "equity")]
+    assert references.first_offered(config.METHOD_DIR / "selection_nasdaq100.csv")[1] == by[("nasdaq100", "equity")]
+    # The first equity fund of the rules' own ranking is not offered on the account, so it differs from the fund held.
+    ranking = pd.read_csv(config.METHOD_DIR / "selection_tracking_difference.csv").drop_duplicates("isin")
+    first = ranking[(ranking["sleeve"] == "equity") & (ranking["rank"] == 1)].iloc[0]
+    assert first["isin"] == "IE00B44Z5B48" and first["offered_on_the_account"] == "no"

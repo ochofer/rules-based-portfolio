@@ -1,0 +1,19 @@
+sleeve,rank,fund,isin,ter_per_cent,year,tracking_difference_points,average_points,three_full_years,offered_on_the_account,held,factsheet_date
+msci_world,1,State Street SPDR MSCI World UCITS ETF USD Unhedged (Acc),IE00BFY0GT14,0.120,2023,0.170,0.187,yes,yes,no,2026-09-30
+msci_world,1,State Street SPDR MSCI World UCITS ETF USD Unhedged (Acc),IE00BFY0GT14,0.120,2024,0.240,0.187,yes,yes,no,2026-09-30
+msci_world,1,State Street SPDR MSCI World UCITS ETF USD Unhedged (Acc),IE00BFY0GT14,0.120,2025,0.150,0.187,yes,yes,no,2026-09-30
+msci_world,2,HSBC MSCI World UCITS ETF USD (Acc),IE000UQND7H4,0.150,2023,0.350,0.177,yes,yes,no,2025-12-31
+msci_world,2,HSBC MSCI World UCITS ETF USD (Acc),IE000UQND7H4,0.150,2024,0.000,0.177,yes,yes,no,2025-12-31
+msci_world,2,HSBC MSCI World UCITS ETF USD (Acc),IE000UQND7H4,0.150,2025,0.180,0.177,yes,yes,no,2025-12-31
+msci_world,3,UBS Core MSCI World UCITS ETF USD acc,IE00BD4TXV59,0.060,2023,0.000,0.137,yes,yes,no,2026-09-30
+msci_world,3,UBS Core MSCI World UCITS ETF USD acc,IE00BD4TXV59,0.060,2024,0.190,0.137,yes,yes,no,2026-09-30
+msci_world,3,UBS Core MSCI World UCITS ETF USD acc,IE00BD4TXV59,0.060,2025,0.220,0.137,yes,yes,no,2026-09-30
+msci_world,4,iShares Core MSCI World UCITS ETF USD (Acc),IE00B4L5Y983,0.200,2023,0.070,0.057,yes,yes,no,2026-10-31
+msci_world,4,iShares Core MSCI World UCITS ETF USD (Acc),IE00B4L5Y983,0.200,2024,0.030,0.057,yes,yes,no,2026-10-31
+msci_world,4,iShares Core MSCI World UCITS ETF USD (Acc),IE00B4L5Y983,0.200,2025,0.070,0.057,yes,yes,no,2026-10-31
+msci_world,5,Xtrackers MSCI World UCITS ETF 1C,IE00BJ0KDQ92,0.120,2023,,,yes,yes,no,2026-06-30
+msci_world,5,Xtrackers MSCI World UCITS ETF 1C,IE00BJ0KDQ92,0.120,2024,,,yes,yes,no,2026-06-30
+msci_world,5,Xtrackers MSCI World UCITS ETF 1C,IE00BJ0KDQ92,0.120,2025,,,yes,yes,no,2026-06-30
+msci_world,6,Amundi Core MSCI World UCITS ETF Acc,IE000BI8OT95,0.120,2023,,,no,yes,no,2026-06-30
+msci_world,6,Amundi Core MSCI World UCITS ETF Acc,IE000BI8OT95,0.120,2024,,,no,yes,no,2026-06-30
+msci_world,6,Amundi Core MSCI World UCITS ETF Acc,IE000BI8OT95,0.120,2025,0.090,,no,yes,no,2026-06-30

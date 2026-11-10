@@ -32,7 +32,7 @@ On the cycle day, the 5th of each month or the first trading day after it when t
 | `cycles/` | The cycle report of each cycle day, written before the orders, with the line after them. |
 | `notes/` | The monthly note written after each cycle day. |
 | `quarterly/` | The quarterly report: each issue's page, built once from the tables of the commit it names and never rebuilt, the PDF printed from it, the commentary it carries and any errata. |
-| `method/` | The fixed tables the program applies: MSCI's regions, the funds the equity ETF holds, share classes of one company, the ETF selection, the choice of the S&P 500 alternative's ETF and the controls. |
+| `method/` | The fixed tables the program applies: MSCI's regions, the funds the equity ETF holds, share classes of one company, the ETF selection, the choice of the S&P 500 alternative's ETF, the funds of the comparisons with the date each was fixed, and the controls. |
 | `guide/` | The guide to the dashboard: its text, `source.md`, the page built from it with the dashboard, and the PDF printed from that page. |
 | `index.html`, `site/` | The dashboard, the style, script and colour palette it is built with, and the style of the quarterly report. |
 

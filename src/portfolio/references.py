@@ -107,9 +107,27 @@ def alternative_fund(path: Path = None) -> tuple:
     """The fund of the S&P 500 alternative: the first in rank order that the account offers, under the rules'
     selection criteria with the S&P 500 in place of the global index (method/selection_sp500.csv). Returns its
     name and ISIN."""
-    frame = pd.read_csv(path or config.METHOD_DIR / "selection_sp500.csv").drop_duplicates("isin").sort_values("rank")
+    return first_offered(path or config.METHOD_DIR / "selection_sp500.csv")
+
+
+def first_offered(path: Path) -> tuple:
+    """The first fund in rank order that the account offers, in a selection table of method/. Returns its name and
+    ISIN."""
+    frame = pd.read_csv(path).drop_duplicates("isin").sort_values("rank")
     row = frame[frame["offered_on_the_account"] == "yes"].iloc[0]
     return str(row["fund"]), str(row["isin"])
+
+
+def comparator_funds(path: Path = None) -> pd.DataFrame:
+    """The funds of the comparisons, each with its ISIN and the date it was fixed, before any of its values was
+    read (method/comparator_funds.csv). A comparator chosen by ranking must be the first fund its selection table
+    gives, and the build stops otherwise."""
+    frame = pd.read_csv(path or config.METHOD_DIR / "comparator_funds.csv", dtype=str).fillna("")
+    for key, table in (("msci_world", "selection_msci_world.csv"), ("nasdaq100", "selection_nasdaq100.csv")):
+        _, isin = first_offered(config.METHOD_DIR / table)
+        if frame.loc[frame["comparator"] == key, "isin"].tolist() != [isin]:
+            raise ValueError(f"method/comparator_funds.csv: {key} is not the first fund offered in method/{table}")
+    return frame
 
 
 def sp500_alternative(ledger: Ledger, unit_value: pd.Series, end: date) -> pd.DataFrame:
