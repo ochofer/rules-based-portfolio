@@ -421,7 +421,7 @@ TOP_UP_SHARE = 5  # the monthly top-up, per cent of the starting amount (rule 3)
 
 def _key_facts(first_day, costs: pd.DataFrame) -> str:
     """Key facts: the sleeves with the funds' full names, the band, the contributions, the rebalancing, the risk limit,
-    the costs, the valuation, the first purchase and the benchmark, which the portfolio has none of by design."""
+    the costs, the valuation, the first purchase and the benchmark, the index blend."""
     low, high = config.BAND
     held = pd.read_csv(config.METHOD_DIR / "selection_tracking_difference.csv")
     held = held[held["held"] == "yes"].drop_duplicates("sleeve").set_index("sleeve")["fund"]
@@ -441,8 +441,9 @@ def _key_facts(first_day, costs: pd.DataFrame) -> str:
     rows += [("Valuation", "Euro, at the issuers' net asset values"),
              ("First purchase", fmt.day_words(first_day) if first_day is not None else "n/a")]  # fmt: skip
     facts = "".join(f'<div class="ch-fact"><dt>{_esc(a)}</dt><dd>{_esc(b)}</dd></div>' for a, b in rows)
-    facts += ('<div class="ch-fact"><dt>Benchmark</dt><dd>None by design, see the '
-              f'{_link("method-not-done", "Method view")}</dd></div>')  # fmt: skip
+    benchmark = _esc("The 70/30 blend of the two funds' own indices, rebalanced at each month end")
+    facts += (f'<div class="ch-fact"><dt>Benchmark</dt><dd>{benchmark} '
+              f'({_link("method-not-done", "the index blend")})</dd></div>')  # fmt: skip
     return f'<aside class="ch-facts" id="key-facts"><h3>Key facts</h3><dl>{facts}</dl></aside>'
 
 
@@ -591,7 +592,8 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
                   f"{fmt.day_words(blend_points['date'].iloc[0])}, and is drawn once a second month's returns are published")
     asof3 = _asof(daily["date"].iloc[-1] if len(daily) else w_now["weights_as_of"],
                   f"100 is the starting amount before the first order. {blend_text}")  # fmt: skip
-    why = ("<p class=\"note\">Why the portfolio has no optimiser, no index benchmark, no views and no signal: "
+    why = ("<p class=\"note\">Why the portfolio has no optimiser, no single market index as its benchmark, no views "
+           "and no signal: "
            f"{_link('method-not-done', 'Method')}.</p>")
     page.add("growth", _card("c3", "Growth of 100: the portfolio, the two reference portfolios and the index blend",
              asof3, "outputs/portfolio_daily.csv", table=None if empty else table, height=340, wide=True, empty=empty,
@@ -1715,14 +1717,17 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
          "that none of the seven optimising rules it tests earns a higher Sharpe ratio than the equal split at the 5 "
          "per cent level, on any of four sets of assets, over the 261 months since the paper.{n2} The frontier of the two sleeves is in the Risk view ({frontier}). With two assets it is a "
          "line, and the limit picks the point on it."),
-        ("No index benchmark, and why not the S&P 500.",
+        ("The benchmark, and why not the S&P 500.",
          "A benchmark is the portfolio a client would hold without the manager, so that the manager's contribution can "
-         "be measured as the difference and bounded. This portfolio has no client and no manager apart from its rules. "
-         "Its reference portfolios are therefore the rules themselves without costs: reference A, the same "
-         "contributions under the same rules at net asset value, and reference B, the same contributions returned to "
-         "70/30 on every cycle day ({growth}). The gap between the portfolio and reference A is the implementation "
-         "cost, shown under {costs}, and it is the one figure a reader can hold the manager to. The question readers "
-         "ask most is why the portfolio does not simply hold the S&P 500. The global equity fund already holds the "
+         "be measured as the difference and bounded. This portfolio's benchmark is the blend of its two funds' own "
+         "indices at 70/30, rebalanced at each month end, the policy the rules implement. The difference to it is the "
+         "cost of implementing that policy: the funds' costs and tracking differences, the band's drift from 70/30, "
+         "cash waiting for the cycle day, and trading. The rules take no position against the benchmark, so there is "
+         "no active return to claim, and the difference is expected to be small and negative. The two reference "
+         "portfolios split it into its parts: reference A, the same contributions under the same rules at net asset "
+         "value, and reference B, the same contributions returned to 70/30 on every cycle day ({growth}). No single "
+         "market index is the benchmark. The question readers ask most is why the portfolio does not simply hold the "
+         "S&P 500. The global equity fund already holds the "
          "index's companies at about two thirds of its weight, so holding the index alone sells the other third of the "
          "world's listed companies and puts the whole portfolio into one country and one currency. A weight on one "
          "country above its share of the world is a view, and the rules take none. The advice to hold the index alone "

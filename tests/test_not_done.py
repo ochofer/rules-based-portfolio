@@ -66,7 +66,7 @@ def test_every_footnote_links_to_one_note_and_every_note_has_one_link():
 
 def test_the_two_exhibits_sit_inside_the_section_in_the_order_the_text_names_them():
     page, html = _section()
-    benchmark = html.index("<b>No index benchmark, and why not the S&amp;P 500.</b>")
+    benchmark = html.index("<b>The benchmark, and why not the S&amp;P 500.</b>")
     assert benchmark < html.index('data-exhibit="c33"') < html.index('data-exhibit="c34"') < html.index("<b>No views.</b>")
     assert html.index("<b>No views.</b>") < html.index("<b>No signal.</b>") < html.index('<ol class="notes">')
     assert [c["id"] for c in page.charts] == ["c33", "c34"] and {c["view"] for c in page.charts} == {"method"}
@@ -100,7 +100,7 @@ def test_the_alternative_exhibit_ranks_neither_line_and_gives_the_gap_with_its_s
 
 def test_the_growth_of_100_links_to_the_section_and_the_other_projects_close_the_method_part():
     page = (config.ROOT / "index.html").read_text(encoding="utf-8")
-    assert ('Why the portfolio has no optimiser, no index benchmark, no views and no signal: '
+    assert ('Why the portfolio has no optimiser, no single market index as its benchmark, no views and no signal: '
             '<a href="#method-not-done">Method</a>.') in page  # fmt: skip
     assert page.index('id="method-correlation"') < page.index('id="method-not-done"') < page.index('id="method-selection"')
     assert page.index('id="method-rules"') < page.index('id="method-projects"') < page.index('id="glossary"') < page.index('id="log"')
@@ -156,3 +156,18 @@ def test_the_issuers_price_history_is_read_in_us_dollars_and_another_currency_st
         prices.parse_hsbc_navs(tmp_path / "b.json")
     with pytest.raises(ValueError, match="no net asset value feed"):
         prices.load_alternative("IE00B5BMR087", cache_dir=tmp_path)
+
+
+def test_the_benchmark_is_the_index_blend_in_the_key_facts_the_method_view_and_the_terms():
+    page = (config.ROOT / "index.html").read_text(encoding="utf-8")
+    facts = re.search(r'<aside class="ch-facts".*?</aside>', page, flags=re.S).group(0)
+    assert ("<dt>Benchmark</dt><dd>The 70/30 blend of the two funds&#x27; own indices, rebalanced at each month end "
+            '(<a href="#method-not-done">the index blend</a>)</dd>') in facts  # fmt: skip
+    section = page.split('id="method-not-done"', 1)[1]
+    assert ("<b>The benchmark, and why not the S&amp;P 500.</b> A benchmark is the portfolio a client would hold "
+            "without the manager") in section  # fmt: skip
+    assert "This portfolio&#x27;s benchmark is the blend of its two funds&#x27; own indices at 70/30" in section
+    assert "No single market index is the benchmark. The question readers ask most" in section
+    assert "None by design" not in page and "no index benchmark" not in page
+    terms = dict(site.terms())
+    assert terms["Index blend"].endswith("rebalanced at each month end, the portfolio's benchmark.")
