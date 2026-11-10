@@ -414,3 +414,35 @@ def test_the_rabobank_cost_overview_is_read_from_its_text():
     assert costs["funds_high"] == pytest.approx(0.0015) and costs["dated"] == pd.Timestamp("2025-05-01")
     with pytest.raises(ValueError):
         prices.parse_rabobank_costs("Kostenoverzicht without its rates")
+
+
+def test_on_the_first_purchase_day_every_effect_but_implementation_is_zero(record):
+    """The comparators and reference portfolio A buy at the first day's net asset values, so on that day the
+    difference is implementation alone, and over the record the effects with timing sum to the money-weighted
+    difference."""
+    r, extra = record, _extra(record["navs"])
+    sims, values, growth, windows, _ = comparisons.simulations(r["records"], r["navs"], r["values"], r["table"], r["ref_a"],
+                                                               r["ref_b"], r["rate"], END, extra)  # fmt: skip
+    days = r["table"].index
+    returns = pd.DataFrame({k: comparisons._returns(g) for k, g in growth.items()})
+    funds = comparisons._fund_returns(r["navs"], days)
+    state = {k: comparisons._state(sims[k], r["navs"], days) for k in ["reference_a", *(s[0] for s in comparisons.SPLITS)]}
+    navs_f = comparisons._with_equity(r["navs"], extra["first_ranked"]["eur"])
+    state["first_ranked"] = comparisons._state(sims["first_ranked"], navs_f, days)
+    returns["_first_ranked_fund"] = comparisons._fund_returns(navs_f, days)["r_e"]
+    ctx = comparisons._context(extra, days, sims, r["navs"])
+    first = days[1]
+    for key in ["reference_a", "reference_b", *(s[0] for s in comparisons.SPLITS), "first_ranked", "msci_world",
+                "lifestrategy_60", "savings"]:  # fmt: skip
+        effects = comparisons.daily_effects(key, returns, funds, state, ctx)
+        line = effects.loc[first].drop("implementation").dropna()
+        assert (line == 0).all(), key
+        assert effects.loc[first, "implementation"] == pytest.approx(-returns.loc[first, "portfolio"])
+    out = _build(record, extra=extra)
+    summary = out["summary"].set_index("comparator")
+    rows = out["effects"][out["effects"]["period"] == "record"].pivot(index="comparator", columns="effect", values="value")
+    own = summary.loc["portfolio", "return_money_weighted"]
+    for key in rows.index:
+        if key == "mag7":
+            continue  # its window has its own money-weighted return for the portfolio
+        assert rows.loc[key].sum() == pytest.approx(summary.loc[key, "return_money_weighted"] - own, abs=1e-12), key

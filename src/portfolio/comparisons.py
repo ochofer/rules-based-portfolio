@@ -242,6 +242,15 @@ def daily_effects(key: str, r: pd.DataFrame, funds: pd.DataFrame, state: dict, c
         _fund_part(out, key, pd.Series(1.0, index=r.index), r[key] - held, funds, ctx, share)
         if ctx[key].get("bonds_na"):
             out[list(BOND_EFFECTS)] = float("nan")
+    # Every effect but implementation starts on the first day on which reference portfolio A held its funds at the
+    # previous close. On the first purchase day the comparators and reference portfolio A buy at that day's net asset
+    # values, so their returns are zero and the portfolio's difference is implementation alone. A comparator whose
+    # series starts later is passed only the days after its base day.
+    idle = state["reference_a"].shift(1).reindex(r.index)["cash"] >= 1 - 1e-12
+    if idle.any():
+        for column in EFFECTS:
+            if column != "implementation" and out[column].notna().any():
+                out.loc[idle, column] = 0.0
     return out
 
 
