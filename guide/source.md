@@ -4,9 +4,9 @@
 
 The rules-based portfolio is a real-money portfolio run under written rules, fixed and tagged before its first order on 8 October 2026. It holds two exchange-traded funds, or ETFs, which are funds whose shares are bought and sold on a stock exchange like the shares of a company: a global equity ETF and a euro government bond ETF. A starting amount, paid in before the first purchase, and a fixed contribution every month fund it. The rules produce the orders the portfolio places, and every departure from them is kept in a register. A program in the public repository computes every figure on the dashboard from the private record of orders and contributions and from the data the ETFs' issuers publish.
 
-The dashboard is where that record is published. It is rebuilt every Monday and on each day the rules are applied, and it is organised in nine views: the Overview, Rebalancing, Costs, Contributions, Look-through, Factor exposures, Method, Simulations and Log. The first five views describe the portfolio as it is, the next two explain what its holdings are exposed to and how it was designed, and the last two hold the simulations on history and the written record of each month.
+The dashboard is where that record is published. It is rebuilt every Monday and on each day the rules are applied, and it is organised in five views: Overview, Performance, Portfolio, Risk and Method. The Overview says where the portfolio stands against its rules. Performance gives what the portfolio has returned, what was paid in and what running it costs, and Portfolio what it holds and how the rules keep its weights near their targets. Risk estimates how far the portfolio could fall and applies the rules to a longer history, and Method explains how the portfolio was set up and holds the terms and the written record of each month.
 
-This guide explains every view, section, tile and exhibit of the dashboard for readers with or without a background in finance: what each one shows, how to read it, where its numbers come from and what it cannot tell. The guide is built with the dashboard, so its figure and table numbers are the dashboard's. Each entry opens with a link to its place on the dashboard, the references in the text link to the entry they name, and the terms at the end define every word the dashboard uses in a sense of its own.
+This guide explains every view, part, key figure and exhibit of the dashboard for readers with or without a background in finance: what each one shows, how to read it, where its numbers come from and what it cannot tell. The guide is built with the dashboard, so its figure and table numbers are the dashboard's. Each entry opens with a link to its place on the dashboard, the references in the text link to the entry they name, and the terms at the end define every word the dashboard uses in a sense of its own.
 
 ## Before you start
 
@@ -18,7 +18,7 @@ The entries that follow assume twelve ideas, which recur across the views of the
 
 **The cycle day, the top-up and the orders.** The cycle day is the day each month on which the rules are applied: the 5th, or the first trading day after it when the 5th is not one. The top-up is the fixed monthly contribution, 5 per cent of the starting amount, paid in by the 2nd and invested on the cycle day in the sleeve furthest below its target weight. The rules allow at most five orders a month, each placed between 15:45 and 17:00 Amsterdam time.
 
-**Net asset value.** An ETF's net asset value is the value of one of its shares at the close of a day, as its issuer publishes it, usually on the next working day. The dashboard values the portfolio at these values, the equity ETF's converted from US dollars at the reference rate of the European Central Bank (ECB). Because the values arrive a day late, the record ends at the last day for which both ETFs have published one, and the dashboard's header gives that date.
+**Net asset value.** An ETF's net asset value is the value of one of its shares at the close of a day, as its issuer publishes it, usually on the next working day. The dashboard values the portfolio at these values, the equity ETF's converted from US dollars at the reference rate of the European Central Bank (ECB). Because the values arrive a day late, the record ends at the last day for which both ETFs have published one, and the date under the dashboard's title is that day.
 
 **Growth of 100, with contributions removed.** Most charts of returns start at 100 and show what 100 of the starting amount would have become. Contributions are removed from these lines, so a top-up does not count as a gain: each day's change is the return on the money the portfolio held that day, and the days are chained together. This is the time-weighted return. The money-weighted return counts the timing of the contributions as well, since it is the rate at which the contributions, each from its own date, grow to the portfolio's value. The two differ when money arrives just before a rise or a fall.
 
@@ -34,43 +34,55 @@ The entries that follow assume twelve ideas, which recur across the views of the
 
 **Growth per year, volatility and correlation.** Growth per year is the compound annual return, with contributions removed. Volatility is the standard deviation of returns, a measure of how widely they spread around their average, and the dashboard gives it for a year. A correlation runs from −1, when two returns always move in opposite directions, through 0, when they are unrelated, to 1, when they always move together.
 
-**Exhibits and their parts.** Every chart is a figure, and every table that stands on its own is a table, each numbered in page order across the views. Under the title, an "as of" line gives the dates and the basis of the numbers. A note explains what the exhibit shows, a source line names the file in the repository that holds its numbers, and a Table toggle opens the numbers behind the chart. Nothing depends on hovering over a chart, since every value is in its table.
+**Exhibits and their parts.** Every chart is a figure, and every table that stands on its own is a table, each numbered in page order across the views. Under the title, a line gives the unit or the dates and the basis of the numbers. A note explains what the exhibit shows, a source line names the file in the repository that holds its numbers, and a Table toggle opens the numbers behind the chart. Nothing depends on hovering over a chart, since every value is in its table.
 
 ## The page around the views
 
-The header, the bar of views and the footer stay the same on every view.
+The navy band and title block at the top, the bar of views and the footer stay the same on every view.
 
-**The header.** Under the title, the dashboard gives the date of the record and the day of the first purchase, followed by links to the repository, the rules, the mandate and this guide. When the prices and the holdings have different dates, as after a cycle day whose orders are not yet valued, both dates are written.
+**The band and the title block.** The navy band carries the site's menu. Under it, the title block gives a line on what the dashboard covers, the date of the figures and the day the page was built, and links to the rules, the mandate, this guide and the code. When the prices and the holdings have different dates, as after a cycle day whose orders are not yet valued, both dates are written.
 
-**The bar of views.** The nine views are tabs in one bar, which stays at the top of the screen as the page scrolls. On a phone the bar scrolls sideways, and a fade marks each edge beyond which more tabs lie. A link to a part of a view opens that view at that part.
+**The bar of views.** The five views are tabs in one bar, which stays at the top of the screen as the page scrolls, and each view opens with one line that says what it answers. On a narrow phone the bar scrolls sideways, and a fade marks each edge beyond which more tabs lie. A link to a part of a view opens that view at that part, and a link to a part keeps working when the page is rearranged.
 
-**The footer.** The footer states the basis of the returns: in euro, at the issuers' net asset values, time-weighted except where the money-weighted return is named, and not offered as evidence for the rules. It then lists the terms the dashboard uses, which are the terms at the end of this guide, and closes with the build date and a link to the code.
+**The footer.** The footer states the basis of the returns: in euro, at the issuers' net asset values, after costs, time-weighted except where the money-weighted return is named, and not offered as evidence for the rules, since past performance is no guide to future returns. It closes with the build date and a link to the code.
 
 ## ⟦view:overview⟧ Overview
 
-The Overview answers where the portfolio stands on the record's date and how it has done since the first purchase, with contributions removed. It holds six tiles and three figures.
+The Overview answers where the portfolio stands against its rules. Four key figures run across the top, a sentence on the returns sits under them, and two figures side by side follow. The key facts stand beside them, and after them on a phone.
 
-### The six tiles
+### The key figures
 
-The six tiles give the figures a reader checks first, each with a line under it that says what the figure is measured against.
+The four key figures are the ones a reader checks first, each with a line under it that names what it is measured against.
 
-**Equity weight.** The equity sleeve's weight on the record's date. The line under it gives the change since the last complete month end, in percentage points, so a top-up, an order or a market move shows here.
+**Equity weight.** The equity sleeve's weight on the record's date. The line under it gives the target weight of 70 per cent and the band from 65 to 75 per cent.
 
-**Drift from 70%.** The equity weight minus its target weight of 70 per cent, in percentage points. The band allows a drift from −5 to +5 points before the rules sell anything.
-
-**Return since the first purchase.** The time-weighted return since the first purchase, with contributions removed: the growth of 100 of ⟦c3⟧, less 100, in per cent.
-
-**Money-weighted return.** The money-weighted return from the first purchase to the record's date. It is cumulative in the first year and given per year after it. The sentence under the tiles explains why it can differ from the time-weighted return: it counts the timing of the contributions, which the time-weighted return removes.
+**Drift from target.** The equity weight minus its target weight of 70 per cent, in percentage points. The band allows a drift from −5 to +5 points before the rules sell anything.
 
 **Drawdown now.** The fall of the growth of 100 below its previous peak on the record's date, in per cent. Zero means that the portfolio is at a new peak.
 
-**Orders this month.** The orders placed in the current month, against the allowance of five set by rule 6. Unlike the record, this tile also counts orders placed after the last net asset values, since the allowance applies to orders as they are placed.
+**Orders this month.** The orders placed in the current month, against the allowance of five set by rule 6. Unlike the record, this figure also counts orders placed after the last net asset values, since the allowance applies to orders as they are placed.
 
-### ⟦c2⟧ Allocation now against the target and the band
+The sentence under the key figures gives the return since the first purchase in two forms, both in euro and after costs. The time-weighted return is the growth of 100 of ⟦c3⟧, less 100, in per cent, with contributions removed. The money-weighted return counts the timing of the contributions as well, which the time-weighted return removes. Within the first year both are cumulative and not annualised, and no annual figure is shown, since past performance is shown for complete twelve-month periods only. From the first full year on, both are given per year.
 
-⟦c2⟧ shows the weights of the two sleeves on the record's date against their target weights. Each bar is a sleeve's weight, blue for equity and orange for bonds, and the black tick on each bar is its target weight. The shaded interval behind the equity bar is the band, from 65 to 75 per cent. The bond sleeve has no band of its own, since its weight is what the equity weight and the cash leave. Cash, the contributions not yet invested, is given in the note, and the table lists all three weights.
+### ⟦c2⟧ Allocation against the target and the band
+
+⟦c2⟧ shows the weights of the two sleeves on the record's date against their target weights. Each bar is a sleeve's weight, navy for equity and slate grey for bonds, with its value at its end, and the black tick on each bar is its target weight. The shaded interval behind the equity bar is the band, from 65 to 75 per cent, labelled above it. The bond sleeve has no band of its own, since its weight is what the equity weight and the cash leave. Cash, the contributions not yet invested, is given in the note, and the table lists all three weights.
 
 The figure tells a reader what the next cycle day would do at these weights. When the equity bar ends inside the shaded interval, the rules sell nothing on that day and the top-up alone moves the weights towards their targets. When it ends outside, the next cycle day brings the portfolio back to 70/30 (rule 5). An order placed after the last net asset values enters the figure with the next ones, and the note names it.
+
+### ⟦c4⟧ Drawdown against the mandate's limit
+
+⟦c4⟧ shows how far the portfolio has been below its previous peak on each day since the first purchase. The filled navy area is the drawdown, drawn downwards, so the deeper the area, the larger the fall, and the end of the line carries the latest value. The axis runs to the mandate's outer bound of 40 per cent, or deeper once a fall passes it, and the dashed line is its test limit of 35 per cent. The grey line, from the second month end, is the index blend's drawdown at month ends, and the note gives the worst fall to date.
+
+The figure and the mandate measure falls differently. The mandate's test used month-end values, which miss falls that reverse within a month, while the figure uses daily values, so the worst daily fall is at least as deep as the worst month-end fall. A drawdown is never a reason to act: under rule 8 a fall in prices neither pauses the cycle nor adds an order.
+
+### ⟦#key-facts⟧ Key facts
+
+The key facts set out the portfolio's terms in ten rows: the two sleeves with the full names of their ETFs and their target weights, the band, the contributions, the rebalancing, the risk limit, the ongoing costs of the two ETFs at the sleeve weights with each ETF's own, the valuation in euro at the issuers' net asset values, the day of the first purchase, and the benchmark, the index against which a manager's work is measured. Each ETF also has a distributing share class under another ISIN, so the full name identifies the fund held. An ETF's ongoing costs are its TER plus its transaction costs, which is why the equity ETF's figure here is above its TER of 0.20 per cent. The portfolio has no benchmark by design, and the row links to the part of the Method view that explains why. The rules and the mandate, linked under the title, set out each of the terms in full.
+
+## ⟦view:performance⟧ Performance
+
+The Performance view answers what the portfolio has returned since the first purchase, what was paid in and what running it costs. It opens with the growth of 100, followed by two parts, Contributions and Costs.
 
 ### ⟦c3⟧ Growth of 100: the portfolio, the reference portfolios and the index blend
 
@@ -80,31 +92,21 @@ Three comparisons sit on this chart, and each answers its own question. The gap 
 
 The line under the figure links to the part of the Method view that explains [what the portfolio does not do](#method-not-done): why it has no optimiser, no index benchmark (an index against which a manager's work is measured), no views and no signal.
 
-### ⟦c4⟧ Drawdown against the mandate's limit
+### ⟦#contributions⟧ Contributions
 
-⟦c4⟧ shows how far the portfolio has been below its previous peak on each day since the first purchase. The filled navy area is the drawdown, drawn downwards, so the deeper the area, the larger the fall. The axis is scaled to the deepest fall so far and reaches at least 10 per cent, and the mandate's two lines, the test limit of 35 per cent and the outer bound of 40 per cent, appear once the axis reaches them. The grey line, from the second month end, is the index blend's drawdown at month ends, and the "as of" line gives the worst fall to date.
+The Contributions part separates the money paid in from the gains and losses on it. Its figures are in units of the starting amount, which counts as 100, so the part shows the portfolio's money without publishing a euro amount.
 
-The figure and the mandate measure falls differently. The mandate's test used month-end values, which miss falls that reverse within a month, while the figure uses daily values, so the worst daily fall is at least as deep as the worst month-end fall. A drawdown is never a reason to act: under rule 8 a fall in prices neither pauses the cycle nor adds an order.
+### ⟦c9⟧ Money paid in and the value of the portfolio
 
-## ⟦view:rebalancing⟧ Rebalancing
+⟦c9⟧ compares what has been paid into the portfolio with what it is worth. The starting amount counts as 100 units and each top-up adds 5. The grey line is the money paid in, which steps up with each top-up, the navy line is the portfolio's value, and the shaded area between them is the gain or loss on the money paid in. Unlike ⟦c3⟧, this figure keeps the contributions in, since it shows money and not returns.
 
-The Rebalancing view shows the equity weight against its band and every order against the rules. Rebalancing means moving the weights back towards the target weights, through the top-ups (rule 4) or through the band (rule 5).
+### ⟦c10⟧ Market effect and contribution by month
 
-### ⟦c5⟧ Equity weight in its band, with every order
+⟦c10⟧ shows, for each month, how much the portfolio's value changed through markets and how much through new money. The upper panel is the market effect, the month's change in value that did not come from contributions, in per cent of the value at the start of the month. The lower panel is the contribution, the money paid in during the month, in the same unit, and the table gives both by month. Together the two make up the month's change in value. While the portfolio is young, a top-up of 5 per cent of the starting amount can be large against a month's market effect.
 
-⟦c5⟧ follows the equity weight day by day since the first purchase and marks each order on the day it was placed. The blue line is the equity weight, the shaded interval is the band from 65 to 75 per cent, and the black line is the target of 70 per cent. A blue dot marks a purchase of the equity ETF and a smaller orange dot a purchase of the bond ETF, drawn smaller so that a day with both purchases shows both. A red diamond labelled "Band order" marks a day on which the band brought the portfolio back to 70/30, and an open orange circle marks an order that the rules called for and that was not placed. The table gives each day's weights of equity, bonds and cash.
+### ⟦#costs⟧ Costs
 
-Between cycle days the line moves with markets alone, since no order is placed. On a cycle day the top-up moves it towards 70 per cent, and only when the weight has left the band does the cycle day bring it back to 70 exactly. An order placed after the last net asset values enters the figure with the next ones, and the note names it.
-
-### ⟦c6⟧ Orders per month against the allowance of five
-
-⟦c6⟧ counts the orders placed in each month. Each bar is a month's orders, and the line at five is the allowance of rule 6, the number of orders a month that the account's plan carries without commission. The table lists every order with its date, sleeve, side and the rule that called for it, whether it was placed inside rule 7's window of 15:45 to 17:00 Amsterdam time, and whether the bid and ask were recorded when it was placed.
-
-Apart from the first purchases, the rules call for orders on the cycle day only, at most two, so any other order, or an order outside the window, departs from the rules. The note names each departure, and the departures register of the Log view, ⟦departures⟧, keeps it with its consequence.
-
-## ⟦view:costs⟧ Costs
-
-The Costs view measures what running the portfolio costs. It separates two kinds of cost: the cost of placing the portfolio's orders, measured against reference portfolio A, and the ETFs' own yearly costs, which are taken inside their net asset values.
+The Costs part measures what running the portfolio costs. It separates two kinds of cost: the cost of placing the portfolio's orders, measured against reference portfolio A, and the ETFs' own yearly costs, which are taken inside their net asset values.
 
 ### ⟦c7⟧ Cost per month by source
 
@@ -126,25 +128,33 @@ The line and ⟦c7⟧ are two views of the same cost. A cost of 10 basis points 
 
 The note sets the implementation cost of ⟦c8⟧ beside the ongoing costs and explains its sign order by order. The two numbers measure different things: the ongoing costs are what holding the ETFs costs every year, taken inside their values, and the implementation cost is what placing the portfolio's own orders has cost since the first purchase.
 
-## ⟦view:contributions⟧ Contributions
+## ⟦view:portfolio⟧ Portfolio
 
-The Contributions view separates the money paid in from the gains and losses on it. Its figures are in units of the starting amount, which counts as 100, so the view shows the portfolio's money without publishing a euro amount.
+The Portfolio view answers what the portfolio holds and how the rules keep the equity weight in its band. Its three parts are Rebalancing, Look-through and the equity ETF's exposures.
 
-### ⟦c9⟧ Money paid in and the value of the portfolio
+### ⟦#rebalancing⟧ Rebalancing
 
-⟦c9⟧ compares what has been paid into the portfolio with what it is worth. The starting amount counts as 100 units and each top-up adds 5. The grey line is the money paid in, which steps up with each top-up, the navy line is the portfolio's value, and the shaded area between them is the gain or loss on the money paid in. Unlike ⟦c3⟧, this figure keeps the contributions in, since it shows money and not returns.
+The Rebalancing part shows the equity weight against its band and every order against the rules. Rebalancing means moving the weights back towards the target weights, through the top-ups (rule 4) or through the band (rule 5).
 
-### ⟦c10⟧ Market effect and contribution by month
+### ⟦c5⟧ Equity weight in its band, with every order
 
-⟦c10⟧ shows, for each month, how much the portfolio's value changed through markets and how much through new money. The upper panel is the market effect, the month's change in value that did not come from contributions, in per cent of the value at the start of the month. The lower panel is the contribution, the money paid in during the month, in the same unit, and the table gives both by month. Together the two make up the month's change in value. While the portfolio is young, a top-up of 5 per cent of the starting amount can be large against a month's market effect.
+⟦c5⟧ follows the equity weight day by day since the first purchase and marks each order on the day it was placed. The navy line is the equity weight, the shaded interval is the band from 65 to 75 per cent, and the black line is the target of 70 per cent. A navy dot marks a purchase of the equity ETF and a smaller slate dot a purchase of the bond ETF, drawn smaller so that a day with both purchases shows both. A red diamond labelled "Band order" marks a day on which the band brought the portfolio back to 70/30, and an open orange circle marks an order that the rules called for and that was not placed. The table gives each day's weights of equity, bonds and cash.
 
-## ⟦view:lookthrough⟧ Look-through
+Between cycle days the line moves with markets alone, since no order is placed. On a cycle day the top-up moves it towards 70 per cent, and only when the weight has left the band does the cycle day bring it back to 70 exactly. An order placed after the last net asset values enters the figure with the next ones, and the note names it.
 
-The Look-through view shows what the portfolio owns through its two ETFs, in four parts: the equity sleeve, the bond sleeve, the whole portfolio and the risk of the whole portfolio. Each holding is weighted by its weight in its ETF and by the ETF's weight in the portfolio, so the shares add up across the two sleeves. The "as of" line of each exhibit gives two dates, that of the issuer's holdings file and that of the sleeve weights.
+### ⟦c6⟧ Orders per month against the allowance of five
+
+⟦c6⟧ counts the orders placed in each month. Each bar is a month's orders, and the line at five is the allowance of rule 6, the number of orders a month that the account's plan carries without commission. The table lists every order with its date, sleeve, side and the rule that called for it, whether it was placed inside rule 7's window of 15:45 to 17:00 Amsterdam time, and whether the bid and ask were recorded when it was placed.
+
+Apart from the first purchases, the rules call for orders on the cycle day only, at most two, so any other order, or an order outside the window, departs from the rules. The note names each departure, and the departures register in the Method view's Log, ⟦departures⟧, keeps it with its consequence.
+
+### ⟦#lookthrough⟧ Look-through
+
+The Look-through part shows what the portfolio owns through its two ETFs, in three sections: the equity sleeve, the bond sleeve and the whole portfolio. The risk of the whole portfolio, estimated at the look-through weights, opens the Risk view. Each holding is weighted by its weight in its ETF and by the ETF's weight in the portfolio, so the shares add up across the two sleeves. The "as of" line of each exhibit gives two dates, that of the issuer's holdings file and that of the sleeve weights.
 
 ### ⟦#lookthrough-equity⟧ Equity sleeve
 
-The first part covers the equity sleeve, the iShares MSCI ACWI UCITS ETF, and its heading gives the sleeve's share of the portfolio on the record's date. iShares publishes the fund's holdings every day, so the holdings and the weights share a date. Every figure in this part gives shares of the whole portfolio, and its table adds the shares of the sleeve.
+The first section covers the equity sleeve, the iShares MSCI ACWI UCITS ETF, and its heading gives the sleeve's share of the portfolio on the record's date. iShares publishes the fund's holdings every day, so the holdings and the weights share a date. Every figure in this section gives shares of the whole portfolio, and its table adds the shares of the sleeve.
 
 ### ⟦c11a⟧ Equity by region
 
@@ -164,7 +174,7 @@ The first part covers the equity sleeve, the iShares MSCI ACWI UCITS ETF, and it
 
 ### ⟦#lookthrough-bonds⟧ Bond sleeve
 
-The second part covers the bond sleeve, the Vanguard EUR Eurozone Government Bond UCITS ETF, and its heading gives the sleeve's share of the portfolio. Vanguard publishes the fund's holdings and its factsheet once a month, so these exhibits are as of the last month end the issuer has published, while the sleeve weight is the record's.
+The second section covers the bond sleeve, the Vanguard EUR Eurozone Government Bond UCITS ETF, and its heading gives the sleeve's share of the portfolio. Vanguard publishes the fund's holdings and its factsheet once a month, so these exhibits are as of the last month end the issuer has published, while the sleeve weight is the record's.
 
 ### ⟦c15⟧ Bonds by issuing country
 
@@ -184,15 +194,43 @@ The second part covers the bond sleeve, the Vanguard EUR Eurozone Government Bon
 
 ### ⟦#lookthrough-portfolio⟧ Whole portfolio
 
-The third part puts both sleeves and cash together, for the one exposure that both sleeves carry: currency.
+The third section puts both sleeves and cash together, for the one exposure that both sleeves carry: currency.
 
 ### ⟦c13⟧ Currency exposure, by sleeve
 
-⟦c13⟧ gives the portfolio's exposure to each currency, each bar split by where the exposure comes from: blue from the equity sleeve, orange from the bond sleeve and grey from cash. Each holding counts in the currency of its market, as the issuers report it, so a US company's shares are an exposure to the US dollar whichever currency they were bought in. Buying the equity ETF in euro on Xetra therefore does not change the exposure. Currencies are named until the rest is below 10 per cent of the portfolio, and the rest is grouped as Other. The share outside the euro is the part of the portfolio whose value in euro moves with exchange rates.
+⟦c13⟧ gives the portfolio's exposure to each currency, each bar split by where the exposure comes from: navy from the equity sleeve, slate grey from the bond sleeve and a lighter grey from cash. Each holding counts in the currency of its market, as the issuers report it, so a US company's shares are an exposure to the US dollar whichever currency they were bought in. Buying the equity ETF in euro on Xetra therefore does not change the exposure. Currencies are named until the rest is below 10 per cent of the portfolio, and the rest is grouped as Other. The share outside the euro is the part of the portfolio whose value in euro moves with exchange rates.
+
+### ⟦#factors⟧ Factor exposures
+
+The Factor exposures part describes the equity ETF by its factors. A factor is one of the return series in Kenneth French's data library for developed markets: the market's return minus the risk-free rate, the one-month US Treasury bill return in French's files, and the returns of long-short portfolios for size, value, profitability, investment and momentum. A long-short portfolio holds one group of stocks and sells another short, so its return is the difference between the two groups: small companies against large ones for size, companies whose shares are cheap relative to their accounting value against expensive ones for value, profitable against unprofitable ones for profitability, companies that invest little against those that invest heavily for investment, and recent winners against recent losers for momentum.
+
+A loading is the coefficient of the ETF's return minus the risk-free rate on a factor's return, which says how far the ETF moves when the factor moves by one. A fund that holds the market at market weights should load close to 1 on the market and close to 0 on the other five factors.
+
+### ⟦c18⟧ Factor loadings of the equity ETF
+
+⟦c18⟧ gives the ETF's loading on each factor, estimated on weekly returns over the last three years. A standard error is the estimated standard deviation of an estimate, and each loading carries a horizontal line of two standard errors on either side, so a loading whose line crosses zero cannot be told apart from zero. Weeks run from Wednesday to Wednesday, to avoid effects at the start and the end of a week. The regression uses the ETF's net asset value in US dollars and French's factors, also in US dollars, so no exchange rate enters it, and its standard errors are Newey-West, which allow for returns that are correlated from one week to the next.
+
+The table adds a daily estimate as a check, with each factor's return of the same day and of the day before (Dimson's correction), since the fund's valuation point and French's daily returns may not be timed alike. The bond sleeve is not regressed on equity factors. A market loading close to 1 and small loadings on the rest describe a fund that holds the market at its weights, which is what the equity sleeve is meant to be.
+
+### ⟦c19⟧ Rolling loadings
+
+⟦c19⟧ repeats the estimate over rolling windows of 36 months of weekly returns, stepped at each month end, in one panel per factor, so that a reader can see whether the loadings have stayed stable. The five panels after the market share one scale, so their lines can be compared directly, and each has a line at zero. Small movements are expected, since 36 months of returns estimate a loading with error. A lasting move away from zero would indicate that the index itself had shifted towards a factor.
+
+### ⟦c20⟧ Where the difference to the index blend came from
+
+⟦c20⟧ will split the portfolio's monthly return against the index blend into its factor exposures times the factors' returns, and a residual. It starts at the October 2027 month end, when twelve months of returns exist, and until then it holds a line saying so.
+
+### ⟦attribution⟧ The difference to the index blend in three parts
+
+⟦attribution⟧ will split the difference between the portfolio and the index blend into three parts that sum to it, over the period of ⟦c20⟧: the portfolio against reference portfolio A, which is the implementation cost, the drift effect, which is reference portfolio A against reference portfolio B, and the tracking difference of the two ETFs. It starts at the October 2027 month end as well.
+
+## ⟦view:risk⟧ Risk
+
+The Risk view answers how far the portfolio could fall. Its first part estimates the risk of the whole portfolio at today's weights on index returns, and its second, Simulations, applies the rules to the allocation test's history and to paths resampled from it. None of its figures is the portfolio's record.
 
 ### ⟦#lookthrough-risk-section⟧ Risk of the whole portfolio
 
-The fourth part estimates the risk of the whole portfolio at its look-through weights. The record is too short to measure risk, so the estimates use index returns over the last 120 months. These index returns price the components, the parts into which the look-through divides the portfolio: MSCI's regional indices in euro for the four equity regions, and three maturity groups of the bond sleeve, each priced as a zero-coupon euro area government bond from the European Central Bank's yield curve. Cash is a component with no return. None of the estimates is part of the record, and none is a limit, since the mandate binds on the worst fall over years.
+This part estimates the risk of the whole portfolio at its look-through weights. The record is too short to measure risk, so the estimates use index returns over the last 120 months. These index returns price the components, the parts into which the look-through divides the portfolio: MSCI's regional indices in euro for the four equity regions, and three maturity groups of the bond sleeve, each priced as a zero-coupon euro area government bond from the European Central Bank's yield curve. Cash is a component with no return. None of the estimates is part of the record, and none is a limit, since the mandate binds on the worst fall over years.
 
 ### The risk tiles
 
@@ -234,33 +272,43 @@ The portfolio's point lies away from the curve because its two ETFs are cap-weig
 
 ⟦stress⟧ estimates what the portfolio, at its weights on the record's date, would have lost in five historical crises: 2000 to 2003, 2007 to 2009, the euro crisis of 2011, February to March 2020, and 2022. Each episode holds today's look-through weights from the end of its first month to the end of its last, without rebalancing, so the two sleeves' contributions add up to the total. The table gives each sleeve's part in per cent of the portfolio, the episode's month ends and the series used. The components' series start in 2001 and 2004, so the fall of 2000 to 2003 uses the allocation test's two series at the sleeve weights. These are estimates on index returns at today's weights and form no part of the record, and month-end values miss falls that reverse within a month.
 
-## ⟦view:factors⟧ Factor exposures
+### ⟦#simulations⟧ Simulations
 
-The Factor exposures view describes the equity ETF by its factors. A factor is one of the return series in Kenneth French's data library for developed markets: the market's return minus the risk-free rate, the one-month US Treasury bill return in French's files, and the returns of long-short portfolios for size, value, profitability, investment and momentum. A long-short portfolio holds one group of stocks and sells another short, so its return is the difference between the two groups: small companies against large ones for size, companies whose shares are cheap relative to their accounting value against expensive ones for value, profitable against unprofitable ones for profitability, companies that invest little against those that invest heavily for investment, and recent winners against recent losers for momentum.
+The Simulations part applies the rules to the allocation test's returns and to paths resampled from them, to show how the rules behave over a longer history than the record. Every chart in it is a simulation on index returns, gross of costs, and none is the portfolio's record.
 
-A loading is the coefficient of the ETF's return minus the risk-free rate on a factor's return, which says how far the ETF moves when the factor moves by one. A fund that holds the market at market weights should load close to 1 on the market and close to 0 on the other five factors.
+### ⟦#simulations-mechanics⟧ Mechanics simulation
 
-### ⟦c18⟧ Factor loadings of the equity ETF
+The first section shows how often the rules act. It runs them on the allocation test's returns with a starting amount of 100 and a top-up of 5 a month, with the cycle at each month end in place of the 5th.
 
-⟦c18⟧ gives the ETF's loading on each factor, estimated on weekly returns over the last three years. A standard error is the estimated standard deviation of an estimate, and each loading carries a horizontal line of two standard errors on either side, so a loading whose line crosses zero cannot be told apart from zero. Weeks run from Wednesday to Wednesday, to avoid effects at the start and the end of a week. The regression uses the ETF's net asset value in US dollars and French's factors, also in US dollars, so no exchange rate enters it, and its standard errors are Newey-West, which allow for returns that are correlated from one week to the next.
+### ⟦c26⟧ Simulation: the equity weight in its band under the rules
 
-The table adds a daily estimate as a check, with each factor's return of the same day and of the day before (Dimson's correction), since the fund's valuation point and French's daily returns may not be timed alike. The bond sleeve is not regressed on equity factors. A market loading close to 1 and small loadings on the rest describe a fund that holds the market at its weights, which is what the equity sleeve is meant to be.
+⟦c26⟧ follows the equity weight at each month end from February 1999 to December 2025, before the top-up, with the band and the target. Each top-up buys the sleeve furthest below its target weight, and the band brings the portfolio back to 70/30 when the weight leaves it. The red diamonds mark the months with a band order. The table counts the cycle days with one and with two orders and the band orders, and gives the most orders on one cycle day against the allowance of five. Every purchase counts as an order, whatever its size.
 
-### ⟦c19⟧ Rolling loadings
+### ⟦#simulations-history⟧ Historical simulation
 
-⟦c19⟧ repeats the estimate over rolling windows of 36 months of weekly returns, stepped at each month end, in one panel per factor, so that a reader can see whether the loadings have stayed stable. The five panels after the market share one scale, so their lines can be compared directly, and each has a line at zero. Small movements are expected, since 36 months of returns estimate a loading with error. A lasting move away from zero would indicate that the index itself had shifted towards a factor.
+The second section runs the whole history as one path, from February 1999 to December 2025.
 
-### ⟦c20⟧ Where the difference to the index blend came from
+### ⟦c27a⟧ Simulation: growth of 100 under the rules
 
-⟦c20⟧ will split the portfolio's monthly return against the index blend into its factor exposures times the factors' returns, and a residual. It starts at the October 2027 month end, when twelve months of returns exist, and until then it holds a line saying so.
+⟦c27a⟧ compares the growth of 100 under the rules, the navy line, with the same portfolio taken back to 70/30 on every cycle day, the grey line, with contributions removed. The gap between them is the drift effect over 27 years of history. The simulation is in-sample, that is, computed on the data on which the split was chosen, and its index series run back before the two ETFs existed. The table gives the year ends, and the months are in the source file.
 
-### ⟦attribution⟧ The difference to the index blend in three parts
+### ⟦c27b⟧ Simulation: fall from the previous peak under the rules
 
-⟦attribution⟧ will split the difference between the portfolio and the index blend into three parts that sum to it, over the period of ⟦c20⟧: the portfolio against reference portfolio A, which is the implementation cost, the drift effect, which is reference portfolio A against reference portfolio B, and the tracking difference of the two ETFs. It starts at the October 2027 month end as well.
+⟦c27b⟧ shows the same two simulations as falls below the previous peak, month by month, with the test limit of 35 per cent and the outer bound of 40 per cent.
+
+### ⟦#simulations-paths⟧ Resampled paths
+
+The third section carries the bootstrap's paths forward from the first purchase.
+
+### ⟦c28⟧ Resampled paths of the portfolio's value over ten years
+
+⟦c28⟧ shows the range of values the portfolio could reach over ten years from the first purchase if the future repeated the test's history, reshuffled in twelve-month blocks. Values are in units of the starting amount, with the top-up of 5 a month and the rules applied at each month end. The pale band holds the middle 90 per cent of the 10,000 paths, from the 5th to the 95th percentile, the darker band the middle half, and the grey line is the median. The dashed line is the money paid in, and the navy line, from the first month end, is the record itself.
+
+The bands say what the test's sample implies and assume nothing beyond it. The record's place inside the range says where markets have taken it and is no evidence about the rules, which a record of this length cannot give. A record below the lower band is a question for the review of the rules in October 2027.
 
 ## ⟦view:method⟧ Method
 
-The Method view explains how the split and the two ETFs were chosen and what the portfolio does not do, and it holds the data sources, the controls and the rules. Its exhibits use history, and each says which history.
+The Method view answers how the portfolio was set up: how the split and the two ETFs were chosen and what the portfolio does not do, with the data sources, the controls and the rules. It then holds the terms the dashboard uses and the Log, the written record of each quarter and month. Its exhibits use history, and each says which history.
 
 ### ⟦c21⟧ The allocation test: growth per year against the worst fall of each split
 
@@ -300,7 +348,7 @@ The split was set on the global series alone, so this figure chooses nothing. It
 
 ⟦c34⟧ shows the S&P 500 alternative beside reference portfolio A, each as a growth of 100 since the first purchase. The S&P 500 alternative is the same contributions on the same days in one S&P 500 ETF at its net asset value in euro, in fractional units and without costs, starting as reference portfolio A starts. Its fund is the S&P 500 ETF that the rules' own selection criteria pick, named in the caption and ranked in `method/selection_sp500.csv`. The dark grey line is reference portfolio A, the teal line is the alternative, and the table gives the gap between them in points of the growth of 100, with its sign.
 
-Both lines are rule sets without costs, so the comparison is like for like, and the portfolio's own line is left off because reference portfolio A stands for it. The difference between the portfolio and reference portfolio A is the implementation cost, which the Costs view shows. A record of months is far too short for the gap to say anything about either rule set, which is the same limit that applies to every return on the dashboard.
+Both lines are rule sets without costs, so the comparison is like for like, and the portfolio's own line is left off because reference portfolio A stands for it. The difference between the portfolio and reference portfolio A is the implementation cost, shown under Costs in the Performance view. A record of months is far too short for the gap to say anything about either rule set, which is the same limit that applies to every return on the dashboard.
 
 ### ⟦c22⟧ The ETF selection: tracking difference by fund and year
 
@@ -322,45 +370,15 @@ The rules card shows `rules/RULES.md`, the ten rules as fixed before the first o
 
 ### ⟦#method-projects⟧ Other projects
 
-The last card of the Method view links to the author's other investment research projects, each with its page, its dashboard or note, and its code.
+The card after the rules links to the author's other investment research projects, each with its page, its dashboard or note, and its code.
 
-## ⟦view:simulations⟧ Simulations
+### ⟦#glossary⟧ Terms
 
-The Simulations view applies the rules to the allocation test's returns and to paths resampled from them, to show how the rules behave over a longer history than the record. Every chart in it is a simulation on index returns, gross of costs, and none is the portfolio's record.
+The Terms part lists every term the dashboard uses in a sense of its own, with its definition. The same list closes this guide.
 
-### ⟦#simulations-mechanics⟧ Mechanics simulation
+### ⟦#log⟧ Log
 
-The first part shows how often the rules act. It runs them on the allocation test's returns with a starting amount of 100 and a top-up of 5 a month, with the cycle at each month end in place of the 5th.
-
-### ⟦c26⟧ Simulation: the equity weight in its band under the rules
-
-⟦c26⟧ follows the equity weight at each month end from February 1999 to December 2025, before the top-up, with the band and the target. Each top-up buys the sleeve furthest below its target weight, and the band brings the portfolio back to 70/30 when the weight leaves it. The red diamonds mark the months with a band order. The table counts the cycle days with one and with two orders and the band orders, and gives the most orders on one cycle day against the allowance of five. Every purchase counts as an order, whatever its size.
-
-### ⟦#simulations-history⟧ Historical simulation
-
-The second part runs the whole history as one path, from February 1999 to December 2025.
-
-### ⟦c27a⟧ Simulation: growth of 100 under the rules
-
-⟦c27a⟧ compares the growth of 100 under the rules, the navy line, with the same portfolio taken back to 70/30 on every cycle day, the grey line, with contributions removed. The gap between them is the drift effect over 27 years of history. The simulation is in-sample, since the split was chosen on these returns, and its index series run back before the two ETFs existed. The table gives the year ends, and the months are in the source file.
-
-### ⟦c27b⟧ Simulation: fall from the previous peak under the rules
-
-⟦c27b⟧ shows the same two simulations as falls below the previous peak, month by month, with the test limit of 35 per cent and the outer bound of 40 per cent.
-
-### ⟦#simulations-paths⟧ Resampled paths
-
-The third part carries the bootstrap's paths forward from the first purchase.
-
-### ⟦c28⟧ Resampled paths of the portfolio's value over ten years
-
-⟦c28⟧ shows the range of values the portfolio could reach over ten years from the first purchase if the future repeated the test's history, reshuffled in twelve-month blocks. Values are in units of the starting amount, with the top-up of 5 a month and the rules applied at each month end. The pale band holds the middle 90 per cent of the 10,000 paths, from the 5th to the 95th percentile, the darker band the middle half, and the grey line is the median. The dashed line is the money paid in, and the navy line, from the first month end, is the record itself.
-
-The bands say what the test's sample implies and assume nothing beyond it. The record's place inside the range says where markets have taken it and is no evidence about the rules, which a record of this length cannot give. A record below the lower band is a question for the review of the rules in October 2027.
-
-## ⟦view:log⟧ Log
-
-The Log view keeps the written record of each quarter and month in five parts, newest first: the quarterly reports, the monthly notes, the cycle reports, the departures register and the monthly table.
+The Log keeps the written record of each quarter and month in five sections, newest first: the quarterly reports, the monthly notes, the cycle reports, the departures register and the monthly table.
 
 ### ⟦#log-quarterly⟧ Quarterly reports
 
@@ -380,4 +398,4 @@ On each cycle day, before any order, the program writes the cycle report: each r
 
 ### ⟦c24⟧ ⟦#log-table⟧ The monthly table
 
-⟦c24⟧ holds every figure behind the tiles and charts, by month, in three blocks. The first block gives returns and risk: the month's return, the time-weighted return since the first purchase, the money-weighted return, cumulative and per year, the drawdown, the worst fall to date and, from the twelfth month, the volatility of the last twelve monthly returns. The second gives the weights at the month end, the drift, the orders, the money paid in and the value in units, and the market effect and the contribution. The third gives the costs in basis points: commissions, half-spread, the price paid against net asset value, and the implementation cost of the month and cumulative. Every tile is a cell of these tables or of `outputs/portfolio_daily.csv`, except that the orders tile also counts orders placed after the last net asset values.
+⟦c24⟧ holds every figure behind the key figures and charts, by month, in three blocks. The first block gives returns and risk: the month's return, the time-weighted return since the first purchase, the money-weighted return, cumulative and per year, the drawdown, the worst fall to date and, from the twelfth month, the volatility of the last twelve monthly returns. The second gives the weights at the month end, the drift, the orders, the money paid in and the value in units, and the market effect and the contribution. The third gives the costs in basis points: commissions, half-spread, the price paid against net asset value, and the implementation cost of the month and cumulative. Every key figure is a cell of these tables or of `outputs/portfolio_daily.csv`, except that the orders figure also counts orders placed after the last net asset values.

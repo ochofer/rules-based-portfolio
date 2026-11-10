@@ -4,7 +4,7 @@ printed from that page.
 The source holds one entry for every view, part, tile and exhibit of the dashboard. A heading names what its entry
 covers with a mark between brackets: ⟦view:overview⟧ for a view, ⟦c3⟧ for the exhibit whose id is c3, and
 ⟦#log-notes⟧ for a part of a view with that anchor. A tile is covered by a paragraph that opens with its name in
-bold. A mark in the text, such as ⟦c3⟧, becomes the exhibit's number with a link to its entry. The build stops when
+bold, and so is a key figure. A mark in the text, such as ⟦c3⟧, becomes the exhibit's number with a link to its entry. The build stops when
 the dashboard holds a view, an exhibit, an anchored part or a tile that the guide has no entry for, or when the guide
 has an entry for something the dashboard no longer holds, so the guide changes whenever the dashboard does.
 
@@ -55,10 +55,10 @@ def parts(sections: dict, numbers: dict, views) -> dict:
         text = "".join(sections[view])
         for kind, n in re.findall(r'<h3 id="(figure|table)-(\d+)">', text):
             found["exhibits"][by_number[(kind, int(n))]] = (kind, int(n), view)
-        for anchor, opening in re.findall(r'<(?:div|article) class="(?:section|card)[^"]*" id="([^"]+)">(<h\d[^>]*>)', text):
+        for anchor, opening in re.findall(r'<(?:div|article|aside) class="(?:section|card|group|ch-facts)[^"]*" id="([^"]+)">(<h\d[^>]*>)', text):
             if not re.match(r'<h3 id="(figure|table)-\d+">', opening):
                 found["anchors"][anchor] = view
-        for name in re.findall(r'<p class="name">(.*?)</p>', text, flags=re.S):
+        for name in re.findall(r'<p class="(?:name|ch-kpi__label)">(.*?)</p>', text, flags=re.S):
             found["tiles"][html.unescape(re.sub(r"<[^>]+>", "", name)).strip()] = view
     return found
 
@@ -139,6 +139,11 @@ def body(source: str, found: dict) -> tuple:
     return markdown.markdown(text), contents
 
 
+def _part_class(label: str) -> str:
+    """A part of a view in the contents stands out from the figures and tables under it."""
+    return "" if re.match(r"(Figure|Table) \d+ \|", label) else ' class="gd-part"'
+
+
 def _contents(contents: list) -> str:
     """The contents: each section of the guide, with its entries under it, every line a link."""
     groups = []
@@ -148,7 +153,7 @@ def _contents(contents: list) -> str:
         else:
             groups[-1][2].append((anchor, label))
     items = "".join(f'<li><a href="#{a}">{html.escape(l)}</a>'
-                    + ("<ul>" + "".join(f'<li><a href="#{sa}">{html.escape(sl)}</a></li>' for sa, sl in sub) + "</ul>"
+                    + ("<ul>" + "".join(f'<li{_part_class(sl)}><a href="#{sa}">{html.escape(sl)}</a></li>' for sa, sl in sub) + "</ul>"
                        if sub else "") + "</li>" for a, l, sub in groups)  # fmt: skip
     return f'<div class="gd-contents" role="navigation" aria-label="Contents"><h2 id="contents">Contents</h2><ul>{items}</ul></div>'
 
@@ -177,7 +182,7 @@ def page(source: str, found: dict, terms: list) -> str:
 <body>
 <header class="ch-band"><div class="ch-band__in">
   <a class="ch-word" href="{SITE_URL}">Carlo Hofer</a>
-  <div class="ch-menu" role="navigation" aria-label="Site"><a href="{SITE_URL}projects/">Projects</a></div>
+  <div class="ch-menu" role="navigation" aria-label="Site">{quarterly.site_menu()}</div>
 </div></header>
 <p class="ch-back"><a href="{config.DASHBOARD_URL}">&larr; Rules-based portfolio, the dashboard</a> &middot; <a href="{PROJECT_URL}">The project</a></p>
 <main class="rp gd">

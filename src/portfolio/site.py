@@ -31,15 +31,29 @@ PLOTLY = "https://cdn.plot.ly/plotly-cartesian-2.35.2.min.js"  # the smallest bu
 PLOTLY_INTEGRITY = "sha384-gKF7EaMDoWW1zLWkouldmVWF5jqEKrAswAciW73iNzqlomabVVPO60XkJvL5q/Ie"
 VIEWS = [
     ("overview", "Overview"),
-    ("rebalancing", "Rebalancing"),
-    ("costs", "Costs"),
-    ("contributions", "Contributions"),
-    ("lookthrough", "Look-through"),
-    ("factors", "Factor exposures"),
+    ("performance", "Performance"),
+    ("portfolio", "Portfolio"),
+    ("risk", "Risk"),
     ("method", "Method"),
-    ("simulations", "Simulations"),
-    ("log", "Log"),
 ]
+# The parts of the page in page order, each with its view and the title of its heading. A part's anchor is its
+# name, so that a link to #costs or #lookthrough opens the view that holds the part, at the part. A part without a
+# title opens its view, or carries its own heading.
+PARTS = [
+    ("overview", "overview", None),
+    ("growth", "performance", None),
+    ("contributions", "performance", "Contributions"),
+    ("costs", "performance", "Costs"),
+    ("rebalancing", "portfolio", "Rebalancing"),
+    ("lookthrough", "portfolio", "Look-through"),
+    ("factors", "portfolio", "Factor exposures"),
+    ("risk", "risk", None),
+    ("simulations", "risk", "Simulations"),
+    ("method", "method", None),
+    ("glossary", "method", "Terms"),
+    ("log", "method", "Log"),
+]
+VIEW_OF = {part: view for part, view, _ in PARTS}
 FACTOR_ROLE = {f: f"@factor_{i}" for i, f in enumerate(config.FACTORS, start=1)}
 SHORT_FUND = {
     "IE00B44Z5B48": "SPDR MSCI ACWI",
@@ -61,17 +75,31 @@ NUMBER_WORD = {1: "One", 2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six", 7
 
 
 class Page:
-    """Collects the charts of each view and their HTML."""
+    """Collects the charts of each part of the page and their HTML. views() then sets the parts into their views."""
 
     def __init__(self):
         self.charts = []
-        self.sections = {v: [] for v, _ in VIEWS}
+        self.sections = {part: [] for part, _, _ in PARTS}
 
-    def add(self, view, html_block, chart=None):
-        self.sections[view].append(html_block)
+    def add(self, part, html_block, chart=None):
+        self.sections[part].append(html_block)
         if chart:
-            chart["view"] = view
+            chart["view"] = part
             self.charts.append(chart)
+
+    def views(self, leads: dict) -> None:
+        """Each view's parts in page order, a part with a title under a heading that carries its lead, and every
+        chart drawn with the view that holds it."""
+        views = {v: [] for v, _ in VIEWS}
+        for part, view, title in PARTS:
+            if title:
+                views[view].append(_group(title, part, leads.get(part, "")))
+            elif part in leads:
+                views[view].append(f'<p class="wide partlead">{leads[part]}</p>')
+            views[view] += self.sections[part]
+        for chart in self.charts:
+            chart["view"] = VIEW_OF.get(chart["view"], chart["view"])
+        self.sections = views
 
 
 def _read(name: str, folder: Path = None) -> pd.DataFrame:
@@ -105,6 +133,11 @@ def _table(columns, rows, numeric=(), prose=False, wrap_first=None, rounding=Fal
             f'<tbody>{"".join(body)}</tbody></table></div></div>{note}')
 
 
+def _files(source) -> str:
+    """The files of a source line, in the body's type."""
+    return ", ".join(_esc(s) for s in ([source] if isinstance(source, str) else source))
+
+
 def _card(cid, title, asof, source, plot=True, table=None, note=None, wide=False, height=300, empty=None,
           anchor=None, kind=None, extra=None) -> str:  # fmt: skip
     """A card. A chart card is a figure and a card that is a table on its own is a table (kind), each numbered by
@@ -125,8 +158,7 @@ def _card(cid, title, asof, source, plot=True, table=None, note=None, wide=False
     if extra:
         parts.append(extra)
     if source:
-        files = ", ".join(f"<code>{_esc(s)}</code>" for s in ([source] if isinstance(source, str) else source))
-        parts.append(f'<p class="source">Source: {files}</p>')
+        parts.append(f'<p class="source">Source: {_files(source)}</p>')
     if table:
         parts.append(f'<details class="twin"><summary>Table</summary>{table}</details>')
     parts.append("</article>")
@@ -174,9 +206,11 @@ def _hover(texts) -> dict:
     return {"customdata": list(texts), "hovertemplate": "%{customdata}<extra></extra>"}
 
 
-def _hline(y, role="@axis", dash=None, label=None, xref="paper"):
+def _hline(y, role="@axis", dash=None, label=None, xref="paper", width=1):
     shape = {"type": "line", "xref": xref, "x0": 0, "x1": 1, "yref": "y", "y0": y, "y1": y,
-             "line": {"color": role, "width": 1}}  # fmt: skip
+             "line": {"color": role, "width": width}}  # fmt: skip
+    if dash:
+        shape["line"]["dash"] = dash
     return shape
 
 
@@ -187,29 +221,38 @@ def _vline(x, role="@axis"):
 
 def _label(x, y, text, xref="x", yref="y", anchor="left", role="@ink2", xshift=6, yshift=0):
     return {"x": x, "y": y, "xref": xref, "yref": yref, "text": _esc(text), "showarrow": False,
-            "xanchor": anchor, "xshift": xshift, "yshift": yshift, "font": {"color": role, "size": 11}}  # fmt: skip
+            "xanchor": anchor, "xshift": xshift, "yshift": yshift, "font": {"color": role, "size": 12.5}}  # fmt: skip
 
 
-# The mandate's two limits on a chart of falls: the full label at width, a short one on a phone.
+# The mandate's two limits on a chart of falls: the full label at width, a short one on a phone. A limit is a
+# dashed line with its label at the end.
 LIMIT_LABELS = ((35, "Test limit of the mandate, 35%", "Test limit, 35%"), (40, "Outer bound, 40%", "Outer bound, 40%"))
 FALL_AXIS_ROOM = 1.08  # the axis runs a little past its deepest tick, so the tick's label clears the dates
 
 
-def _limit_lines(deepest: float, x: float = 0, anchor: str = "left") -> tuple:
+def _limit_lines(deepest: float, x: float = 1, anchor: str = "right", levels=(35, 40)) -> tuple:
     """The limit lines within the range, and their labels at width and on a phone."""
     shapes, wide, narrow = [], [], []
     for level, long_text, short_text in LIMIT_LABELS:
-        if level <= deepest:
-            shapes.append(_hline(level))
-            wide.append(_label(x, level, long_text, xref="paper", anchor=anchor, yshift=8, xshift=0))
-            narrow.append(_label(x, level, short_text, xref="paper", anchor=anchor, yshift=8, xshift=0))
+        if level <= deepest and level in levels:
+            shapes.append(_hline(level, "@ink2", dash="dash", width=1.5))
+            wide.append({**_label(x, level, long_text, xref="paper", anchor=anchor, yshift=2, xshift=0), "yanchor": "bottom"})
+            narrow.append({**_label(x, level, short_text, xref="paper", anchor=anchor, yshift=2, xshift=0), "yanchor": "bottom"})
     return shapes, wide, narrow
 
 
+def _group(title: str, anchor: str, lead: str = "") -> str:
+    """The heading of a part of a view, across its whole width, with an anchor for links and the part's lead, which
+    may hold links."""
+    line = f'<p class="sub">{lead}</p>' if lead else ""
+    return f'<div class="group wide" id="{anchor}"><h2>{_esc(title)}</h2>{line}</div>'
+
+
 def _section(title: str, anchor: str, sub: str = "", tone: str = "") -> str:
-    """A heading that groups the cards after it, across the whole width of the view, with an anchor for links."""
+    """A heading that groups the cards after it within a part, across the whole width of the view, with an anchor
+    for links."""
     line = f'<p class="sub">{_esc(sub)}</p>' if sub else ""
-    return f'<div class="section wide {tone}" id="{anchor}"><h2>{_esc(title)}</h2>{line}</div>'
+    return f'<div class="section wide {tone}" id="{anchor}"><h3>{_esc(title)}</h3>{line}</div>'
 
 
 def _link(anchor: str, text: str) -> str:
@@ -221,16 +264,23 @@ def _and(items) -> str:
     return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
 
 
+def _month_tick(month) -> str:
+    """A month on a category axis, the month over the year: Oct over 2026."""
+    return fmt.month_short(month).replace(" ", "<br>")
+
+
 def _start_label(day, i) -> str:
     """The first row of a daily series is the starting amount at the close before the first order."""
-    return f"{day}, start" if i == 0 else str(day)
+    return f"{fmt.day_short(day)}, start" if i == 0 else fmt.day_short(day)
 
 
 def _date_axis(dates, most: int = 5) -> dict:
-    """A date axis. Over two weeks or less Plotly ticks by the hour and repeats each date, so the ticks are
-    then valuation days, at most `most` of them, the last day always among them."""
-    axis = {"type": "date", "tickformat": "%Y-%m-%d", "hoverformat": "%Y-%m-%d"}
+    """A date axis, its ticks as 8 Oct and as Oct 2026 once the dates span most of a year. Over two weeks or less
+    Plotly ticks by the hour and repeats each date, so the ticks are then valuation days, at most `most` of them, the
+    last day always among them."""
     days = sorted({str(d)[:10] for d in dates})
+    long = bool(days) and (pd.Timestamp(days[-1]) - pd.Timestamp(days[0])).days > 300
+    axis = {"type": "date", "tickformat": "%b %Y" if long else "%-d %b", "hoverformat": "%-d %B %Y"}
     if days and (pd.Timestamp(days[-1]) - pd.Timestamp(days[0])).days <= 14:
         step = -(-len(days) // most)
         axis.update(tickmode="array", tickvals=days[::-1][::step][::-1])
@@ -245,13 +295,13 @@ def _date_axes(dates) -> tuple:
 def _colophon(now_row) -> str:
     """The footer's last line. The record is built on the date of its holdings, so the build date comes
     from the committed outputs and a rebuild reproduces the page."""
-    built = fmt.day(_built(now_row))
+    built = fmt.day_words(_built(now_row))
     return (f'<p class="colophon">Carlo Hofer &middot; Data: the issuers\' published data &middot; '
             f'<a href="{config.REPOSITORY_URL}">Code on GitHub</a> &middot; Built {_esc(built)}</p>')
 
 
 def _asof(day, extra="") -> str:
-    return f"As of {fmt.day(day)}" + (f". {extra}" if extra else "")
+    return f"As of {fmt.day_words(day)}" + (f". {extra}" if extra else "")
 
 
 def _built(now_row) -> pd.Timestamp:
@@ -264,8 +314,14 @@ def _two_dates(now_row) -> str:
     """The date of the record. The prices and the holdings share it, and when they differ both are written."""
     prices, held = pd.Timestamp(now_row["weights_as_of"]), pd.Timestamp(now_row["positions_as_of"])
     if prices == held:
-        return f"As of {fmt.day(prices)}"
-    return f"Prices as of {fmt.day(prices)}, holdings as of {fmt.day(held)}"
+        return f"As of {fmt.day_words(prices)}"
+    return f"Prices as of {fmt.day_words(prices)}, holdings as of {fmt.day_words(held)}"
+
+
+def _stamp(now_row) -> str:
+    """The hero's stamp: the date of the figures, both dates when the prices and the holdings differ."""
+    dates = _two_dates(now_row)
+    return "Figures as of" + dates[len("As of"):] if dates.startswith("As of") else dates
 
 
 def _later_orders(orders, now_row) -> pd.DataFrame:
@@ -305,20 +361,187 @@ def _after_record(orders, now_row, counted=False) -> str:
 # Overview ------------------------------------------------------------------------------------------
 
 
-def _money_weighted(latest, orders) -> tuple:
-    """The money-weighted return to the last valuation day, the day of the time-weighted return beside it:
-    cumulative in the first year, per year after it."""
-    if latest is not None and pd.notna(latest.get("money_weighted_per_year")):
-        return fmt.pct(latest["money_weighted_per_year"], True), f"Per year, to {fmt.day(latest['last_day'])}"
-    if latest is not None and pd.notna(latest.get("money_weighted_since_start")):
-        return fmt.pct(latest["money_weighted_since_start"], True), f"Since the first purchase, to {fmt.day(latest['last_day'])}"
-    return "n/a", "From the first valuation day"
+def _whole(share: float) -> str:
+    """A share as a whole number of per cent, 0.7 -> 70."""
+    return fmt.count(round(share * 100))
 
 
-MONEY_WEIGHTED = "The money-weighted return counts the timing of the contributions, which the time-weighted return removes."
+def _span(first, last) -> str:
+    """A period in words: 7 October to 6 November 2026, with both years when they differ."""
+    a, b = pd.Timestamp(first), pd.Timestamp(last)
+    start = f"{a.day} {a.strftime('%B')}" + ("" if a.year == b.year else f" {a.year}")
+    return f"{start} to {fmt.day_words(b)}"
 
 
-def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.DataFrame, orders: pd.DataFrame):
+def _key_figures(w_now, last, month_orders: int) -> str:
+    """The strip of key figures: where the portfolio stands against its rules, each figure over the line that names
+    its reference."""
+    low, high = config.BAND
+    target = config.TARGET[config.EQUITY]
+    figures = [
+        ("Equity weight", fmt.pct(w_now["weight_equity"]), f"Target {_whole(target)}%, band {_whole(low)} to {_whole(high)}"),
+        ("Drift from target", fmt.points((w_now["weight_equity"] - target) * 100),
+         f"Equity weight minus {_whole(target)}%"),
+        ("Drawdown now", fmt.pct(-last["drawdown_portfolio"]) if last is not None else "n/a",
+         "Below the previous peak" if last is not None else "From the first valuation day"),
+        ("Orders this month", f"{month_orders} of {config.ORDERS_PER_MONTH}", "Allowance of rule 6"),
+    ]  # fmt: skip
+    def value(text: str) -> str:
+        # A unit in words, such as points, is set smaller beside its number, so the figure keeps to one line.
+        if not text.endswith(" points"):
+            return _esc(text)
+        return _esc(text[: -len(" points")]) + ' <span class="ch-kpi__unit">points</span>'
+
+    cells = "".join(f'<div class="ch-kpi"><p class="ch-kpi__label">{_esc(n)}</p><div class="ch-kpi__value">{value(v)}</div>'
+                    f'<div class="ch-kpi__ref">{_esc(r)}</div></div>' for n, v, r in figures)  # fmt: skip
+    return f'<div class="ch-kpis">{cells}</div>'
+
+
+def _returns(daily: pd.DataFrame, monthly: pd.DataFrame) -> str:
+    """The sentence under the key figures: the return since the first purchase, time-weighted and money-weighted.
+    Within the first year both are cumulative and no annual figure is shown, and from the first year on both are given
+    per year."""
+    history = daily.iloc[1:] if len(daily) else daily
+    latest = monthly.iloc[-1] if len(monthly) else None
+    if not len(history) or latest is None:
+        return "The returns start with the first valuation day."
+    growth = history["growth_portfolio"].iloc[-1] / 100
+    if pd.notna(latest.get("money_weighted_per_year")):
+        years = (pd.Timestamp(history["date"].iloc[-1]) - pd.Timestamp(daily["date"].iloc[0])).days / 365.25
+        return (f"Since the first purchase: <b>{_esc(fmt.pct(growth ** (1 / years) - 1, True))}</b> a year time-weighted "
+                f"and <b>{_esc(fmt.pct(latest['money_weighted_per_year'], True))}</b> a year money-weighted, in euro, after "
+                "costs.")  # fmt: skip
+    return (f"Since the first purchase: <b>{_esc(fmt.pct(growth - 1, True))}</b> time-weighted and "
+            f"<b>{_esc(fmt.pct(latest['money_weighted_since_start'], True))}</b> money-weighted, in euro, after costs, "
+            "not annualised. The record is shorter than a year, so no annual figures are shown yet.")  # fmt: skip
+
+
+TOP_UP_SHARE = 5  # the monthly top-up, per cent of the starting amount (rule 3)
+
+
+def _key_facts(first_day, costs: pd.DataFrame) -> str:
+    """Key facts: the sleeves with the funds' full names, the band, the contributions, the rebalancing, the risk limit,
+    the costs, the valuation, the first purchase and the benchmark, which the portfolio has none of by design."""
+    low, high = config.BAND
+    held = pd.read_csv(config.METHOD_DIR / "selection_tracking_difference.csv")
+    held = held[held["held"] == "yes"].drop_duplicates("sleeve").set_index("sleeve")["fund"]
+    rows = [
+        ("Equity sleeve", f"{held['equity']}, target {_whole(config.TARGET[config.EQUITY])}%"),
+        ("Bond sleeve", f"{held['bonds']}, target {_whole(config.TARGET[config.BONDS])}%"),
+        ("Band", f"Equity between {_whole(low)}% and {_whole(high)}%"),
+        ("Contributions", f"A starting amount, then a fixed monthly top-up of {TOP_UP_SHARE}% of it"),
+        ("Rebalancing", "Through the top-ups, and back to target when equity leaves the band on a cycle day"),
+        ("Risk limit", f"Worst fall within about one third, tested at {_whole(config.RISK_LIMIT_TEST)}%"),
+    ]  # fmt: skip
+    if len(costs):
+        by = costs.set_index("sleeve")["ongoing_costs"]
+        two = lambda v: f"{v * 100:.2f}%"  # noqa: E731
+        rows.append(("Ongoing costs", f"{two(by['portfolio'])} a year at the sleeve weights, TER plus transaction costs "
+                                      f"(equity {two(by['equity'])}, bonds {two(by['bonds'])})"))  # fmt: skip
+    rows += [("Valuation", "Euro, at the issuers' net asset values"),
+             ("First purchase", fmt.day_words(first_day) if first_day is not None else "n/a")]  # fmt: skip
+    facts = "".join(f'<div class="ch-fact"><dt>{_esc(a)}</dt><dd>{_esc(b)}</dd></div>' for a, b in rows)
+    facts += ('<div class="ch-fact"><dt>Benchmark</dt><dd>None by design, see the '
+              f'{_link("method-not-done", "Method view")}</dd></div>')  # fmt: skip
+    return f'<aside class="ch-facts" id="key-facts"><h3>Key facts</h3><dl>{facts}</dl></aside>'
+
+
+def _allocation(w_now, pending: str) -> tuple:
+    """Chart 2: the allocation against the target and the band, a bullet chart: the weight as a bar, the target as a
+    tick, the band shaded."""
+    low, high = config.BAND
+    band_text = f"Band {_whole(low)} to {_whole(high)}"
+    rows = [("Equity", w_now["weight_equity"], config.TARGET[config.EQUITY], "@equity", band_text),
+            ("Bonds", w_now["weight_bonds"], config.TARGET[config.BONDS], "@bonds", "No band of its own")]  # fmt: skip
+    traces, annotations = [], []
+    for name, w, target, role, band in rows:
+        hover = f"{name} {fmt.pct(w)}<br>Target {fmt.pct(target)}<br>{band}"
+        traces.append({"type": "bar", "orientation": "h", "y": [name], "x": [fmt.rounded(w * 100, 2)], "name": name,
+                       "width": 0.45, "marker": {"color": role}, "showlegend": False, **_hover([hover])})  # fmt: skip
+        annotations.append({**_label(max(w, target) * 100, name, "", anchor="left", role="@accent", xshift=10),
+                            "text": f"<b>{_esc(fmt.pct(w))}</b>"})  # fmt: skip
+    traces.append({"type": "scatter", "mode": "markers", "name": "Target weight", "y": [r[0] for r in rows],
+                   "x": [r[2] * 100 for r in rows], "showlegend": False,
+                   "marker": {"symbol": "line-ns", "size": 34, "color": "@ink", "line": {"color": "@ink", "width": 2}},
+                   **_hover([f"{r[0]} target {fmt.pct(r[2])}" for r in rows])})  # fmt: skip
+    label = _label((low + high) * 50, -0.42, band_text, anchor="center", xshift=0, yshift=2)
+    label["yanchor"] = "bottom"
+    layout = {
+        "barmode": "overlay", "showlegend": False, "height": 200,
+        "xaxis": {"range": [0, 100], "dtick": 25, "showline": False},
+        "yaxis": {"type": "category", "range": [1.55, -0.78], "showline": False, "showgrid": False, "ticks": ""},
+        "shapes": [{"type": "rect", "xref": "x", "yref": "y", "x0": low * 100, "x1": high * 100, "y0": -0.42, "y1": 0.42,
+                    "fillcolor": "@band", "line": {"width": 0}, "layer": "below"}],
+        "annotations": annotations + [label], "margin": {"t": 8, "r": 56},
+    }  # fmt: skip
+    cash = w_now["weight_cash"]
+    table = _table(["Sleeve", "Weight", "Target weight", "Band"],
+                   [["Equity", fmt.pct(w_now["weight_equity"]), fmt.pct(config.TARGET[config.EQUITY]), band_text],
+                    ["Bonds", fmt.pct(w_now["weight_bonds"]), fmt.pct(config.TARGET[config.BONDS]), ""],
+                    ["Cash", fmt.pct(cash), "", ""]], numeric=("Weight", "Target weight"), rounding=True)  # fmt: skip
+    dates = _two_dates(w_now)
+    unit = "Per cent of the portfolio, " + (dates[len("As of "):] if dates.startswith("As of ") else dates[0].lower() + dates[1:])
+    note = (f"The vertical marks are the target weights. Cash {fmt.pct(cash)}. The band applies to the equity weight only."
+            + (f" {pending}" if pending else ""))  # fmt: skip
+    card = _card("c2", "Allocation against the target and the band", unit, "outputs/allocation_now.csv", table=table,
+                 note=note, height=200)
+    return card, {"id": "c2", "view": "overview", "traces": traces, "layout": layout}
+
+
+def _drawdown(daily: pd.DataFrame, empty) -> tuple:
+    """Chart 4: the drawdown against the mandate's limit, as a positive fall below the previous peak on a reversed
+    axis that runs to the outer bound or deeper."""
+    history = daily.iloc[1:] if len(daily) else daily
+    traces, annotations = [], []
+    worst = -daily["drawdown_portfolio"].min() if len(daily) else 0.0
+    if len(history):
+        falls = [fmt.rounded(-v * 100, 1) for v in daily["drawdown_portfolio"]]
+        traces.append({"type": "scatter", "mode": "lines", "name": "Portfolio", "x": list(daily["date"]), "y": falls,
+                       "fill": "tozeroy", "line": {"color": "@accent", "width": 2}, "fillcolor": "@drawdown_fill",
+                       **_hover([f"{fmt.day_words(d)}<br>Portfolio: {fmt.pct(-v)} below the previous peak" for d, v in
+                                 zip(daily["date"], daily["drawdown_portfolio"])])})  # fmt: skip
+        traces.append({"type": "scatter", "mode": "markers", "x": [daily["date"].iloc[-1]], "y": [falls[-1]],
+                       "marker": {"size": 7, "color": "@accent"}, "showlegend": False, "hoverinfo": "skip",
+                       "cliponaxis": False})  # fmt: skip
+        annotations.append({**_label(daily["date"].iloc[-1], falls[-1], "", anchor="right", role="@accent", xshift=-4,
+                                     yshift=-14), "text": f"<b>{_esc(fmt.pct(-daily['drawdown_portfolio'].iloc[-1]))}</b>"})  # fmt: skip
+        blend = daily[["date", "drawdown_index_blend"]].dropna()
+        if len(blend) >= 2:
+            traces.append({"type": "scatter", "mode": "lines+markers", "name": "Index blend", "x": list(blend["date"]),
+                           "y": [fmt.rounded(-v * 100, 1) for v in blend["drawdown_index_blend"]],
+                           "line": {"color": "@index_blend", "width": 2}, "marker": {"size": 8},
+                           **_hover([f"{fmt.day_words(d)}<br>Index blend: {fmt.pct(-v)} below the previous peak" for d, v in
+                                     zip(blend["date"], blend["drawdown_index_blend"])])})  # fmt: skip
+    deepest = max(config.RISK_LIMIT_OUTER * 100, 10 * -(-worst * 100 // 10))
+    shapes, labels, short_labels = _limit_lines(deepest, levels=(35,))
+    ticks = list(range(0, int(deepest) + 1, 10))
+    wide, narrow = _date_axes(daily["date"])
+    if len(daily) > 1:
+        ends = [daily["date"].iloc[0], daily["date"].iloc[-1]]
+        wide["xaxis"]["range"], narrow["xaxis"]["range"] = ends, ends
+    layout = {"showlegend": len(traces) > 2, "height": 210,
+              "yaxis": {"range": [deepest + 0.5, -0.5], "tickmode": "array", "tickvals": ticks,
+                        "ticktext": [f"{t}%" if t == 0 else str(t) for t in ticks], "showline": False},
+              **wide, "shapes": shapes, "annotations": annotations + labels, "margin": {"t": 8}}  # fmt: skip
+    rows = [[_start_label(r["date"], i), fmt.pct(-r["drawdown_portfolio"]), fmt.pct(-r["drawdown_index_blend"])]
+            for i, (_, r) in enumerate(daily.iterrows())]  # fmt: skip
+    table = _table(["Date", "Portfolio", "Index blend"], rows, numeric=("Portfolio", "Index blend"))
+    unit = (f"Per cent below the previous peak, daily, {_span(daily['date'].iloc[0], daily['date'].iloc[-1])}"
+            if len(daily) else "Per cent below the previous peak, daily")  # fmt: skip
+    note = (f"The worst fall to date is {fmt.pct(worst)}. The mandate's test limit is 35 per cent and its outer bound 40 "
+            "per cent. Its test used month-end values, which miss falls that reverse within a month, so the worst daily "
+            "fall is at least as deep.")  # fmt: skip
+    card = _card("c4", "Drawdown against the mandate's limit", unit, "outputs/portfolio_daily.csv",
+                 table=None if empty else table, height=210, empty=empty, note=note)
+    chart = None if empty else {"id": "c4", "view": "overview", "traces": traces, "layout": layout,
+                                "layout_narrow": {**narrow, "annotations": annotations + short_labels}}  # fmt: skip
+    return card, chart
+
+
+def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.DataFrame, orders: pd.DataFrame,
+             costs: pd.DataFrame = pd.DataFrame()):  # fmt: skip
+    """The Overview: the key figures, the returns, the allocation and the drawdown in a pair, and the key facts. The
+    growth of 100 opens the Performance view."""
     history = daily.iloc[1:] if len(daily) else daily
     last = history.iloc[-1] if len(history) else None
     w_now = now.iloc[0]
@@ -326,80 +549,19 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
     if len(orders):
         current = _built(w_now).to_period("M")
         month_orders = int((pd.to_datetime(orders["date"]).dt.to_period("M") == current).sum())
-    previous = monthly[monthly["complete"] == "yes"].iloc[-1] if len(monthly) and (monthly["complete"] == "yes").any() else None
-
-    def change(now_value, before_value, f):
-        if before_value is None or pd.isna(before_value):
-            return "No month end yet"
-        return f"{f(now_value - before_value)} since {before_value_label}"
-
-    before_value_label = previous["month"] if previous is not None else ""
-    tiles = [
-        ("Equity weight", fmt.pct(w_now["weight_equity"]),
-         change(w_now["weight_equity"] * 100, None if previous is None else previous["weight_equity"] * 100,
-                lambda d: fmt.points(d))),
-        ("Drift from 70%", fmt.points((w_now["weight_equity"] - config.TARGET[config.EQUITY]) * 100),
-         "Equity weight minus the target weight"),
-        ("Return since the first purchase", fmt.pct(last["growth_portfolio"] / 100 - 1, signed=True) if last is not None else "n/a",
-         "Time-weighted, contributions removed" if last is not None else "From the first valuation day"),
-        ("Money-weighted return", *_money_weighted(monthly.iloc[-1] if len(monthly) else None, orders)),
-        ("Drawdown now", fmt.pct(-last["drawdown_portfolio"]) if last is not None else "n/a",
-         "Below the previous peak" if last is not None else "From the first valuation day"),
-        ("Orders this month", f"{month_orders} of {config.ORDERS_PER_MONTH}", "The allowance of rule 6"),
-    ]  # fmt: skip
-    tile_html = "".join(
-        f'<div class="tile"><p class="name">{_esc(n)}</p><div class="value">{_esc(v)}</div>'
-        f'<div class="change">{_esc(c)}</div></div>'
-        for n, v, c in tiles
-    )
-    asof = _two_dates(w_now)
+    first_order = orders["date"].min() if len(orders) else None
+    empty = None if len(history) >= 1 else (f"The series starts with the net asset values of {fmt.day_words(first_order)}, "
+                                            "the day of the first purchase, which the issuers publish the next working day.")  # fmt: skip
     pending = _after_record(orders, w_now)
-    page.add("overview", f'<div class="wide"><div class="tiles">{tile_html}</div><p class="tilenote">{_esc(MONEY_WEIGHTED)}</p><p class="source">{_esc(asof)}. '
-             f'Source: <code>outputs/allocation_now.csv</code>, <code>outputs/portfolio_daily.csv</code></p></div>')
-
-    # Chart 2: allocation now, a bullet chart: the weight as a bar, the target as a tick, the band shaded.
-    low, high = config.BAND
-    band_text = f"Band {fmt.count(round(low * 100))} to {fmt.count(round(high * 100))}"
-    rows2 = [("Equity", w_now["weight_equity"], config.TARGET[config.EQUITY], "@equity", band_text),
-             ("Bonds", w_now["weight_bonds"], config.TARGET[config.BONDS], "@bonds", "No band of its own")]  # fmt: skip
-    traces, annotations = [], []
-    for name, w, target, role, band in rows2:
-        hover = f"{name} {fmt.pct(w)}<br>Target {fmt.pct(target)}<br>{band}"
-        traces.append({"type": "bar", "orientation": "h", "y": [name], "x": [fmt.rounded(w * 100, 2)], "name": name,
-                       "width": 0.32, "marker": {"color": role}, "showlegend": False, **_hover([hover])})  # fmt: skip
-        annotations.append(_label(max(w, target) * 100, name, fmt.pct(w), anchor="left", role="@ink", xshift=8))
-    traces.append({"type": "scatter", "mode": "markers", "name": "Target weight", "y": [r[0] for r in rows2],
-                   "x": [r[2] * 100 for r in rows2], "showlegend": False,
-                   "marker": {"symbol": "line-ns", "size": 30, "color": "@ink", "line": {"color": "@ink", "width": 3}},
-                   **_hover([f"{r[0]} target {fmt.pct(r[2])}" for r in rows2])})  # fmt: skip
-    # Each target is labelled above its tick: a legend there would sit over a point of the axis.
-    for row, (name, w, target, role, band) in enumerate(rows2):
-        text = f"Target {fmt.count(round(target * 100))}%" + (f", {band_text[0].lower()}{band_text[1:]}" if row == 0 else "")
-        annotations.append(_label(target * 100, row - 0.42, text, anchor="center", xshift=0, yshift=2))
-        annotations[-1]["yanchor"] = "bottom"
-    layout = {
-        "barmode": "overlay", "showlegend": False, "height": 210,
-        "xaxis": {"range": [0, 100], "title": {"text": "Per cent of the portfolio"}, "dtick": 10},
-        "yaxis": {"type": "category", "range": [1.55, -0.78], "showline": False, "showgrid": False,
-                  "tickfont": {"size": 12}},
-        "shapes": [{"type": "rect", "xref": "x", "yref": "y", "x0": low * 100, "x1": high * 100, "y0": -0.4, "y1": 0.4,
-                    "fillcolor": "@band", "line": {"width": 0}, "layer": "below"}],
-        "annotations": annotations, "margin": {"t": 8},
-    }  # fmt: skip
-    cash = w_now["weight_cash"]
-    table = _table(["Sleeve", "Weight", "Target weight", "Band"],
-                   [["Equity", fmt.pct(w_now["weight_equity"]), fmt.pct(config.TARGET[config.EQUITY]), band_text],
-                    ["Bonds", fmt.pct(w_now["weight_bonds"]), fmt.pct(config.TARGET[config.BONDS]), ""],
-                    ["Cash", fmt.pct(cash), "", ""]], numeric=("Weight", "Target weight"), rounding=True)  # fmt: skip
-    note2 = f"Cash {fmt.pct(cash)}. The band applies to the equity weight only." + (f" {pending}" if pending else "")
-    page.add("overview", _card("c2", "Allocation now against the target and the band", asof,
-             "outputs/allocation_now.csv", table=table, note=note2, height=210, wide=True),
-             {"id": "c2", "traces": traces, "layout": layout})  # fmt: skip
+    allocation_card, allocation_chart = _allocation(w_now, pending)
+    drawdown_card, drawdown_chart = _drawdown(daily, empty)
+    page.charts += [c for c in (allocation_chart, drawdown_chart) if c]
+    source = '<p class="source">Source: outputs/allocation_now.csv, outputs/portfolio_daily.csv, outputs/metrics_monthly.csv</p>'
+    page.add("overview", f'<div class="wide ch-top"><div class="ch-main">{_key_figures(w_now, last, month_orders)}'
+             f'<p class="ch-returns">{_returns(daily, monthly)}</p>{source}'
+             f'<div class="ch-pair">{allocation_card}{drawdown_card}</div></div>{_key_facts(first_order, costs)}</div>')  # fmt: skip
 
     # Chart 3: growth of 100.
-    first_order = orders["date"].min() if len(orders) else None
-    empty = None if len(history) >= 1 else (f"The series starts with the net asset values of {first_order}, the day of "
-                                            "the first purchase, which the issuers publish the next working day.")
     series = [("Portfolio", "growth_portfolio", "@accent", 2),
               ("Reference A, same rules", "growth_reference_a", "@reference_a", 2),
               ("Reference B, 70/30 each cycle day", "growth_reference_b", "@reference_b", 2),
@@ -412,7 +574,7 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
         traces.append({"type": "scatter", "mode": "lines+markers" if len(data) < 3 else "lines", "name": name,
                        "x": list(data["date"]), "y": [fmt.rounded(v, 1) for v in data[column]],
                        "line": {"color": role, "width": width}, "marker": {"size": 8, "color": role},
-                       **_hover([f"{d}<br>{name}: {fmt.index(v)}" for d, v in zip(data["date"], data[column])])})  # fmt: skip
+                       **_hover([f"{fmt.day_words(d)}<br>{name}: {fmt.index(v)}" for d, v in zip(data["date"], data[column])])})  # fmt: skip
         if column == "growth_portfolio":
             end = data.iloc[-1]
             annotations.append(_label(end["date"], fmt.rounded(end[column], 1), fmt.index(end[column])))
@@ -431,44 +593,11 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
                   f"100 is the starting amount before the first order. {blend_text}")  # fmt: skip
     why = ("<p class=\"note\">Why the portfolio has no optimiser, no index benchmark, no views and no signal: "
            f"{_link('method-not-done', 'Method')}.</p>")
-    page.add("overview", _card("c3", "Growth of 100: the portfolio, the two reference portfolios and the index blend",
+    page.add("growth", _card("c3", "Growth of 100: the portfolio, the two reference portfolios and the index blend",
              asof3, "outputs/portfolio_daily.csv", table=None if empty else table, height=340, wide=True, empty=empty,
              extra=why),
              None if empty else {"id": "c3", "traces": traces, "layout": layout,
                                  "layout_narrow": {"annotations": [], "margin": {"r": 12}, **narrow}})  # fmt: skip
-
-    # Chart 4: drawdown, as a positive fall below the previous peak on a reversed axis scaled to the data.
-    traces = []
-    if len(history):
-        traces.append({"type": "scatter", "mode": "lines", "name": "Portfolio", "x": list(daily["date"]),
-                       "y": [fmt.rounded(-v * 100, 1) for v in daily["drawdown_portfolio"]], "fill": "tozeroy",
-                       "line": {"color": "@accent", "width": 2}, "fillcolor": "@ring",
-                       **_hover([f"{d}<br>Portfolio: {fmt.pct(-v)} below the previous peak" for d, v in
-                                 zip(daily["date"], daily["drawdown_portfolio"])])})  # fmt: skip
-        blend = daily[["date", "drawdown_index_blend"]].dropna()
-        if len(blend) >= 2:
-            traces.append({"type": "scatter", "mode": "lines+markers", "name": "Index blend", "x": list(blend["date"]),
-                           "y": [fmt.rounded(-v * 100, 1) for v in blend["drawdown_index_blend"]],
-                           "line": {"color": "@index_blend", "width": 2}, "marker": {"size": 8},
-                           **_hover([f"{d}<br>Index blend: {fmt.pct(-v)} below the previous peak" for d, v in
-                                     zip(blend["date"], blend["drawdown_index_blend"])])})  # fmt: skip
-    worst = -daily["drawdown_portfolio"].min() if len(daily) else 0.0
-    deepest = max(10.0, 1.3 * worst * 100)
-    shapes, annotations, short_labels = _limit_lines(deepest)
-    wide, narrow = _date_axes(daily["date"])
-    narrow = {**narrow, "annotations": short_labels}
-    layout = {"showlegend": len(traces) > 1, "yaxis": {"title": {"text": "Per cent below the previous peak"},
-              "range": [deepest * FALL_AXIS_ROOM, -1]}, **wide, "shapes": shapes, "annotations": annotations}  # fmt: skip
-    rows = [[_start_label(r["date"], i), fmt.pct(-r["drawdown_portfolio"]), fmt.pct(-r["drawdown_index_blend"])]
-            for i, (_, r) in enumerate(daily.iterrows())]  # fmt: skip
-    table = _table(["Date", "Portfolio", "Index blend"], rows, numeric=("Portfolio", "Index blend"))
-    asof4 = _asof(daily["date"].iloc[-1] if len(daily) else w_now["weights_as_of"],
-                  f"Worst fall to date {fmt.pct(worst)}. The mandate's test limit is 35 per cent and its outer bound 40 per cent")  # fmt: skip
-    page.add("overview", _card("c4", "Drawdown against the mandate's limit", asof4,
-             "outputs/portfolio_daily.csv", table=None if empty else table, height=300, wide=True, empty=empty,
-             note="Daily values. The mandate's 35% test used month-end values, which miss falls that reverse within "
-                  "a month. The worst daily fall is at least as deep."),
-             None if empty else {"id": "c4", "traces": traces, "layout": layout, "layout_narrow": narrow})  # fmt: skip
 
 
 # Rebalancing ---------------------------------------------------------------------------------------
@@ -483,7 +612,7 @@ def rebalancing(page, daily, orders, band, compliance, monthly, now=None):
         traces.append({"type": "scatter", "mode": "lines", "name": "Equity weight", "x": list(history["date"]),
                        "y": [fmt.rounded(v * 100, 1) for v in history["weight_equity"]],
                        "line": {"color": "@equity", "width": 2},
-                       **_hover([f"{d}<br>Equity weight {fmt.pct(v)}" for d, v in
+                       **_hover([f"{fmt.day_words(d)}<br>Equity weight {fmt.pct(v)}" for d, v in
                                  zip(history["date"], history["weight_equity"])])})  # fmt: skip
         weight_on = dict(zip(history["date"], history["weight_equity"]))
         # The equity marker is the larger, so that a day with both purchases shows both.
@@ -495,14 +624,14 @@ def rebalancing(page, daily, orders, band, compliance, monthly, now=None):
                 traces.append({"type": "scatter", "mode": "markers", "name": label, "x": [p[0] for p in pts],
                                "y": [fmt.rounded(p[1] * 100, 1) for p in pts],
                                "marker": {"size": size, "color": role, "line": {"color": "@surface", "width": 2}},
-                               **_hover([f"{d}<br>{label}" for d, _ in pts])})  # fmt: skip
+                               **_hover([f"{fmt.day_words(d)}<br>{label}" for d, _ in pts])})  # fmt: skip
         annotations = []
         if len(band):
             pts = [(d, weight_on.get(d)) for d in band["date"] if d in weight_on]
             traces.append({"type": "scatter", "mode": "markers", "name": "Band order",
                            "x": [p[0] for p in pts], "y": [fmt.rounded(p[1] * 100, 1) for p in pts],
                            "marker": {"size": 11, "symbol": "diamond", "color": "@status_breach"},
-                           **_hover([f"{d}<br>Band order, rule 5" for d, _ in pts])})  # fmt: skip
+                           **_hover([f"{fmt.day_words(d)}<br>Band order, rule 5" for d, _ in pts])})  # fmt: skip
             annotations += [_label(p[0], fmt.rounded(p[1] * 100, 1), "◆ Band order") for p in pts]
         missed = compliance[compliance["issue"] == "called for by the rules and not placed"] if len(compliance) else compliance
         if len(missed):
@@ -511,7 +640,7 @@ def rebalancing(page, daily, orders, band, compliance, monthly, now=None):
                            "x": [p[0] for p in pts], "y": [fmt.rounded(p[1] * 100, 1) for p in pts],
                            "marker": {"size": 11, "symbol": "circle-open", "color": "@status_missed",
                                       "line": {"width": 2}},
-                           **_hover([f"{d}<br>Order called for by the rules and not placed" for d, _ in pts])})  # fmt: skip
+                           **_hover([f"{fmt.day_words(d)}<br>Order called for by the rules and not placed" for d, _ in pts])})  # fmt: skip
             annotations += [_label(p[0], fmt.rounded(p[1] * 100, 1), "○ Not placed") for p in pts]
     wide, narrow = _date_axes(history["date"])
     layout = {"showlegend": True, "yaxis": {"title": {"text": "Equity weight, per cent"}, "range": [60, 80], "dtick": 5},
@@ -521,7 +650,7 @@ def rebalancing(page, daily, orders, band, compliance, monthly, now=None):
                          _hline(70, "@ink")]}  # fmt: skip
     if len(history):
         layout["annotations"] = annotations
-    rows = [[r["date"], fmt.pct(r["weight_equity"]), fmt.pct(r["weight_bonds"]), fmt.pct(r["weight_cash"])]
+    rows = [[fmt.day_short(r["date"]), fmt.pct(r["weight_equity"]), fmt.pct(r["weight_bonds"]), fmt.pct(r["weight_cash"])]
             for _, r in history.iterrows()]  # fmt: skip
     table = _table(["Date", "Equity", "Bonds", "Cash"], rows, numeric=("Equity", "Bonds", "Cash"), rounding=True)
     first_cycle = "No cycle day yet: the line covers the days since the first purchase" if not len(band) and (
@@ -536,18 +665,19 @@ def rebalancing(page, daily, orders, band, compliance, monthly, now=None):
     if len(orders):
         months = pd.to_datetime(orders["date"]).dt.strftime("%Y-%m")
         counts = months.value_counts().sort_index()
+        counts.index = [_month_tick(m) for m in counts.index]
     else:
         counts = pd.Series(dtype=int)
     traces = [{"type": "bar", "x": list(counts.index), "y": [int(v) for v in counts.values], "name": "Orders",
                "width": 0.45, "marker": {"color": "@accent"},
-               **_hover([f"{m}: {v} of {config.ORDERS_PER_MONTH}" for m, v in counts.items()])}]
+               **_hover([f"{fmt.month_words(m.replace('<br>', ' '))}: {v} of {config.ORDERS_PER_MONTH}" for m, v in counts.items()])}]
     shown = max(len(counts), 6)
     layout = {"yaxis": {"title": {"text": "Orders in the month"}, "range": [0, 6], "dtick": 1},
               "xaxis": {"type": "category", "title": {"text": "Month"}, "range": [-0.5, shown - 0.5]},
               "shapes": [_hline(config.ORDERS_PER_MONTH, "@ink")],
               "annotations": [_label(1, config.ORDERS_PER_MONTH, "Allowance, 5", xref="paper", anchor="right",
                                      xshift=0, yshift=8)]}  # fmt: skip
-    rows = [[r["date"], r["sleeve"], r["side"], r["rule"], r["inside_rule_7_window"], r["bid_and_ask_recorded"]]
+    rows = [[fmt.day_short(r["date"]), r["sleeve"], r["side"], r["rule"], r["inside_rule_7_window"], r["bid_and_ask_recorded"]]
             for _, r in orders.iterrows()] if len(orders) else []  # fmt: skip
     table = _table(["Date", "Sleeve", "Side", "Rule", "Inside 15:45 to 17:00", "Bid and ask recorded"], rows)
     note = _departures(compliance, orders)
@@ -599,17 +729,17 @@ def costs(page, monthly, implementation, daily):
              ("Price paid against net asset value", "execution_against_nav_bps", "@cost_1")]  # fmt: skip
     if len(monthly):
         for name, column, role in parts:
-            traces.append({"type": "bar", "name": name, "x": list(monthly["month"]), "width": 0.45,
+            traces.append({"type": "bar", "name": name, "x": [_month_tick(m) for m in monthly["month"]], "width": 0.45,
                            "y": [fmt.rounded(v, 0) for v in monthly[column]],
                            "marker": {"color": role, "line": {"color": "@surface", "width": 2}},
-                           **_hover([f"{m}<br>{name}: {fmt.bps(v, signed=False)}<br>Implementation cost of the month: "
+                           **_hover([f"{fmt.month_words(m)}<br>{name}: {fmt.bps(v, signed=False)}<br>Implementation cost of the month: "
                                      f"{fmt.bps(t, signed=False)}" for m, v, t in
                                      zip(monthly["month"], monthly[column], monthly["implementation_cost_month_bps"])])})  # fmt: skip
     layout = {"barmode": "relative", "showlegend": True, "bargap": 0.45, "legend": {"traceorder": "normal"},
               "yaxis": {"title": {"text": "Basis points of the portfolio's value"}},
               "xaxis": {"type": "category", "title": {"text": "Month"},
                         "range": [-0.5, max(len(monthly), 6) - 0.5]}, "shapes": [_hline(0, "@ink")]}  # fmt: skip
-    rows = [[r["month"], fmt.bps(r["commissions_bps"], False), fmt.bps(r["half_spread_bps"], False),
+    rows = [[fmt.month_short(r["month"]), fmt.bps(r["commissions_bps"], False), fmt.bps(r["half_spread_bps"], False),
              fmt.count(r["orders_without_bid_and_ask"]), fmt.bps(r["currency_conversion_bps"], False),
              fmt.bps(r["execution_against_nav_bps"], False), fmt.bps(r["implementation_cost_month_bps"], False)]
             for _, r in monthly.iterrows()] if len(monthly) else []  # fmt: skip
@@ -628,7 +758,8 @@ def costs(page, monthly, implementation, daily):
     empty = None if len(monthly) else "Costs start with the first valuation day."
     page.add("costs", _card("c7", "Cost per month by source", _asof(daily["date"].iloc[-1]),
              "outputs/costs_monthly.csv", table=table, note=note, height=280, empty=empty),
-             None if empty else {"id": "c7", "traces": traces, "layout": layout})  # fmt: skip
+             None if empty else {"id": "c7", "traces": traces, "layout": layout,
+                                 "layout_narrow": {"yaxis": {"title": {"text": "Basis points"}}}})  # fmt: skip
 
     data = implementation.dropna(subset=["implementation_cost_bps"]) if len(implementation) else implementation
     empty = None if len(data) > 1 else "The comparison starts on the first valuation day."
@@ -638,7 +769,7 @@ def costs(page, monthly, implementation, daily):
                    "name": "Reference portfolio A against the portfolio", "x": list(data["date"]),
                    "y": [fmt.rounded(v, 0) for v in data["implementation_cost_bps"]],
                    "line": {"color": "@accent", "width": 2}, "marker": {"size": 8, "color": "@accent"},
-                   **_hover([f"{d}<br>{fmt.bps(v)}" for d, v in zip(data["date"], data["implementation_cost_bps"])])}]
+                   **_hover([f"{fmt.day_words(d)}<br>{fmt.bps(v)}" for d, v in zip(data["date"], data["implementation_cost_bps"])])}]
         end = data.iloc[-1]
         wide, narrow = _date_axes(data["date"])
         layout = {"yaxis": {"title": {"text": "Basis points, cumulative"}}, **wide, "shapes": [_hline(0, "@ink")],
@@ -654,7 +785,8 @@ def costs(page, monthly, implementation, daily):
                   "between reference portfolio A and the portfolio is the cumulative cost of running the portfolio. "
                   f"A cost of 10 basis points in one month of {_ref('c7')} moves this line up by 10 basis points in that "
                   "month."),
-             None if empty else {"id": "c8", "traces": traces, "layout": layout, "layout_narrow": narrow})  # fmt: skip
+             None if empty else {"id": "c8", "traces": traces, "layout": layout,
+                                 "layout_narrow": {**narrow, "yaxis": {"title": {"text": "Basis points"}}}})  # fmt: skip
 
 
 # Contributions -------------------------------------------------------------------------------------
@@ -676,10 +808,10 @@ def contributions(page, daily, monthly):
              "line": {"width": 0}, "hoverinfo": "skip", "name": "Gap between value and money paid in", "showlegend": True},
             {"type": "scatter", "mode": "lines", "name": "Contributions paid in", "x": x, "y": paid,
              "line": {"color": "@ink2", "width": 2},
-             **_hover([f"{d}<br>Paid in: {fmt.index(p)}" for d, p in zip(x, daily["contributions_in_units"])])},
+             **_hover([f"{fmt.day_words(d)}<br>Paid in: {fmt.index(p)}" for d, p in zip(x, daily["contributions_in_units"])])},
             {"type": "scatter", "mode": "lines+markers" if len(x) < 4 else "lines", "name": "Value of the portfolio",
              "x": x, "y": value, "line": {"color": "@accent", "width": 2}, "marker": {"size": 8, "color": "@accent"},
-             **_hover([f"{d}<br>Value: {fmt.index(v)}" for d, v in zip(x, daily["value_in_units"])])},
+             **_hover([f"{fmt.day_words(d)}<br>Value: {fmt.index(v)}" for d, v in zip(x, daily["value_in_units"])])},
         ]  # fmt: skip
     wide, narrow = _date_axes(daily["date"])
     # From zero, so that the gap between the value and the money paid in is drawn to scale.
@@ -690,26 +822,26 @@ def contributions(page, daily, monthly):
     table = _table(["Date", "Paid in", "Value"], rows, numeric=("Paid in", "Value"))
     page.add("contributions", _card("c9", "Money paid in and the value of the portfolio, in units of the starting amount",
              _asof(daily["date"].iloc[-1], "The starting amount is 100 units and each top-up is 5"),
-             "outputs/portfolio_daily.csv", table=None if empty else table, height=320, wide=True, empty=empty),
+             "outputs/portfolio_daily.csv", table=None if empty else table, height=320, empty=empty),
              None if empty else {"id": "c9", "traces": traces, "layout": layout, "layout_narrow": narrow})  # fmt: skip
 
     empty = None if len(monthly) else "The first month starts with the first valuation day."
-    rows = [[r["month"] + ("" if r["complete"] == "yes" else " (to date)"), fmt.pct(r["market_effect"], True),
+    rows = [[fmt.month_short(r["month"]) + ("" if r["complete"] == "yes" else " (to date)"), fmt.pct(r["market_effect"], True),
              fmt.pct(r["contribution_effect"], True)] for _, r in monthly.iterrows()] if len(monthly) else []  # fmt: skip
     table = _table(["Month", "Market effect", "Contribution"], rows, numeric=("Market effect", "Contribution"))
     chart_a = chart_b = None
     if not empty:
-        m = list(monthly["month"])
+        m = [_month_tick(x) for x in monthly["month"]]
         months_shown = [-0.5, max(len(m), 6) - 0.5]
         chart_a = {"id": "c10a", "traces": [{"type": "bar", "name": "Market effect", "x": m, "width": 0.45,
                    "y": [fmt.rounded(v * 100, 1) for v in monthly["market_effect"]],
                    "marker": {"color": "@accent"},
-                   **_hover([f"{a}<br>Market effect {fmt.pct(v, True)}" for a, v in zip(m, monthly["market_effect"])])}],
+                   **_hover([f"{fmt.month_words(a)}<br>Market effect {fmt.pct(v, True)}" for a, v in zip(monthly["month"], monthly["market_effect"])])}],
                    "layout": {"yaxis": {"title": {"text": "Market effect, per cent"}, "zeroline": True},
                               "xaxis": {"type": "category", "range": months_shown}, "shapes": [_hline(0, "@ink")]}}  # fmt: skip
         chart_b = {"id": "c10b", "traces": [{"type": "bar", "name": "Contribution", "x": m, "width": 0.45,
                    "y": [fmt.rounded(v * 100, 1) for v in monthly["contribution_effect"]], "marker": {"color": "@ink2"},
-                   **_hover([f"{a}<br>Contribution {fmt.pct(v, True)}" for a, v in zip(m, monthly["contribution_effect"])])}],
+                   **_hover([f"{fmt.month_words(a)}<br>Contribution {fmt.pct(v, True)}" for a, v in zip(monthly["month"], monthly["contribution_effect"])])}],
                    "layout": {"yaxis": {"title": {"text": "Contribution, per cent"}}, "xaxis": {"type": "category",
                               "title": {"text": "Month"}, "range": months_shown}}}  # fmt: skip
     body = "" if empty else ('<div class="plot" id="c10a" style="height:200px" role="img" aria-label="Market effect by month"></div>'
@@ -756,7 +888,7 @@ def _bars(cid, frame, label, role, title, asof, source, page, view, note=None, s
 def lookthrough(page, out):
     def asof(frame):
         r = frame.iloc[0]
-        return f"Holdings as of {fmt.day(r['holdings_as_of'])}, sleeve weights as of {fmt.day(r['weights_as_of'])}"
+        return f"Holdings as of {fmt.day_words(r['holdings_as_of'])}, sleeve weights as of {fmt.day_words(r['weights_as_of'])}"
 
     held = pd.read_csv(config.METHOD_DIR / "selection_tracking_difference.csv")
     held = held[held["held"] == "yes"].drop_duplicates("sleeve").set_index("sleeve")["fund"]
@@ -805,7 +937,7 @@ def lookthrough(page, out):
                    numeric=("Share of the sleeve", "Share of the portfolio"), rounding=True)
     tiles = (f'<div class="duo"><div class="tile"><p class="name">Duration of the bond sleeve</p>'
              f'<div class="value">{_esc(fmt.years(dur["duration_years"]))}</div><div class="change">Vanguard factsheet of '
-             f'{_esc(fmt.day(dur["holdings_as_of"]))}</div></div><div class="tile"><p class="name">Duration contribution to the portfolio</p>'
+             f'{_esc(fmt.day_words(dur["holdings_as_of"]))}</div></div><div class="tile"><p class="name">Duration contribution to the portfolio</p>'
              f'<div class="value">{_esc(fmt.years(dur["portfolio_duration_years"]))}</div><div class="change">Sleeve weight times duration'
              f'</div></div></div>')  # fmt: skip
     block = _card("c16", "Bonds by maturity, and duration", asof(mat), ["outputs/lookthrough_bonds_maturity.csv",
@@ -827,7 +959,7 @@ def lookthrough(page, out):
     table = _table(["Rating", "Share of the sleeve", "Share of the portfolio"], rows,
                    numeric=("Share of the sleeve", "Share of the portfolio"), rounding=True)
     page.add("lookthrough", _card("c17", "Credit quality of the bond sleeve, as the issuer reports it",
-             f"Vanguard factsheet as of {fmt.day(rating['holdings_as_of'].iloc[0])}", "outputs/lookthrough_bonds_rating.csv",
+             f"Vanguard factsheet as of {fmt.day_words(rating['holdings_as_of'].iloc[0])}", "outputs/lookthrough_bonds_rating.csv",
              table=table, height=260, note="The factsheet takes the median of the Moody's, Fitch and S&P ratings of each issue."),
              {"id": "c17", "traces": traces, "layout": layout})  # fmt: skip
 
@@ -908,9 +1040,9 @@ def _risk_tiles(page, summary, boot, weight_equity, monthly):
     line = ("The forecast's calibration is the standard deviation, over the months, of each month's return divided by the "
             "monthly volatility estimated at the end of the month before. 1 means the estimates matched the returns, and "
             "above 1 that they were too low. Every estimate is kept as first written, in outputs/ex_ante_risk.csv.")  # fmt: skip
-    page.add("lookthrough", f'<div class="wide"><div class="tiles three">{tile_html}</div><p class="tilenote">{_esc(line)}</p>'
+    page.add("risk", f'<div class="wide"><div class="tiles three">{tile_html}</div><p class="tilenote">{_esc(line)}</p>'
              '<p class="source">Estimated on index returns, at today\'s weights, and not the record. Source: '
-             '<code>outputs/risk_summary.csv</code>, <code>mandate/simulation_bootstrap.csv</code></p></div>')  # fmt: skip
+             'outputs/risk_summary.csv, mandate/simulation_bootstrap.csv</p></div>')  # fmt: skip
 
 
 def _tail_tiles(page, summary):
@@ -936,9 +1068,9 @@ def _tail_tiles(page, summary):
             "holds. Not a limit, and never a reason to sell, under rule 8, since the mandate binds on the worst fall over "
             "years. Each month end's value at risk is kept as first written, in outputs/ex_ante_risk.csv, and twelve months "
             "give the count of months beyond it almost no power. It starts to say something at about sixty.")  # fmt: skip
-    page.add("lookthrough", f'<div class="wide"><div class="tiles four">{tile_html}</div><p class="tilenote">{_esc(line)}</p>'
+    page.add("risk", f'<div class="wide"><div class="tiles four">{tile_html}</div><p class="tilenote">{_esc(line)}</p>'
              '<p class="source">Estimated on index returns, at today\'s weights, and not the record. Source: '
-             '<code>outputs/risk_summary.csv</code>, <code>outputs/ex_ante_risk.csv</code></p></div>')  # fmt: skip
+             'outputs/risk_summary.csv, outputs/ex_ante_risk.csv</p></div>')  # fmt: skip
 
 
 def _correlation_heatmap(page, components, pairs, summary):
@@ -969,11 +1101,11 @@ def _correlation_heatmap(page, components, pairs, summary):
             "bond at the group's midpoint, priced from the ECB's curve as the allocation test prices its seven-year bond: "
             "short 1 to 5 years at 3, medium 5 to 10 years at 7.5, and long over 10 years at 20. Cash has no return and no "
             "correlation.")  # fmt: skip
-    block = _card("c30", "Correlation of the components' monthly returns", f"Window {summary['window_start']} to {summary['window_end']}",
+    block = _card("c30", "Correlation of the components' monthly returns", f"Window {_month_name(summary['window_start'])} to {_month_name(summary['window_end'])}",
                   ["outputs/risk_correlation.csv", "outputs/risk_components.csv"], note=note, wide=True, height=420,
                   anchor="lookthrough-risk")  # fmt: skip
     block = block.replace('<p class="note">', table + '<p class="note">', 1)
-    page.add("lookthrough", block, {"id": "c30", "traces": [trace], "layout": layout, "layout_narrow": narrow})
+    page.add("risk", block, {"id": "c30", "traces": [trace], "layout": layout, "layout_narrow": narrow})
 
 
 def _risk_contributions(page, components, summary):
@@ -1000,8 +1132,8 @@ def _risk_contributions(page, components, summary):
             f"variance, on {_window_text(summary)}. The equity regions carry {fmt.pct(equity['risk_contribution'].sum())} of "
             f"the estimated variance against {fmt.pct(equity['weight'].sum())} of the weight, and the maturity groups "
             f"{fmt.pct(bonds['risk_contribution'].sum())} against {fmt.pct(bonds['weight'].sum())}.")  # fmt: skip
-    page.add("lookthrough", _card("c31", "Each component's share of the estimated variance, beside its weight",
-             f"Look-through weights of {fmt.day(summary['weights_as_of'])}", "outputs/risk_components.csv", table=table, note=note,
+    page.add("risk", _card("c31", "Each component's share of the estimated variance, beside its weight",
+             f"Look-through weights of {fmt.day_words(summary['weights_as_of'])}", "outputs/risk_components.csv", table=table, note=note,
              wide=True, height=360), {"id": "c31", "traces": traces, "layout": layout, "layout_narrow": narrow})  # fmt: skip
 
 
@@ -1043,16 +1175,16 @@ def _frontier(page, frontiers, summary, components):
             f"{STUDY_NAME} finds that sample-based optimisation of this kind does not keep its in-sample advantage out of "
             "sample. The table gives the weights of each point of the window's frontier.")  # fmt: skip
     block = _card("c32", "The efficient frontier of the components, and the portfolio's point",
-                  f"The 120 months to {summary['earlier_window_end']}, and to {summary['window_end']}", "outputs/risk_frontier.csv",
+                  f"The 120 months to {_month_name(summary['earlier_window_end'])}, and to {_month_name(summary['window_end'])}", "outputs/risk_frontier.csv",
                   table=table, note=note, wide=True, height=380)  # fmt: skip
     block = block.replace(f"The study {STUDY_NAME} finds", f'The study <a href="{STUDY_URL}">{STUDY_NAME}</a> finds', 1)
-    page.add("lookthrough", block, {"id": "c32", "traces": traces, "layout": layout})
+    page.add("risk", block, {"id": "c32", "traces": traces, "layout": layout})
 
 
 def _stress(page, episodes):
     series = {"the components": "Components", "the allocation test's two series": "Allocation test"}
     rows = [[r["episode"], fmt.pct(r["equity_contribution"], True), fmt.pct(r["bond_contribution"], True),
-             fmt.pct(r["total"], True), f"{r['from_month_end']} to {r['to_month_end']}", series.get(r["series"], r["series"])]
+             fmt.pct(r["total"], True), f"{fmt.month_short(r['from_month_end'])} to {fmt.month_short(r['to_month_end'])}", series.get(r["series"], r["series"])]
             for _, r in episodes.iterrows()]  # fmt: skip
     columns = ["Episode", "Equity", "Bonds", "Total", "Month ends", "Series"]
     table = _table(columns, rows, numeric=("Equity", "Bonds", "Total"), wrap_first=True)
@@ -1061,7 +1193,7 @@ def _stress(page, episodes):
             "contributions add up to the total. Month-end values miss falls that reverse within a month. The components' "
             "series start in January 2001 (MSCI) and October 2004 (the ECB curve), so the fall of 2000 to 2003 takes the "
             "allocation test's two series at the sleeve weights.")  # fmt: skip
-    page.add("lookthrough", _card("stress", "Today's portfolio in five historical episodes, estimated", "Per cent of the portfolio, by sleeve",
+    page.add("risk", _card("stress", "Today's portfolio in five historical episodes, estimated", "Per cent of the portfolio, by sleeve",
              "outputs/stress.csv", plot=False, kind="table", wide=True, note=note).replace('<p class="note">', table + '<p class="note">', 1))  # fmt: skip
 
 
@@ -1070,8 +1202,8 @@ def risk_view(page, out, boot, monthly):
     if not len(summary):
         return
     summary = summary.iloc[0]
-    page.add("lookthrough", _section("Risk of the whole portfolio", "lookthrough-risk-section",
-             sub="Estimated on index returns at the look-through weights"))  # fmt: skip
+    page.add("risk", _group("Risk of the whole portfolio", "lookthrough-risk-section",
+             "Estimated on index returns at the look-through weights."))  # fmt: skip
     _risk_tiles(page, summary, boot, out["allocation_now.csv"].iloc[0]["weight_equity"], monthly)
     _tail_tiles(page, summary)
     components = out["risk_components.csv"]
@@ -1113,7 +1245,7 @@ def _cost_of_ownership(page, costs, implementation, monthly, orders, now=None):
             f"so {_ref('c8')} does not hold them.")  # fmt: skip
     bp = lambda v: fmt.bps(v * 1e4, False)  # noqa: E731
     rows = [[SHORT_FUND.get(r["isin"], r["fund"]), bp(r["ongoing_costs"]), bp(r["management_fees"]), bp(r["transaction_costs"]),
-             fmt.pct(r["weight"]), fmt.day(r["document_date"])] for _, r in funds.iterrows()]  # fmt: skip
+             fmt.pct(r["weight"]), fmt.day_short(r["document_date"])] for _, r in funds.iterrows()]  # fmt: skip
     # Cash not yet invested carries no ongoing costs. Its row makes the weights add up to the portfolio.
     cash = 1.0 - float(weighted["weight"])
     if cash >= 0.0005:
@@ -1144,7 +1276,7 @@ def _attribution(page, attribution, as_of):
             ["The difference to the index blend", "The portfolio's return minus the index blend's", fmt.pct(r["total"], True)]]  # fmt: skip
     table = _table(["Part", "Measured as", "Return, percentage of the start"], rows, numeric=("Return, percentage of the start",))
     page.add("factors", _card("attribution", "The difference to the index blend in three parts",
-             f"{fmt.day(r['period_start'])} to {fmt.day(r['period_end'])}, {int(r['months'])} months", "outputs/attribution.csv",
+             f"{_span(r['period_start'], r['period_end'])}, {int(r['months'])} months", "outputs/attribution.csv",
              plot=False, wide=True, kind="table", note="Differences of the returns over the period, so the three parts sum to the total. The "
              f"first part is negative when the portfolio trails reference portfolio A, where the implementation cost of {_ref('c8')} "
              "is positive.").replace('<p class="note">', table + '<p class="note">', 1))  # fmt: skip
@@ -1185,7 +1317,7 @@ def factor_view(page, loadings, rolling, as_of):
     table = _table(["Factor", "Weekly loading", "Weekly s.e.", "Daily, with the previous day", "Daily s.e."], rows,
                    numeric=("Weekly loading", "Weekly s.e.", "Daily, with the previous day", "Daily s.e."))  # fmt: skip
     asof = (f"Weekly returns, Wednesday to Wednesday to avoid week-start and week-end effects, "
-            f"{fmt.day(first['window_start'])} to {fmt.day(first['window_end'])}, {int(first['observations'])} weeks")  # fmt: skip
+            f"{_span(first['window_start'], first['window_end'])}, {int(first['observations'])} weeks")  # fmt: skip
     note = ("The regression uses the ETF's net asset value in US dollars and Kenneth French's developed-market factors, "
             "also in US dollars, so no exchange rate enters it. Standard errors are Newey-West. The table adds a daily "
             "estimate as a check, with each factor's return of the same day and of the previous day (Dimson's "
@@ -1207,17 +1339,17 @@ def factor_view(page, loadings, rolling, as_of):
                       f'role="img" aria-label="Rolling {_esc(name)} loading"></div></div>')  # fmt: skip
         traces = [{"type": "scatter", "mode": "lines", "name": name, "x": list(data["window_end"]),
                    "y": [fmt.rounded(v, 2) for v in data["loading"]], "line": {"color": FACTOR_ROLE[f], "width": 2},
-                   **_hover([f"{fmt.month(d)}<br>{name}: {fmt.loading(v)}" for d, v in
+                   **_hover([f"{fmt.month_words(d)}<br>{name}: {fmt.loading(v)}" for d, v in
                              zip(data["window_end"], data["loading"])])}]  # fmt: skip
         yaxis = {"zeroline": False} if f == "Mkt-RF" else {"zeroline": False, "range": shared}
-        layout = {"xaxis": {"type": "date", "tickformat": "%Y", "hoverformat": "%Y-%m"}, "yaxis": yaxis,
+        layout = {"xaxis": {"type": "date", "tickformat": "%Y", "hoverformat": "%B %Y"}, "yaxis": yaxis,
                   "shapes": [_hline(0, "@ink")] if f != "Mkt-RF" else [], "margin": {"t": 4, "b": 4}}  # fmt: skip
         page.charts.append({"id": cid, "view": "factors", "traces": traces, "layout": layout})
     wide = rolling.pivot(index="window_end", columns="factor", values="loading")[list(config.FACTORS)]
-    rows = [[fmt.month(d)] + [fmt.loading(v) for v in r] for d, r in wide.iterrows()]
+    rows = [[fmt.month_short(d)] + [fmt.loading(v) for v in r] for d, r in wide.iterrows()]
     table = _table(["Window end"] + names, rows, numeric=tuple(names))
     block = _card("c19", "Rolling loadings: 36-month windows of weekly returns, stepped at each month end",
-                  f"Windows ending {fmt.month(rolling['window_end'].min())} to {fmt.month(rolling['window_end'].max())}. "
+                  f"Windows ending {fmt.month_words(rolling['window_end'].min())} to {fmt.month_words(rolling['window_end'].max())}. "
                   "The five panels after the market share one scale",
                   "outputs/factor_rolling.csv", plot=False, table=table, wide=True, kind="figure")
     block = block.replace('<p class="source">', f'<div class="multiples">{"".join(blocks)}</div><p class="source">', 1)
@@ -1276,13 +1408,13 @@ def _correlation(page, test: pd.DataFrame, etfs: pd.DataFrame):
             continue
         traces.append({"type": "scatter", "mode": "lines", "name": name, "x": [_month_end(m) for m in frame["window_end"]],
                        "y": [fmt.rounded(v, 4) for v in frame["correlation"]], "line": {"color": role, "width": 2},
-                       **_hover([f"Window to {m}<br>{name}: {fmt.loading(v)}" for m, v in zip(frame["window_end"], frame["correlation"])])})  # fmt: skip
+                       **_hover([f"Window to {_month_name(m)}<br>{name}: {fmt.loading(v)}" for m, v in zip(frame["window_end"], frame["correlation"])])})  # fmt: skip
         for m, v in zip(frame["window_end"], frame["correlation"]):
             rows.setdefault(m, ["", ""])[0 if frame is test else 1] = fmt.loading(v)
     layout = {"showlegend": True, "yaxis": {"title": {"text": "Correlation"}, "range": [-1, 1], "dtick": 0.5},
-              "xaxis": {"type": "date", "tickformat": "%Y", "hoverformat": "%Y-%m"}, "shapes": [_hline(0, "@ink")]}  # fmt: skip
+              "xaxis": {"type": "date", "tickformat": "%Y", "hoverformat": "%B %Y"}, "shapes": [_hline(0, "@ink")]}  # fmt: skip
     year_ends = [m for m in sorted(rows) if m.endswith("-12")] + ([max(rows)] if rows and not max(rows).endswith("-12") else [])
-    table = _table(["Window to", "Allocation test", "The two ETFs"], [[m] + rows[m] for m in year_ends],
+    table = _table(["Window to", "Allocation test", "The two ETFs"], [[fmt.month_short(m)] + rows[m] for m in year_ends],
                    numeric=("Allocation test", "The two ETFs"))  # fmt: skip
     spans = [f"{_month_name(f['window_end'].iloc[0])} to {_month_name(f['window_end'].iloc[-1])} on {what}"
              for f, what in ((test, "the test's series"), (etfs, "the ETFs")) if len(f)]  # fmt: skip
@@ -1299,6 +1431,12 @@ def _correlation(page, test: pd.DataFrame, etfs: pd.DataFrame):
 
 def _month_name(month: str) -> str:
     return pd.Period(month, "M").strftime("%B %Y")
+
+
+def _short_date(value) -> str:
+    """A date of a table cell as 6 Nov 2026, and a month as Oct 2026."""
+    text = str(value)
+    return fmt.month_short(text) if re.fullmatch(r"\d{4}-\d{2}", text) else fmt.day_short(text)
 
 
 def _controls(page, controls: pd.DataFrame):
@@ -1358,7 +1496,7 @@ def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: 
     rows = [[int(r["rank"]), SHORT_FUND.get(r["isin"], r["fund"]), r["isin"], r["year"],
              "n/a" if pd.isna(r["tracking_difference_points"]) else f"{r['tracking_difference_points']:+.2f}".replace("-", fmt.MINUS),
              "n/a" if pd.isna(r["average_points"]) else f"{r['average_points']:+.3f}".replace("-", fmt.MINUS),
-             r["offered_on_the_account"], r["held"], r["factsheet_date"]] for _, r in selection.iterrows()]  # fmt: skip
+             r["offered_on_the_account"], r["held"], fmt.day_short(r["factsheet_date"])] for _, r in selection.iterrows()]  # fmt: skip
     table = _table(["Rank", "Fund", "ISIN", "Year", "Tracking difference", "Average", "Offered", "Held", "Factsheet"], rows,
                    numeric=("Tracking difference", "Average"))  # fmt: skip
     block = _card("c22", "The ETF selection: tracking difference by fund and year", "Calendar years 2023 to 2025, "
@@ -1374,7 +1512,7 @@ def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: 
     block = block.replace('<p class="note">', "".join(blocks) + '<p class="note">', 1)
     page.add("method", block)
 
-    rows = [[r["source"], r["last_date_covered"], r["downloaded"] if isinstance(r["downloaded"], str) else ""]
+    rows = [[r["source"], _short_date(r["last_date_covered"]), _short_date(r["downloaded"]) if isinstance(r["downloaded"], str) else ""]
             for _, r in sources.iterrows()]  # fmt: skip
     page.add("method", _card("sources", "Data sources", "", "outputs/sources.csv", plot=False, wide=True, anchor="method-sources", kind="table",
              table=_table(["Source", "Last date covered", "Downloaded"], rows),
@@ -1509,7 +1647,7 @@ def _alternative(daily: pd.DataFrame, fund: str) -> tuple:
     traces = [{"type": "scatter", "mode": "lines+markers" if len(data) < 3 else "lines", "name": name,
                "x": list(data["date"]), "y": [fmt.rounded(v, 1) for v in data[column]],
                "line": {"color": role, "width": 2}, "marker": {"size": 8, "color": role},
-               **_hover([f"{d}<br>{name}: {fmt.index(v)}" for d, v in zip(data["date"], data[column])])}
+               **_hover([f"{fmt.day_words(d)}<br>{name}: {fmt.index(v)}" for d, v in zip(data["date"], data[column])])}
               for name, column, role in series]  # fmt: skip
     rows = [[_start_label(r["date"], i), fmt.index(r["growth_reference_a"]), fmt.index(r["growth_sp500_alternative"]),
              _signed(r["growth_sp500_alternative"] - r["growth_reference_a"])] for i, (_, r) in enumerate(data.iterrows())]  # fmt: skip
@@ -1519,7 +1657,7 @@ def _alternative(daily: pd.DataFrame, fund: str) -> tuple:
                f"alternative is {fund}, at its net asset value in euro. Over the record's months the gap says nothing "
                "about either rule set.")  # fmt: skip
     note = ("The portfolio's own line is not on the chart. Reference A stands for it, and the difference between the "
-            "portfolio and reference A is the implementation cost, which the Costs view shows.")  # fmt: skip
+            "portfolio and reference A is the implementation cost, shown under Costs in the Performance view.")  # fmt: skip
     empty = None if len(data) >= 2 else "The S&P 500 alternative is drawn from the second valuation day."
     asof = _asof(data["date"].iloc[-1], "100 is the starting amount before the first order") if len(data) else ""
     wide, narrow = _date_axes(data["date"])
@@ -1543,7 +1681,7 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
     gap = (test.loc["100/0", "growth_per_year"] - test.loc["40/60", "growth_per_year"]) * 100
     within = us_test[us_test["within_limit"] == "yes"]
     u70 = us_test.set_index("split").loc["70/30"]
-    costs = '<a href="#costs">Costs view</a>'
+    costs = '<a href="#costs">Costs</a> in the Performance view'
     fields = {
         "test": _ref("c21"), "frontier": _ref("c32"), "growth": _ref("c3"), "us_test": _ref("c33"),
         "alternative": _ref("c34"), "costs": costs, "years": f"{months / 12:.0f}", "error": f"{error:.1f}",
@@ -1562,7 +1700,7 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
          "measured how much history a sample-based optimiser needs before it beats an equal split out of sample: about "
          "3,000 months for 25 assets and about 6,000 for 50.{n1} A replication of their study by the same author finds "
          "one of 32 optimising rules beating the equal split at the 5 per cent level on the 261 months since the "
-         "paper.{n2} The frontier of the two sleeves is in the Look-through view ({frontier}). With two assets it is a "
+         "paper.{n2} The frontier of the two sleeves is in the Risk view ({frontier}). With two assets it is a "
          "line, and the limit picks the point on it."),
         ("No index benchmark, and why not the S&P 500.",
          "A benchmark is the portfolio a client would hold without the manager, so that the manager's contribution can "
@@ -1570,7 +1708,7 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
          "Its reference portfolios are therefore the rules themselves without costs: reference A, the same "
          "contributions under the same rules at net asset value, and reference B, the same contributions returned to "
          "70/30 on every cycle day ({growth}). The gap between the portfolio and reference A is the implementation "
-         "cost, shown in the {costs}, and it is the one figure a reader can hold the manager to. The question readers "
+         "cost, shown under {costs}, and it is the one figure a reader can hold the manager to. The question readers "
          "ask most is why the portfolio does not simply hold the S&P 500. The global equity fund already holds the "
          "index's companies at about two thirds of its weight, so holding the index alone sells the other third of the "
          "world's listed companies and puts the whole portfolio into one country and one currency. A weight on one "
@@ -1596,7 +1734,7 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
          "value of a forecasting skill grows with the square root of the number of independent bets it is applied "
          "to,{n5} and a portfolio of two funds with one decision a year makes about one bet a year, so no skill would "
          "be detectable in its record and none would be worth its cost. At this portfolio's size the orders a signal "
-         "calls for cost more than the signal could earn, and the {costs} shows what each order costs. A portfolio "
+         "calls for cost more than the signal could earn, and the cost of each order is shown under {costs}. A portfolio "
          "that carries a signal also becomes a test of that signal, and a few years of one portfolio cannot run that "
          "test. Signals belong in a separate study on decades of data, and a signal that passes its test there can "
          "enter the portfolio only through the yearly review of the rules, as a dated amendment with its test fixed "
@@ -1610,7 +1748,7 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
     dated = (f"Added on {fmt.day_words(added)}, after the first cycle day, in answer to the questions readers ask "
              "most. The rules are unchanged.")  # fmt: skip
     page.add("method", f'<article class="card wide essay" id="method-not-done"><h3>What the portfolio does not do, '
-             f'and why</h3><p class="asof">{_esc(dated)}</p>{"".join(paragraphs[:2])}{us_card}{alt_card}'
+             f'and why</h3><p class="asof">{_esc(dated)}</p>{"".join(paragraphs[:2])}<div class="ch-pair">{us_card}{alt_card}</div>'
              f'{"".join(paragraphs[2:])}<p class="label">Notes</p><ol class="notes">{notes}</ol></article>', us_chart)  # fmt: skip
     if alt_chart:
         page.charts.append(alt_chart)
@@ -1730,13 +1868,13 @@ def simulations(page, history, paths, monthly):
     traces = [{"type": "scatter", "mode": "lines", "name": "Equity weight at the month end", "x": x,
                "y": [fmt.rounded(v * 100, 1) for v in data["equity_weight_before_top_up"]],
                "line": {"color": "@equity", "width": 1.5},
-               **_hover([f"{m}: {fmt.pct(v)}" for m, v in zip(data["month"], data["equity_weight_before_top_up"])])},
+               **_hover([f"{fmt.month_words(m)}: {fmt.pct(v)}" for m, v in zip(data["month"], data["equity_weight_before_top_up"])])},
               {"type": "scatter", "mode": "markers", "name": "Band order", "x": [_month_end(m) for m in band["month"]],
                "y": [fmt.rounded(v * 100, 1) for v in band["equity_weight_before_top_up"]],
                "marker": {"size": 11, "symbol": "diamond", "color": "@status_breach"},
-               **_hover([f"{m}: band order, rule 5" for m in band["month"]])}]  # fmt: skip
+               **_hover([f"{fmt.month_words(m)}: band order, rule 5" for m in band["month"]])}]  # fmt: skip
     layout = {"showlegend": True, "yaxis": {"title": {"text": "Equity weight, per cent"}, "range": [60, 80], "dtick": 5},
-              "xaxis": {"type": "date", "tickformat": "%Y", "hoverformat": "%Y-%m"},
+              "xaxis": {"type": "date", "tickformat": "%Y", "hoverformat": "%B %Y"},
               "shapes": [{"type": "rect", "xref": "paper", "yref": "y", "x0": 0, "x1": 1, "y0": low * 100,
                           "y1": high * 100, "fillcolor": "@band", "line": {"width": 0}, "layer": "below"},
                          _hline(70, "@ink")]}  # fmt: skip
@@ -1746,7 +1884,7 @@ def simulations(page, history, paths, monthly):
             ["Cycle days with one order", fmt.count((orders == 1).sum())],
             ["Cycle days with two orders", fmt.count((orders == 2).sum())],
             ["Cycle days with a band order", fmt.count(len(band))],
-            ["Months of the band orders", ", ".join(band["month"])],
+            ["Months of the band orders", ", ".join(fmt.month_short(m) for m in band["month"])],
             ["Months with the equity weight outside the band before the top-up", fmt.count(outside)],
             ["Most orders on a cycle day, against the budget of five", fmt.count(orders.max())]]  # fmt: skip
     table = _table(["Count", "Value"], rows)
@@ -1770,19 +1908,19 @@ def simulations(page, history, paths, monthly):
     for name, g, d, role in series:
         growth_traces.append({"type": "scatter", "mode": "lines", "name": name, "x": xs,
                               "y": [fmt.rounded(v, 1) for v in history[g]], "line": {"color": role, "width": 2},
-                              **_hover([f"{m}<br>{name}: {fmt.index(v)}" for m, v in zip(history["month"], history[g])])})
+                              **_hover([f"{fmt.month_words(m)}<br>{name}: {fmt.index(v)}" for m, v in zip(history["month"], history[g])])})
         fall_traces.append({"type": "scatter", "mode": "lines", "name": name, "x": xs,
                             "y": [fmt.rounded(-v * 100, 1) for v in history[d]], "line": {"color": role, "width": 2},
-                            **_hover([f"{m}<br>{name}: {fmt.pct(-v)} below the previous peak" for m, v in
+                            **_hover([f"{fmt.month_words(m)}<br>{name}: {fmt.pct(-v)} below the previous peak" for m, v in
                                       zip(history["month"], history[d])])})  # fmt: skip
-    year_axis = {"type": "date", "tickformat": "%Y", "hoverformat": "%Y-%m"}
+    year_axis = {"type": "date", "tickformat": "%Y", "hoverformat": "%B %Y"}
     growth_layout = {"showlegend": True, "yaxis": {"title": {"text": "Growth of 100"}}, "xaxis": year_axis}
     deepest = max(10.0, 1.3 * float(-history[["drawdown_rules", "drawdown_every_cycle_day"]].min().min()) * 100)
     shapes, annotations, short_labels = _limit_lines(deepest, x=1, anchor="right")
     fall_layout = {"showlegend": True, "xaxis": year_axis, "shapes": shapes, "annotations": annotations,
                    "yaxis": {"title": {"text": "Per cent below the previous peak"}, "range": [deepest * FALL_AXIS_ROOM, -1]}}  # fmt: skip
     year_ends = history[(history["month"].str.endswith("-12")) | (history.index == 0) | (history.index == len(history) - 1)]
-    rows = [[r["month"] + (", start" if i == 0 else ""), fmt.index(r["growth_rules"]), fmt.index(r["growth_every_cycle_day"]),
+    rows = [[fmt.month_short(r["month"]) + (", start" if i == 0 else ""), fmt.index(r["growth_rules"]), fmt.index(r["growth_every_cycle_day"]),
              fmt.pct(-r["drawdown_rules"]), fmt.pct(-r["drawdown_every_cycle_day"])]
             for i, (_, r) in enumerate(year_ends.iterrows())]  # fmt: skip
     columns = ["Month", "The rules", "Every cycle day", "Fall, the rules", "Fall, every cycle day"]
@@ -1796,11 +1934,11 @@ def simulations(page, history, paths, monthly):
              sub="Growth of 100 and the fall from the previous peak on the allocation test's returns"))  # fmt: skip
     page.add("simulations", _card("c27a", "Simulation: growth of 100 under the rules and with the target weights restored on "
              "every cycle day, 1999 to 2025", "Monthly, February 1999 to December 2025", "mandate/simulation_history.csv",
-             table=table, note=note, height=320, wide=True), {"id": "c27a", "traces": growth_traces, "layout": growth_layout})  # fmt: skip
+             table=table, note=note, height=320), {"id": "c27a", "traces": growth_traces, "layout": growth_layout})  # fmt: skip
     page.add("simulations", _card("c27b", "Simulation: fall from the previous peak under the rules and with the target "
              "weights restored on every cycle day, 1999 to 2025", "Monthly, February 1999 to December 2025",
              "mandate/simulation_history.csv", note="The same simulation as the growth of 100, month by month. " + SIMULATION_BASIS,
-             height=300, wide=True), {"id": "c27b", "traces": fall_traces, "layout": fall_layout,
+             height=320), {"id": "c27b", "traces": fall_traces, "layout": fall_layout,
                                       "layout_narrow": {"annotations": short_labels}})  # fmt: skip
 
     # The resampled paths, with the record drawn inside them from the first month end.
@@ -1897,12 +2035,12 @@ def _log_quarterly(page, issues, orders):
         return
     items = []
     for number, period, as_of, commit, path, prints in issues:
-        pdfs = "".join(f' &middot; <a href="{_esc(pdf)}">PDF, printed {_esc(day)}</a>' for day, pdf in prints)
+        pdfs = "".join(f' &middot; <a href="{_esc(pdf)}">PDF, printed {_esc(fmt.day_words(day))}</a>' for day, pdf in prints)
         items.append(f'<li><a href="{_esc(path)}">Issue {number}, {_esc(period)}</a>{pdfs}'
-                     f'<span class="asof">Figures as of {_esc(as_of)}, from commit {_esc(commit)}</span></li>')  # fmt: skip
+                     f'<span class="asof">Figures as of {_esc(fmt.day_words(as_of))}, from commit {_esc(commit)}</span></li>')  # fmt: skip
     page.add("log", '<article class="card wide quarterly"><h3>Quarterly reports</h3><p class="note">Each issue is built '
              "once from the tables at the commit it names and is never rebuilt. A correction goes in the next issue as "
-             f'an erratum.</p><ul class="issues">{"".join(items)}</ul><p class="source">Source: <code>quarterly/</code></p></article>')  # fmt: skip
+             f'an erratum.</p><ul class="issues">{"".join(items)}</ul><p class="source">Source: quarterly/</p></article>')  # fmt: skip
 
 
 def _log_notes(page, notes_list, next_cycle):
@@ -1915,8 +2053,8 @@ def _log_notes(page, notes_list, next_cycle):
         path = f"notes/{n.month}.md"
         body = "".join(f"<p>{_esc(para)}</p>" for para in n.body.split("\n\n"))
         page.add("log", f'<article class="card wide notebody"><h3>{_esc(pd.Period(n.month, "M").strftime("%B %Y"))}</h3>'
-                 f'<p class="asof">Cycle day {_esc(n.cycle_day)}. Committed in {_history(path)}</p>'
-                 f'<p class="figures">{_esc(n.figures)}</p>{body}<p class="source">Source: <code>{_esc(path)}</code></p></article>')  # fmt: skip
+                 f'<p class="asof">Cycle day {_esc(fmt.day_words(n.cycle_day))}. Committed in {_history(path)}</p>'
+                 f'<p class="figures">{_esc(n.figures)}</p>{body}<p class="source">Source: {_esc(path)}</p></article>')  # fmt: skip
 
 
 def _log_reports(page, reports, orders, next_cycle):
@@ -1936,13 +2074,13 @@ def _log_reports(page, reports, orders, next_cycle):
         placed = (_table(["Sleeve", "Side", "Rule", "Inside 15:45 to 17:00", "Bid and ask recorded"], rows)
                   if rows else '<p class="note">No order is in the record for this day.</p>')  # fmt: skip
         page.add("log", f'<article class="card wide report"><h3>{_esc(title)}</h3><p class="asof">Committed in {_history(path)}</p>'
-                 f'<div class="reportbody">{body}</div><p class="label">The orders of {_esc(day)} in the record</p>{placed}'
-                 f'<p class="source">Source: <code>{_esc(path)}</code>, <code>outputs/orders.csv</code></p></article>')  # fmt: skip
+                 f'<div class="reportbody">{body}</div><p class="label">The orders of {_esc(fmt.day_words(day))} in the record</p>{placed}'
+                 f'<p class="source">Source: {_esc(path)}, outputs/orders.csv</p></article>')  # fmt: skip
 
 
 def _log_register(page, register):
     page.add("log", _section("Departures register", "log-departures", sub="Each departure from the rules, kept as it happened"))
-    rows = [[r["date"], r["rule"], r["what_happened"], r["consequence"]] for _, r in register.iterrows()] if len(register) else []
+    rows = [[fmt.day_short(r["date"]), r["rule"], r["what_happened"], r["consequence"]] for _, r in register.iterrows()] if len(register) else []
     table = _table(["Date", "Rule", "What happened", "Consequence"], rows, prose=True)
     page.add("log", _card("departures", "Departures register", "Every departure since the first purchase",
              "outputs/departures.csv", plot=False, wide=True, kind="table",
@@ -1960,9 +2098,9 @@ def log(page, monthly, notes_list=(), reports=None, orders=pd.DataFrame(), regis
         page.add("log", _card("c24", "The monthly table", "", None, plot=False, wide=True, kind="table",
                  empty="The first row appears with the first valuation day."))
         return
-    month = ("Month", lambda r: r["month"] + ("" if r["complete"] == "yes" else " to date"))
+    month = ("Month", lambda r: fmt.month_short(r["month"]) + ("" if r["complete"] == "yes" else " to date"))
     groups = [
-        ("Returns and risk", [month, ("Last day", lambda r: r["last_day"]),
+        ("Returns and risk", [month, ("Last day", lambda r: fmt.day_short(r["last_day"])),
          ("Return", lambda r: fmt.pct(r["return_month"], True)),
          ("Since the first purchase", lambda r: fmt.pct(r["return_since_start"], True)),
          ("Money-weighted, cumulative", lambda r: fmt.pct(r["money_weighted_since_start"], True)),
@@ -1990,10 +2128,10 @@ def log(page, monthly, notes_list=(), reports=None, orders=pd.DataFrame(), regis
         numeric = tuple(n for n in names[1:] if n != "Last day")
         tables.append(f'<p class="label">{_esc(heading)}</p>' + _table(names, rows, numeric=numeric,
                       rounding=heading.startswith("Weights")).replace("<table>", '<table class="headwrap">', 1))  # fmt: skip
-    note = "Each chart's own table is under it, and every tile is a cell of these tables or of outputs/portfolio_daily.csv."
+    note = "Each chart's own table is under it, and every key figure is a cell of these tables or of outputs/portfolio_daily.csv."
     if len(_later_orders(orders, now)):
-        note = ("Each chart's own table is under it, and every tile is a cell of these tables or of outputs/portfolio_daily.csv, "
-                "except that the orders tile also counts the orders placed after the last net asset values.")
+        note = ("Each chart's own table is under it, and every key figure is a cell of these tables or of outputs/portfolio_daily.csv, "
+                "except that the orders figure also counts the orders placed after the last net asset values.")
     pending = _after_record(orders, now)
     if pending:
         note += f" {pending}"
@@ -2025,6 +2163,52 @@ def terms() -> list:
     if not found or not all(found):
         raise ValueError("README.md: every line of the Terms section must read '- **term**: definition'")
     return [(m.group(1)[0].upper() + m.group(1)[1:], m.group(2).replace("`", "")) for m in found]
+
+
+# Each view opens with the question it answers.
+VIEW_LEADS = {
+    "overview": "Where the portfolio stands against its rules.",
+    "performance": "What the portfolio has returned since the first purchase, what was paid in and what running it costs.",
+    "portfolio": "What the portfolio holds, and how the rules keep the equity weight in its band.",
+    "risk": "How far the portfolio could fall, estimated on index returns and simulated under the rules.",
+    "method": "How the split and the two ETFs were chosen, the terms the dashboard uses, and the record of each month.",
+}
+
+
+def _part_leads() -> dict:
+    """The line under each part's heading, as HTML, some with links to the part's sections."""
+    leads = {
+        "contributions": _esc("Money paid in against gains and losses, in units of the starting amount."),
+        "costs": _esc("What running the portfolio costs, measured against reference portfolio A, which follows the same "
+                      "rules at net asset value without costs."),
+        "rebalancing": _esc("The equity weight against its band, and every order against the rules."),
+        "lookthrough": "The holdings of the two ETFs, weighted by each sleeve's weight in the portfolio, in three parts: "
+                       + _link("lookthrough-equity", "the equity sleeve") + ", " + _link("lookthrough-bonds", "the bond sleeve")
+                       + " and " + _link("lookthrough-portfolio", "the whole portfolio") + ", where currency exposure "
+                       "combines both. " + _link("lookthrough-risk-section", "The risk of the whole portfolio")
+                       + ", estimated on index returns, opens the Risk view.",
+        "factors": _esc("The equity ETF's loadings on Kenneth French's developed-market factors."),
+        "method": "How the split and the two ETFs were chosen, what the portfolio does not do, the data behind the charts, "
+                  "the controls and the rules, in eight parts: " + _link("method-allocation", "the allocation test") + ", "
+                  + _link("method-bootstrap", "its bootstrap") + ", "
+                  + _link("method-correlation", "the correlation of the two sleeves") + ", "
+                  + _link("method-not-done", "what the portfolio does not do and why") + ", "
+                  + _link("method-selection", "the ETF selection") + ", " + _link("method-sources", "the data sources")
+                  + ", " + _link("method-controls", "the controls") + " and " + _link("method-rules", "the rules") + ".",
+        "glossary": _esc("The terms the dashboard uses, each with its definition."),
+        "simulations": "The rules applied to the allocation test's returns and to paths resampled from them, in three parts: "
+                       + _link("simulations-mechanics", "the mechanics simulation") + ", "
+                       + _link("simulations-history", "the historical simulation") + " and "
+                       + _link("simulations-paths", "the resampled paths")
+                       + ". Every chart here is a simulation on index returns, gross of costs. None is the portfolio's "
+                       "record, which starts in October 2026.",
+        "log": "The record of each quarter and month, in five parts: " + _link("log-quarterly", "the quarterly reports")
+               + ", " + _link("log-notes", "the monthly notes") + ", "
+               + _link("log-cycles", "the cycle reports") + ", " + _link("log-departures", "the departures register")
+               + " and " + _link("log-table", "the monthly table") + ", which holds every figure behind the key figures "
+               "and charts.",
+    }  # fmt: skip
+    return leads
 
 
 DESCRIPTION = ("A real-money portfolio run under written rules, 70/30 equity and euro government bonds: allocation, "
@@ -2076,7 +2260,7 @@ def build(out_dir: Path = None) -> Path:
         monthly = pd.DataFrame()
     orders = out["orders.csv"]
     page = Page()
-    overview(page, daily, monthly, out["allocation_now.csv"], orders)
+    overview(page, daily, monthly, out["allocation_now.csv"], orders, out.get("cost_of_ownership.csv", pd.DataFrame()))
     now_row = out["allocation_now.csv"].iloc[0]
     rebalancing(page, daily, orders, out["band_events.csv"], out["compliance.csv"], monthly, now_row)
     costs(page, monthly, out["implementation_cost.csv"], daily)
@@ -2102,56 +2286,32 @@ def build(out_dir: Path = None) -> Path:
     log(page, monthly, notes_module.read(), reports, orders, out.get("departures.csv", pd.DataFrame()),
         _next_cycle_day(now_row), _quarterly_issues(), now_row)  # fmt: skip
     _check_roles(page.charts, palette)
+    glossary = "".join(f"<dt>{_esc(a)}</dt><dd>{_esc(b)}</dd>" for a, b in terms())
+    page.add("glossary", f'<div class="wide"><dl class="terms">{glossary}</dl></div>')
+    page.views(_part_leads())
     numbers = _number(page.sections)
     # The guide to the dashboard is built with it, and the build stops when a part of the page has no entry in it.
     guide_module.write(page.sections, numbers, VIEWS, terms(), _built(now_row), out_dir)
 
-    first = daily["date"].iloc[1] if len(daily) > 1 else None
-    leads = {
-        "overview": "Where the portfolio stands and how it has done since the first purchase, with contributions removed.",
-        "rebalancing": "The equity weight against its band, and every order against the rules.",
-        "costs": "What running the portfolio costs, measured against reference portfolio A, which follows the same rules "
-                 "at net asset value without costs.",
-        "contributions": "Money paid in against gains and losses, in units of the starting amount.",
-        "lookthrough": "The holdings of the two ETFs, weighted by each sleeve's weight in the portfolio, in four parts: "
-                       + _link("lookthrough-equity", "the equity sleeve") + ", " + _link("lookthrough-bonds", "the bond sleeve")
-                       + ", " + _link("lookthrough-portfolio", "the whole portfolio") + ", where currency exposure "
-                       "combines both, and " + _link("lookthrough-risk-section", "the risk of the whole portfolio")
-                       + ", estimated on index returns.",
-        "factors": "The equity ETF's loadings on Kenneth French's developed-market factors.",
-        "method": "How the split and the two ETFs were chosen, what the portfolio does not do, the data behind the charts, "
-                  "the controls and the rules, in eight parts: " + _link("method-allocation", "the allocation test") + ", "
-                  + _link("method-bootstrap", "its bootstrap") + ", "
-                  + _link("method-correlation", "the correlation of the two sleeves") + ", "
-                  + _link("method-not-done", "what the portfolio does not do and why") + ", "
-                  + _link("method-selection", "the ETF selection") + ", " + _link("method-sources", "the data sources")
-                  + ", " + _link("method-controls", "the controls") + " and " + _link("method-rules", "the rules") + ".",
-        "simulations": "The rules applied to the allocation test's returns and to paths resampled from them, in three parts: "
-                       + _link("simulations-mechanics", "the mechanics simulation") + ", "
-                       + _link("simulations-history", "the historical simulation") + " and "
-                       + _link("simulations-paths", "the resampled paths")
-                       + ". Every chart here is a simulation on index returns, gross of costs. None is the portfolio's "
-                       "record, which starts in October 2026.",
-        "log": "The record of each quarter and month, in five parts: " + _link("log-quarterly", "the quarterly reports")
-               + ", " + _link("log-notes", "the monthly notes") + ", "
-               + _link("log-cycles", "the cycle reports") + ", " + _link("log-departures", "the departures register")
-               + " and " + _link("log-table", "the monthly table") + ", which holds every figure behind the tiles and charts.",
-    }  # fmt: skip
-    leads = {v: (text if v in ("lookthrough", "method", "simulations", "log") else _esc(text)) for v, text in leads.items()}
+    first = orders["date"].min() if len(orders) else None
     tabs = "".join(f'<button type="button" data-view="{v}" aria-selected="false">{_esc(t)}</button>' for v, t in VIEWS)
     sections = []
     for v, t in VIEWS:
-        sections.append(f'<section class="view" id="view-{v}" aria-label="{_esc(t)}"><p class="lead">{leads[v]}</p>'
+        sections.append(f'<section class="view" id="view-{v}" aria-label="{_esc(t)}"><p class="ch-view-lead">{_esc(VIEW_LEADS[v])}</p>'
                         f'<div class="grid">{"".join(page.sections[v])}</div></section>')  # fmt: skip
-    glossary = "".join(f"<dt>{_esc(a)}</dt><dd>{_esc(b)}</dd>" for a, b in terms())
     data = {"palette": palette, "charts": page.charts, "views": [{"id": v, "title": t} for v, t in VIEWS]}
     payload = json.dumps(data, separators=(",", ":"), ensure_ascii=False).replace("</", "<\\/")
     css = _palette_css(palette) + (config.SITE_DIR / "style.css").read_text()
     script = (config.SITE_DIR / "app.js").read_text()
-    intro = ("A real-money portfolio run under written rules: 70 per cent in a global equity ETF and 30 per cent in a "
-             "euro government bond ETF, funded by a starting amount and a fixed monthly top-up. Every figure is computed "
-             "from the ledger and the issuers' published data.")  # fmt: skip
-    started = f"First purchase {first}" if first else "First purchase 2026-10-08"
+    since = f" since {fmt.day_words(first)}" if first else ""
+    lead = (f"A real-money portfolio run under written rules{since}, with a target of 70 per cent in a global equity ETF "
+            "and 30 per cent in a euro government bond ETF, funded by a starting amount and a fixed monthly top-up. Every "
+            "figure of the record is computed from the ledger and the issuers' published data.")  # fmt: skip
+    menu = quarterly_module.site_menu()
+    documents = (f'<a href="{config.REPOSITORY_URL}/blob/main/rules/RULES.md">Rules</a>'
+                 f'<a href="{config.REPOSITORY_URL}/blob/main/mandate/MANDATE.md">Mandate</a>'
+                 '<a href="guide/guide.pdf">Guide to the dashboard (PDF)</a>'
+                 f'<a href="{config.REPOSITORY_URL}">Code on GitHub</a>')  # fmt: skip
     document = f"""<!doctype html>
 <html lang="en">
 <head>
@@ -2168,25 +2328,23 @@ def build(out_dir: Path = None) -> Path:
 <body>
 <header class="ch-band"><div class="ch-band__in">
 <a class="ch-word" href="{SITE_URL}">Carlo Hofer</a>
-<div class="ch-menu" role="navigation" aria-label="Site"><a href="{PROJECTS_URL}">Projects</a></div>
+<div class="ch-menu" role="navigation" aria-label="Site">{menu}</div>
 </div></header>
-<p class="ch-back"><a href="{PROJECT_PAGE_URL}">&larr; Rules-based portfolio</a> &middot; <a href="{PROJECTS_URL}">All projects</a></p>
-<header class="top"><div class="wrap">
+<header class="ch-hero"><div>
+<p class="ch-back"><a href="{PROJECT_PAGE_URL}">&larr; Rules-based portfolio</a></p>
+<p class="ch-over">Portfolio in practice</p>
 <h1>Rules-based portfolio</h1>
-<p>{_esc(intro)}</p>
-<div class="meta"><span>{_esc(_two_dates(out["allocation_now.csv"].iloc[0]))}</span><span>{_esc(started)}</span>
-<a href="{config.REPOSITORY_URL}">Repository</a><a href="{config.REPOSITORY_URL}/blob/main/rules/RULES.md">Rules</a>
-<a href="{config.REPOSITORY_URL}/blob/main/mandate/MANDATE.md">Mandate</a>
-<a href="guide/guide.pdf">Guide to the dashboard (PDF)</a></div>
+<p class="ch-lead">{_esc(lead)}</p>
+<div class="ch-meta"><span>{_esc(_stamp(now_row))}</span><span>Built {_esc(fmt.day_words(_built(now_row)))}</span></div>
+<div class="ch-docs">{documents}</div>
 </div></header>
-<div class="viewtabs" role="navigation" aria-label="Views"><div class="wrap">{tabs}</div></div>
+<div class="ch-tabs" role="navigation" aria-label="Views"><div>{tabs}</div></div>
 <main class="wrap">
 {"".join(sections)}
 </main>
 <footer><div class="wrap">
-<p>Returns are in euro and valued at the issuers' net asset values. They are time-weighted, except the money-weighted return of the Overview and the monthly table. A record of five to ten years cannot show that one set of rules is better than another, so the returns are not offered as evidence for the rules.</p>
-<dl class="terms">{glossary}</dl>
-{_colophon(out["allocation_now.csv"].iloc[0])}
+<p>Returns are in euro and valued at the issuers' net asset values, after costs. They are time-weighted, except the money-weighted return of the Overview and the monthly table. A record of five to ten years cannot show that one set of rules is better than another, so the returns are not offered as evidence for the rules. Past performance is no guide to future returns.</p>
+{_colophon(now_row)}
 </div></footer>
 <script type="application/json" id="dashboard-data">{payload}</script>
 <script>

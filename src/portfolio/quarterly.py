@@ -47,6 +47,14 @@ AUTHOR = "Carlo Hofer"
 PROJECT_URL = "https://www.carlohofer.com/projects/rules-based-portfolio/"
 SITE_URL = "https://www.carlohofer.com/"
 FAVICON_URL = SITE_URL + "images/favicon.svg"
+MENU = (("Investment research", SITE_URL + "projects/"), ("Portfolio", PROJECT_URL), ("Publications", SITE_URL + "publications/"),
+        ("Academic CV", SITE_URL + "cv/"))  # the site's menu (V5 of the house standard), as renamed on 6 November 2026
+
+
+def site_menu() -> str:
+    """The links of the site's menu, with Portfolio, the section of the portfolio's pages, marked as current."""
+    return "".join(f'<a href="{url}"' + (' aria-current="true"' if url == PROJECT_URL else "") + f">{name}</a>"
+                   for name, url in MENU)  # fmt: skip
 CLOSING = ("A record of five to ten years cannot show that one set of rules is better than another, so the returns "
            "are not offered as evidence for the rules.")  # fmt: skip
 SANS = "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif"
@@ -733,7 +741,7 @@ def build(root: Path, quarter: pd.Period, commit: str) -> str:
 <body>
 <header class="ch-band"><div class="ch-band__in">
   <a class="ch-word" href="{SITE_URL}">Carlo Hofer</a>
-  <div class="ch-menu" role="navigation" aria-label="Site"><a href="{SITE_URL}projects/">Projects</a><a href="{SITE_URL}publications/">Publications</a><a href="{SITE_URL}cv/">CV</a></div>
+  <div class="ch-menu" role="navigation" aria-label="Site">{site_menu()}</div>
 </div></header>
 <p class="ch-back"><a href="{config.DASHBOARD_URL}#log">&larr; Rules-based portfolio, Log</a> &middot; <a href="{PROJECT_URL}">The project</a></p>
 <main class="rp">

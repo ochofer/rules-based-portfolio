@@ -36,7 +36,7 @@
   function axis(p) {
     return {
       gridcolor: p.grid, linecolor: p.axis, zerolinecolor: p.axis, zeroline: false, showline: true,
-      tickfont: { color: p.muted, size: 11 }, title: { font: { color: p.ink2, size: 12 }, standoff: 8 },
+      tickfont: { color: p.muted, size: 12.5 }, title: { font: { color: p.ink2, size: 12.5 }, standoff: 8 },
       automargin: true, fixedrange: true
     };
   }
@@ -44,10 +44,10 @@
   function baseLayout(p, narrow) {
     return {
       paper_bgcolor: p.surface, plot_bgcolor: p.surface,
-      font: { family: 'system-ui, -apple-system, "Segoe UI", sans-serif', color: p.ink2, size: 12 },
-      margin: { l: 8, r: 24 - 12 * Number(narrow), t: 8, b: 8 },
+      font: { family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', color: p.ink2, size: 12.5 },
+      margin: { l: 0, r: 24 - 12 * Number(narrow), t: 8, b: 8 },
       xaxis: axis(p), yaxis: axis(p), showlegend: false,
-      legend: { orientation: "h", x: 0, y: 1.02, yanchor: "bottom", font: { color: p.ink2, size: 12 } },
+      legend: { orientation: "h", x: 0, y: 1.02, yanchor: "bottom", font: { color: p.ink2, size: 12.5 } },
       hoverlabel: { bgcolor: p.surface, bordercolor: p.axis, font: { color: p.ink, size: 12 } },
       hovermode: "closest", dragmode: false, bargap: 0.25
     };
@@ -69,17 +69,17 @@
     DATA.charts.forEach(function (c) { if (c.view === view) draw(c); });
   }
 
-  // On a phone the view bar is one row that scrolls sideways. A fade marks each edge with more tabs,
+  // The tab bar is one row. On a narrow phone it scrolls sideways, a fade marks each edge with more tabs,
   // and the selected tab is brought into view.
   function barEdges() {
-    var bar = document.querySelector(".viewtabs"), wrap = bar && bar.querySelector(".wrap");
+    var bar = document.querySelector(".ch-tabs"), wrap = bar && bar.querySelector(":scope > div");
     if (!wrap) return;
     bar.classList.toggle("more-r", wrap.scrollWidth - wrap.clientWidth - wrap.scrollLeft > 1);
     bar.classList.toggle("more-l", wrap.scrollLeft > 1);
   }
 
   function centreTab() {
-    var wrap = document.querySelector(".viewtabs .wrap"), sel = wrap && wrap.querySelector('[aria-selected="true"]');
+    var wrap = document.querySelector(".ch-tabs > div"), sel = wrap && wrap.querySelector('[aria-selected="true"]');
     if (sel && wrap.scrollWidth > wrap.clientWidth) {
       wrap.scrollLeft += sel.getBoundingClientRect().left - wrap.getBoundingClientRect().left - (wrap.clientWidth - sel.offsetWidth) / 2;
     }
@@ -90,7 +90,7 @@
     document.querySelectorAll("section.view").forEach(function (s) {
       s.classList.toggle("active", s.id === "view-" + view);
     });
-    document.querySelectorAll(".viewtabs button").forEach(function (b) {
+    document.querySelectorAll(".ch-tabs button").forEach(function (b) {
       b.setAttribute("aria-selected", String(b.getAttribute("data-view") === view));
     });
     drawView(view);
@@ -112,7 +112,7 @@
   function scrollToPart(id) {
     var el = document.getElementById(id);
     if (!el) return;
-    var bar = document.querySelector(".viewtabs");
+    var bar = document.querySelector(".ch-tabs");
     var offset = 12;
     if (bar) offset += bar.offsetHeight;
     window.scrollTo(0, Math.max(el.getBoundingClientRect().top + window.pageYOffset - offset, 0));
@@ -124,7 +124,7 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll(".viewtabs button").forEach(function (b) {
+    document.querySelectorAll(".ch-tabs button").forEach(function (b) {
       b.addEventListener("click", function () { show(b.getAttribute("data-view"), true); });
     });
     var resizeTimer = null;
@@ -132,7 +132,7 @@
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(function () { redrawActive(); centreTab(); }, 150);
     });
-    var tabWrap = document.querySelector(".viewtabs .wrap");
+    var tabWrap = document.querySelector(".ch-tabs > div");
     if (tabWrap) tabWrap.addEventListener("scroll", barEdges, { passive: true });
     var views = DATA.views.map(function (v) { return v.id; });
     function route() {

@@ -5,6 +5,7 @@
 .gd-contents > ul > li { margin: 8px 0 0; font-weight: 600; }
 .gd-contents ul ul { font-weight: 400; margin: 2px 0 0 14px; columns: 2; column-gap: 28px; }
 .gd-contents ul ul li { break-inside: avoid; margin: 1px 0; }
+.gd-contents ul ul li.gd-part { margin-top: 6px; font-weight: 600; }
 .gd > p, .gd > ul, .gd > ol { max-width: 75ch; }
 .gd h3 { font-size: 1.05rem; font-weight: 600; color: var(--ink); margin: 28px 0 2px; }
 .gd-where { font-size: 13px; color: var(--meta); margin: 0 0 8px; }

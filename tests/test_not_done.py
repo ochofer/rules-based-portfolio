@@ -78,17 +78,17 @@ def test_the_alternative_exhibit_ranks_neither_line_and_gives_the_gap_with_its_s
     assert ("Two rule sets on the same contributions from the first purchase, both without costs. The S&amp;P 500 "
             "alternative is An S&amp;P 500 fund, at its net asset value in euro. Over the record&#x27;s months the gap "
             "says nothing about either rule set.") in card  # fmt: skip
-    assert '<td class="num">−0.6</td>' in card and "2026-10-07, start" in card
+    assert '<td class="num">−0.6</td>' in card and "7 Oct 2026, start" in card
     assert [t["line"]["color"] for t in chart["traces"]] == ["@reference_a", "@sp500_alternative"]
     assert "growth_portfolio" not in json.dumps(chart) and "Portfolio" not in json.dumps(chart)
 
 
-def test_the_overview_links_to_the_section_and_the_other_projects_close_the_method_view():
+def test_the_growth_of_100_links_to_the_section_and_the_other_projects_close_the_method_part():
     page = (config.ROOT / "index.html").read_text(encoding="utf-8")
     assert ('Why the portfolio has no optimiser, no index benchmark, no views and no signal: '
             '<a href="#method-not-done">Method</a>.') in page  # fmt: skip
     assert page.index('id="method-correlation"') < page.index('id="method-not-done"') < page.index('id="method-selection"')
-    assert page.index('id="method-rules"') < page.index('id="method-projects"') < page.index('id="view-simulations"')
+    assert page.index('id="method-rules"') < page.index('id="method-projects"') < page.index('id="glossary"') < page.index('id="log"')
 
 
 def test_the_readme_lists_the_other_projects_in_the_words_and_links_of_the_page():
