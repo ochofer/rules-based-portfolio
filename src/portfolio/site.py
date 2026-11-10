@@ -612,8 +612,8 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
 
     # Chart 3: growth of 100.
     series = [("Portfolio", "growth_portfolio", "@accent", 2),
-              ("Reference A, same rules", "growth_reference_a", "@reference_a", 2),
-              ("Reference B, 70/30 each cycle day", "growth_reference_b", "@reference_b", 2),
+              (COMPARATOR_NAME["reference_a"][0], "growth_reference_a", "@reference_a", 2),
+              (COMPARATOR_NAME["reference_b"][0], "growth_reference_b", "@reference_b", 2),
               ("Index blend", "growth_index_blend", "@index_blend", 2)]  # fmt: skip
     traces, annotations, rows = [], [], []
     for name, column, role, width in series:
@@ -622,7 +622,8 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
             continue
         traces.append({"type": "scatter", "mode": "lines+markers" if len(data) < 3 else "lines", "name": name,
                        "x": list(data["date"]), "y": [fmt.rounded(v, 1) for v in data[column]],
-                       "line": {"color": role, "width": width}, "marker": {"size": 8, "color": role},
+                       "line": {"color": role, "width": width, "dash": "dot" if column == "growth_reference_b" else "solid"},
+                       "marker": {"size": 8, "color": role},
                        **_hover([f"{fmt.day_words(d)}<br>{name}: {fmt.index(v)}" for d, v in zip(data["date"], data[column])])})  # fmt: skip
         if column == "growth_portfolio":
             end = data.iloc[-1]
@@ -640,7 +641,12 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
                   f"{fmt.day_words(blend_points['date'].iloc[0])}, and is drawn once a second month's returns are published")
     asof3 = _asof(daily["date"].iloc[-1] if len(daily) else w_now["weights_as_of"],
                   f"100 is the starting amount before the first order. {blend_text}")  # fmt: skip
-    why = ("<p class=\"note\">Why the portfolio has no optimiser, no single market index as its benchmark, no views "
+    same = (len(daily) > 1 and {"growth_reference_a", "growth_reference_b"} <= set(daily.columns)
+            and float((daily["growth_reference_a"] - daily["growth_reference_b"]).abs().max()) < 1e-4)  # fmt: skip
+    overlap = ("<p class=\"note\">Reference B&#x27;s dotted line lies on reference A&#x27;s so far: on each cycle day "
+               "the top-up alone has brought reference portfolio A back to 70/30, which is where reference portfolio B "
+               "goes on every cycle day.</p>") if same else ""  # fmt: skip
+    why = overlap + ("<p class=\"note\">Why the portfolio has no optimiser, no single market index as its benchmark, no views "
            "and no signal: "
            f"{_link('method-not-done', 'Method')}.</p>")
     page.add("growth", _card("c3", "Growth of 100: the portfolio, the two reference portfolios and the index blend",
@@ -2342,7 +2348,7 @@ def _us_test(allocation: pd.DataFrame, us: pd.DataFrame, period: tuple, added) -
 
 def _alternative(daily: pd.DataFrame, fund: str) -> tuple:
     """The growth of 100 of reference portfolio A and of the S&P 500 alternative from the first purchase."""
-    series = (("Reference A, same rules", "growth_reference_a", "@reference_a"),
+    series = ((COMPARATOR_NAME["reference_a"][0], "growth_reference_a", "@reference_a"),
               ("S&P 500 alternative", "growth_sp500_alternative", "@sp500_alternative"))  # fmt: skip
     columns = ["date"] + [c for _, c, _ in series]
     data = daily[columns].dropna() if set(columns) <= set(daily.columns) else pd.DataFrame(columns=columns)

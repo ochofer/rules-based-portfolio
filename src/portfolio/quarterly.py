@@ -419,8 +419,8 @@ class Issue:
         base = float(self.start["growth_portfolio"])
         lines, table_columns = [], []
         for name, column, colour, stroke in (("Portfolio", "growth_portfolio", NAVY, 2.0),
-                                             ("Reference A, same rules", "growth_reference_a", REF_A, 1.5),
-                                             ("Reference B, 70/30 each cycle day", "growth_reference_b", REF_B, 1.5),
+                                             ("Reference A, the same rules without costs", "growth_reference_a", REF_A, 1.5),
+                                             ("Reference B, 70/30 every cycle day", "growth_reference_b", REF_B, 1.5),
                                              ("Index blend", "growth_index_blend", BLEND, 1.5)):  # fmt: skip
             data = frame[["date", column]].dropna()
             if not len(data):
@@ -432,7 +432,9 @@ class Issue:
                 level = float(frame.loc[frame["date"] == first["date"], "growth_portfolio"].iloc[0]) / base * 100
                 scale = level / float(first[column])
             values = [float(v) * scale for v in data[column]]
-            lines.append((name, list(data["date"]), values, colour, stroke, False))
+            # Reference B is dotted, so that it shows where it lies on reference A, as it does while each top-up
+            # brings reference A back to 70/30 on its own.
+            lines.append((name, list(data["date"]), values, colour, stroke, column == "growth_reference_b"))
             table_columns.append((name, dict(zip(data["date"], values))))
         ends = [start_day] + list(self._month_ends()["date"])
         rows = [[("Start, " + d.strftime("%Y-%m-%d")) if d == start_day else d.strftime("%Y-%m-%d")] +
