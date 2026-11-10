@@ -175,6 +175,42 @@ def _ref(cid: str) -> str:
 
 EXHIBIT = re.compile(r'<h3 data-exhibit="([^"]+)" data-kind="(figure|table)">')
 REFERENCE = re.compile("\u27e6([^\u27e7]+)\u27e7")
+NOTE_MARK = re.compile("\u2e28note:([a-z0-9_]+)\u2e29")
+NOTE_LIST = "\u2e28notes\u2e29"
+
+
+def _note(key: str) -> str:
+    """A footnote mark for one of CITATIONS, numbered by the build in order of first mention on the page."""
+    return f"\u2e28note:{key}\u2e29"
+
+
+def _number_notes(sections: dict) -> list:
+    """Number the notes in order of first mention across the views, write each mark as a link to its note and the
+    Notes list in its place. A mark without a note, or marks on a page without the Notes list, stop the build."""
+    order = []
+    for v, _ in VIEWS:
+        for html in sections[v]:
+            for key in NOTE_MARK.findall(html):
+                if key not in CITATIONS:
+                    raise ValueError(f"the text cites {key}, which has no note")
+                if key not in order:
+                    order.append(key)
+    if order and sum(html.count(NOTE_LIST) for v, _ in VIEWS for html in sections[v]) != 1:
+        raise ValueError("the page cites notes and does not carry the Notes list once")
+    number = {key: i for i, key in enumerate(order, start=1)}
+    seen = set()
+
+    def mark(m):
+        n = number[m.group(1)]
+        first = n not in seen
+        seen.add(n)
+        return _fn(n) if first else f'<sup class="fn"><a href="#note-{n}">{n}</a></sup>'
+
+    items = "".join(f'<li id="note-{number[k]}">{_esc(CITATIONS[k][0])} <a href="{_esc(CITATIONS[k][1])}">'
+                    f'{_esc(CITATIONS[k][1])}</a></li>' for k in order)  # fmt: skip
+    for v, _ in VIEWS:
+        sections[v] = [NOTE_MARK.sub(mark, html).replace(NOTE_LIST, items) for html in sections[v]]
+    return order
 
 
 def _number(sections: dict) -> dict:
@@ -813,7 +849,7 @@ COMPARATOR_NAME = {
     "lifestrategy_80": ("LifeStrategy 80% Equity", "LifeStrategy 80"),
     "nasdaq100": ("The Nasdaq-100 fund", "Nasdaq-100"),
     "mag7": ("The Mag7 fund", "Mag7"),
-    "market_portfolio": ("The global market portfolio", "Market portfolio"),
+    "market_portfolio": ("The global market portfolio", "The global market portfolio"),
     "savings": ("Savings at the euro short-term rate", "Savings"),
     "bank_offensief": ("Rabobank's managed profile Offensief", "Rabobank Offensief"),
 }
@@ -842,10 +878,9 @@ PANES = (
 )  # fmt: skip
 MARKET_NOTE = (
     "The global market portfolio is a comparator the portfolio's design names, and the benchmark remains the index blend. "
-    "It holds every asset class at its share of the world's invested market value, by the weights at 31 December 2023 "
-    "in the data update of Doeswijk, Lam and Swinkels, version 6 (doi.org/10.25397/eur.9371741, licence CC BY 4.0), "
-    "which updates their paper The Global Multi-Asset Market Portfolio, 1959-2012, Financial Analysts Journal 70(2), "
-    "26-41, 2014 (doi.org/10.2469/faj.v70.n2.1).",
+    "It holds every asset class at its share of the world's invested market value, as Doeswijk, Lam and Swinkels "
+    "measure the global multi-asset market portfolio," + _note("doeswijk_2014") + " at the weights of 31 December "
+    "2023 in their data update, version 6." + _note("doeswijk_2024"),
     "It takes the same contributions on the same days. It bought the published weights carried to the day before the "
     "first purchase by each class fund's return in euro, holds them as they move with prices, as the market holds them, "
     "and invests each top-up in proportion to what it holds. The carried weights are not the market's weights of that "
@@ -2169,6 +2204,13 @@ def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: 
 
 ADDED_WITH = "method/selection_sp500.csv"  # the section came with this file, so the file's first commit dates it
 TEST_PERIOD = re.compile(r"from (\d{4}-\d{2}) to (\d{4}-\d{2}), (\d+) months")
+# Every note of the dashboard's Notes list, keyed. The build numbers them in order of first mention on the page.
+CITATIONS = {
+    "doeswijk_2014": ("Doeswijk, R., Lam, T. and Swinkels, L. (2014). The global multi-asset market portfolio, "
+                      "1959\u20132012. Financial Analysts Journal 70(2), 26 to 41.", "https://doi.org/10.2469/faj.v70.n2.1"),
+    "doeswijk_2024": ("Doeswijk, R., Lam, T. and Swinkels, L. (2024). Data update: the global multi-asset market "
+                      "portfolio, 1959\u20132012, version 6. Licence CC BY 4.0.", "https://doi.org/10.25397/eur.9371741"),
+}  # fmt: skip
 NOTES = (
     ("DeMiguel, V., Garlappi, L. and Uppal, R. (2009). Optimal versus naive diversification: how inefficient is the "
      "1/N portfolio strategy? Review of Financial Studies 22(5), 1915 to 1953.", "https://doi.org/10.1093/rfs/hhm075"),
@@ -2183,6 +2225,10 @@ NOTES = (
     ("The agenda of the review, mandate/REVIEW_2027.md in the repository:",
      config.REPOSITORY_URL + "/blob/main/mandate/REVIEW_2027.md"),
 )
+# The section on what the portfolio does not do cites these, as {n1} to {n6} in its text.
+ESSAY_NOTES = ("demiguel_2009", "naive_diversification_study", "french_library", "black_litterman_1992",
+               "grinold_1989", "review_2027")
+CITATIONS.update(zip(ESSAY_NOTES, NOTES))
 # The wording of the cards on the site's projects page. The README's section Other projects carries the same.
 OTHER_PROJECTS = (
     ("Optimal versus naive diversification.",
@@ -2342,7 +2388,7 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
         "alternative": _ref("c34"), "costs": costs, "years": f"{months / 12:.0f}", "error": f"{error:.1f}",
         "gap": f"{gap:.1f}", "us_split": _esc(within.loc[within["equity_weight"].idxmax(), "split"]),
         "us_fall": f"{u70['worst_fall'] * 100:.1f}", "us_peak": _month_name(u70["peak"]),
-        "us_low": _month_name(u70["low"]), "fund": _esc(fund), **{f"n{i}": _fn(i) for i in range(1, len(NOTES) + 1)},
+        "us_low": _month_name(u70["low"]), "fund": _esc(fund), **{f"n{i}": _note(key) for i, key in enumerate(ESSAY_NOTES, start=1)},
         "us_after": _per_cent(cumulative[("US stock market", "2010-01")]),
         "rest_after": _per_cent(cumulative[("Developed markets outside the United States", "2010-01")]),
         "us_decade": _per_cent(cumulative[("US stock market", "2000-01")]),
@@ -2405,13 +2451,11 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
     us_card, us_chart = _us_test(allocation, us_test, period, added)
     alt_card, alt_chart = _alternative(daily, fund)
     paragraphs = [f'<p class="part"><b>{_esc(label)}</b> {_esc(body).format(**fields)}</p>' for label, body in parts]
-    notes = "".join(f'<li id="note-{i}">{_esc(text)} <a href="{_esc(url)}">{_esc(url)}</a></li>'
-                    for i, (text, url) in enumerate(NOTES, start=1))  # fmt: skip
     dated = (f"Added on {fmt.day_words(added)}, after the first cycle day, in answer to the questions readers ask "
              "most. The rules are unchanged.")  # fmt: skip
     page.add("method", f'<article class="card wide essay" id="method-not-done"><h3>What the portfolio does not do, '
              f'and why</h3><p class="asof">{_esc(dated)}</p>{"".join(paragraphs[:2])}<div class="ch-pair">{us_card}{alt_card}</div>'
-             f'{"".join(paragraphs[2:])}<p class="label">Notes</p><ol class="notes">{notes}</ol></article>', us_chart)  # fmt: skip
+             f'{"".join(paragraphs[2:])}<p class="label">Notes</p><ol class="notes">{NOTE_LIST}</ol></article>', us_chart)  # fmt: skip
     if alt_chart:
         page.charts.append(alt_chart)
 
@@ -3101,6 +3145,7 @@ def build(out_dir: Path = None) -> Path:
     page.add("glossary", f'<div class="wide"><dl class="terms">{glossary}</dl></div>')
     page.views(_part_leads())
     numbers = _number(page.sections)
+    _number_notes(page.sections)
     # The guide to the dashboard is built with it, and the build stops when a part of the page has no entry in it.
     guide_module.write(page.sections, numbers, VIEWS, terms(), _built(now_row), out_dir)
 

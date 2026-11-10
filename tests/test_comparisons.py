@@ -190,7 +190,9 @@ def test_the_comparisons_part_on_the_page():
     pane = part.split("<summary>Every asset class at its market value</summary>", 1)[1].split('<details class="ch-pane">', 1)[0]
     assert pane.index("is a comparator the portfolio&#x27;s design names, and the benchmark remains the index blend") \
         < pane.index("The global market portfolio&#x27;s weights and funds, by asset class")
-    assert "10.25397/eur.9371741" in pane and "10.2469/faj.v70.n2.1" in pane and "inside the band" in pane
+    # Its two sources are the first notes of the dashboard's Notes list, cited in order of mention.
+    assert re.findall(r'<sup class="fn"><a href="#note-(\d+)"', pane) == ["1", "2"] and "inside the band" in pane
+    assert "doi.org" not in pane.split("</h3>", 1)[1].split('<p class="source">', 1)[0]
     assert '<details class="ch-pane" open' not in part
     summary = part.split('<div class="ch-pair">', 1)[0] if '<div class="ch-pair">' in part else part.split('ch-pair', 1)[0]
     names = re.findall(r"<tr><td>([^<]+)</td>", summary)

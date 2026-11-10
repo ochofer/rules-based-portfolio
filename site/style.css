@@ -180,7 +180,7 @@ footer { color: var(--ink2); background: var(--tint); font-size: 12.5px; padding
 .ch-pane[open] > summary::after { transform: rotate(225deg); margin-bottom: -4px; }
 .ch-pane__body { padding: 4px 0 26px; }
 .ch-pane__body > .card { padding-top: 0; border-top: 0; }
-.ch-pane__body > .card + .card { padding-top: 28px; }
+.ch-pane__body > .card + .card { margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--rule); }
 table.history tr.group td { background: var(--tint); padding-top: 10px; }
 .ch-select { margin: 10px 0 2px; font-size: 13.5px; color: var(--ink2); }
 .ch-select select { font: inherit; color: var(--ink); margin-left: 6px; min-height: 36px; padding: 4px 8px; border: 1px solid var(--frame); background: var(--surface); }
