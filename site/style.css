@@ -158,7 +158,7 @@ table.prose td:first-child, table.prose th:first-child { white-space: nowrap; }
 .quarterly ul.issues li .asof { display: block; margin: 2px 0 0; }
 .card.essay > p.part { margin: 10px 0 0; max-width: 860px; }
 .card.essay > .ch-pair { margin: 22px 0 14px; }
-sup.fn { font-size: 0.72em; line-height: 0; margin-left: 1px; }
+sup.fn { font-size: max(11px, 0.72em); line-height: 0; margin-left: 1px; }
 sup.fn a { text-decoration: none; }
 ol.notes { margin: 6px 0 0; padding-left: 1.6em; font-size: 13px; color: var(--ink2); max-width: 860px; }
 ol.notes li { margin: 3px 0; overflow-wrap: anywhere; }

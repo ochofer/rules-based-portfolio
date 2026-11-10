@@ -184,6 +184,17 @@ def _note(key: str) -> str:
     return f"\u2e28note:{key}\u2e29"
 
 
+def _note_text(text: str, url: str, title: str = None) -> str:
+    """A note of the Notes list. A published work is followed by its address. A page or file of the author's own
+    carries its link on its title, given as title, and its address is not written out."""
+    if title is None:
+        return f'{_esc(text)} <a href="{_esc(url)}">{_esc(url)}</a>'
+    if text.count(title) != 1:
+        raise ValueError(f"the note does not name its title once: {title}")
+    before, after = text.split(title)
+    return f'{_esc(before)}<a href="{_esc(url)}">{_esc(title)}</a>{_esc(after)}'
+
+
 def _number_notes(sections: dict) -> list:
     """Number the notes in order of first mention across the views, write each mark as a link to its note and the
     Notes list in its place. A mark without a note, or marks on a page without the Notes list, stop the build."""
@@ -206,8 +217,7 @@ def _number_notes(sections: dict) -> list:
         seen.add(n)
         return _fn(n) if first else f'<sup class="fn"><a href="#note-{n}">{n}</a></sup>'
 
-    items = "".join(f'<li id="note-{number[k]}">{_esc(CITATIONS[k][0])} <a href="{_esc(CITATIONS[k][1])}">'
-                    f'{_esc(CITATIONS[k][1])}</a></li>' for k in order)  # fmt: skip
+    items = "".join(f'<li id="note-{number[k]}">{_note_text(*CITATIONS[k])}</li>' for k in order)
     for v, _ in VIEWS:
         sections[v] = [NOTE_MARK.sub(mark, html).replace(NOTE_LIST, items) for html in sections[v]]
     return order
@@ -2215,15 +2225,15 @@ NOTES = (
     ("DeMiguel, V., Garlappi, L. and Uppal, R. (2009). Optimal versus naive diversification: how inefficient is the "
      "1/N portfolio strategy? Review of Financial Studies 22(5), 1915 to 1953.", "https://doi.org/10.1093/rfs/hhm075"),
     ("Optimal versus naive diversification, the replication and the index-tracking study, with its dashboard, note "
-     "and code:", STUDY_URL),
+     "and code.", STUDY_URL, "Optimal versus naive diversification"),
     ("Kenneth French's data library, the US market return and the developed markets outside the United States:",
      "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html"),
     ("Black, F. and Litterman, R. (1992). Global portfolio optimization. Financial Analysts Journal 48(5), 28 to 43.",
      "https://doi.org/10.2469/faj.v48.n5.28"),
     ("Grinold, R. C. (1989). The fundamental law of active management. Journal of Portfolio Management 15(3), 30 to "
      "37.", "https://doi.org/10.3905/jpm.1989.409211"),
-    ("The agenda of the review, mandate/REVIEW_2027.md in the repository:",
-     config.REPOSITORY_URL + "/blob/main/mandate/REVIEW_2027.md"),
+    ("The agenda of the review, mandate/REVIEW_2027.md in the repository.",
+     config.REPOSITORY_URL + "/blob/main/mandate/REVIEW_2027.md", "mandate/REVIEW_2027.md"),
 )
 # The section on what the portfolio does not do cites these, as {n1} to {n6} in its text.
 ESSAY_NOTES = ("demiguel_2009", "naive_diversification_study", "french_library", "black_litterman_1992",

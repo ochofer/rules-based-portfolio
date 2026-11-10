@@ -68,6 +68,11 @@ def test_every_footnote_links_to_one_note_and_every_note_has_one_link():
     assert notes[0][1].startswith("Doeswijk, R., Lam, T. and Swinkels, L. (2014). The global multi-asset market portfolio")
     assert notes[1][1].startswith("Doeswijk, R., Lam, T. and Swinkels, L. (2024). Data update:")
     assert notes[2][1].startswith("DeMiguel, V., Garlappi, L. and Uppal, R. (2009).")
+    # A page or file of the author's own carries its link on its title, with no address written out.
+    assert notes[3][1].startswith('<a href="https://www.carlohofer.com/projects/optimal-vs-naive-diversification/">'
+                                  'Optimal versus naive diversification</a>, the replication')
+    assert notes[7][1] == ('The agenda of the review, <a href="https://github.com/ochofer/rules-based-portfolio/blob/main/'
+                           'mandate/REVIEW_2027.md">mandate/REVIEW_2027.md</a> in the repository.')
     section = html.split('id="method-not-done"', 1)[1].split('<p class="label">Notes</p>', 1)[0]
     assert re.findall(r'<sup class="fn"><a href="#note-(\d+)"', section) == [str(n) for n in range(3, 9)]
     with pytest.raises(ValueError):
