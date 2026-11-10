@@ -267,7 +267,8 @@ def test_no_return_sits_in_the_key_figures_and_one_sentence_gives_it():
 
 
 def test_every_date_a_reader_sees_is_in_words():
-    # E7: the fixed documents shown on the page, the rules, a note's line of figures and a cycle report, keep their own.
+    # E7: a note's line of figures and a cycle report, which the Log quotes word for word, keep their own. The rules'
+    # amendments table writes its dates as the page does, and rules/RULES.md keeps its own form.
     import html
     import json
 
@@ -275,8 +276,7 @@ def test_every_date_a_reader_sees_is_in_words():
     data = json.loads(re.search(r'<script type="application/json" id="dashboard-data">(.*?)</script>', page,
                                 flags=re.S).group(1).replace("<\\/", "</"))  # fmt: skip
     visible = re.sub(r"<script.*?</script>|<style.*?</style>|<head>.*?</head>", " ", page, flags=re.S)
-    for fixed in (r'<article class="card wide rules" id="method-rules">.*?</article>', r'<p class="figures">.*?</p>',
-                  r'<div class="reportbody">.*?</div>'):  # fmt: skip
+    for fixed in (r'<p class="figures">.*?</p>', r'<div class="reportbody">.*?</div>'):
         visible = re.sub(fixed, " ", visible, flags=re.S)
     text = re.sub(r"\b(notes|cycles)/\d{4}-\d{2}\.md", " ", html.unescape(re.sub(r"<[^>]+>", " ", visible)))
     assert not re.search(r"\b\d{4}-\d{2}\b", text), re.findall(r".{0,40}\b\d{4}-\d{2}\b.{0,20}", text)
@@ -284,6 +284,7 @@ def test_every_date_a_reader_sees_is_in_words():
     assert not re.search(r"\b\d{4}-\d{2}\b", shown)
     formats = re.findall(r'"(?:tick|hover)format":"([^"]+)"', json.dumps(data["charts"], separators=(",", ":")))
     assert formats and not [f for f in formats if "%m" in f or "%Y-" in f]
+    assert "<td>7 Oct 2026</td>" in page and "| 2026-10-07 |" in (config.ROOT / "rules" / "RULES.md").read_text()
 
 
 def test_the_sleeves_take_navy_and_slate_and_the_band_its_shade():

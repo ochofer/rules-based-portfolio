@@ -2244,11 +2244,14 @@ def _check_roles(charts: list, palette: dict) -> None:
 
 
 def _rules_html() -> str:
+    """The rules as rules/RULES.md holds them. A date in a table cell, such as an amendment's day of commit, is
+    written as 7 Oct 2026, as every date on the page is, and the file keeps its own form."""
     import markdown
 
     text = (config.ROOT / "rules" / "RULES.md").read_text()
     body = markdown.markdown(text, extensions=["tables"])
     body = re.sub(r"<h1>.*?</h1>", "", body, count=1)
+    body = re.sub(r"<td>(\d{4}-\d{2}-\d{2})</td>", lambda m: f"<td>{fmt.day_short(m.group(1))}</td>", body)
     return body.replace("<table>", '<div class="tw"><div class="tablewrap"><table>').replace("</table>", "</table></div></div>")
 
 
