@@ -400,6 +400,16 @@ The split was set on the global series alone, so this figure chooses nothing. It
 
 Both lines are rule sets without costs, so the comparison is like for like, and the portfolio's own line is left off because reference portfolio A stands for it. The difference between the portfolio and reference portfolio A is the implementation cost, shown under Costs in the Performance view. A record of months is far too short for the gap to say anything about either rule set, which is the same limit that applies to every return on the dashboard.
 
+### ⟦history⟧ The same effects on 1999 to 2025
+
+The pane "The same effects on 1999 to 2025" runs the split and the dollar effects of the Comparisons part on history. It is history and in-sample: the allocation test's own monthly euro series from February 1999 to December 2025, with no contributions and no costs, each split rebalanced by its band at month ends. 70/30 stands against three comparators: 100/0 and 60/40 on the global series, and the US stock market at 70/30, the test's US run, with the same bonds and the same band and the US stock market in place of the global equity series, so that the choice of region is kept apart from the choice of split.
+
+⟦history⟧ gives one block of rows per comparator: first the whole test and the two periods already used in the Method view, 2000 to 2009 and 2010 to 2024, then each calendar year. Split and the dollar are defined as on the record, from the equity weights at the previous month end. For the US stock market at 70/30 a third effect, the US stock market in dollars, is its equity weight times the US market's return in dollars less the global series'. Calendar years are in points, and the longer spans in points a year: the difference of the two growth rates per year, with each effect divided by the span's years. Over a decade, effects summed month by month leave a large remainder when they are set against cumulative returns, and the figures per year keep that remainder, compounding, small. Each row carries the comparator's volatility and worst fall within the span and the band chance alone produces, from one tracking error per comparator over the whole test.
+
+### ⟦history-windows⟧ The difference per year over rolling ten-year windows
+
+⟦history-windows⟧ shows, for each comparator, its growth per year minus 70/30's over each window of ten calendar years, from 2000 to 2009 to 2016 to 2025, plotted at the window's last year. The 17 windows overlap, so the chart smooths the same 26 full years and adds no evidence. Its table gives each window's effects per year, the comparator's volatility and worst fall, and the band.
+
 ### ⟦c22⟧ The ETF selection: tracking difference by fund and year
 
 ⟦c22⟧ shows how the two ETFs were chosen. For each sleeve the funds that meet the criteria of the rules, such as the index tracked, the costs and the fund size, are ranked in an order fixed before they were compared. Equity ETFs rank first by Irish domicile, which lowers the tax the fund pays on US dividends, then by the highest average tracking difference over 2023 to 2025, then by the lowest TER. Bond ETFs rank by the highest average tracking difference, then by the lowest TER. The tracking difference is a fund's calendar-year return minus its index's return, from the issuers' factsheets, so a higher figure means a smaller shortfall against the index.

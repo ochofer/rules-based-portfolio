@@ -2002,7 +2002,10 @@ def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: 
     if any(len(c) for c in correlation):
         _correlation(page, *correlation)
     if not_done:
+        history = {k: not_done.pop(k) for k in ("history", "history_windows") if k in not_done}
         _not_done(page, allocation, **not_done)
+        if history:
+            history_pane(page, history["history"], history["history_windows"])
 
     blocks = []
     for sleeve, title in (("equity", "Equity ETFs"), ("bonds", "Bond ETFs")):
@@ -2315,6 +2318,141 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
              f'{"".join(paragraphs[2:])}<p class="label">Notes</p><ol class="notes">{notes}</ol></article>', us_chart)  # fmt: skip
     if alt_chart:
         page.charts.append(alt_chart)
+
+
+# History of the comparisons ------------------------------------------------------------------------
+
+HISTORY_ROLE = {"100/0": "@comparator_5", "60/40": "@comparator_4", "the US stock market at 70/30": "@us_series"}
+HISTORY_NAME = {"100/0": "100/0", "60/40": "60/40", "the US stock market at 70/30": "The US stock market at 70/30"}
+
+
+def _pp(x) -> str:
+    """A difference or an effect in points, two decimals, signed: +2.83, and n/a where it does not apply."""
+    if pd.isna(x):
+        return "n/a"
+    value = round(float(x) * 100, 2) + 0.0
+    return (f"{value:+.2f}" if value else "0.00").replace("-", fmt.MINUS)
+
+
+def _history_band(row) -> str:
+    inside = "inside the band" if row["inside_band"] == "yes" else "outside the band"
+    return f"±{float(row['band']) * 100:.2f}, {inside}"
+
+
+def _span_name(row) -> str:
+    if row["kind"] == "year":
+        return f"{row['span']}, from February" if int(row["months"]) < 12 else str(row["span"])
+    first, last = str(row["first_month"]), str(row["last_month"])
+    return f"{_month_name(first)} to {_month_name(last)}"
+
+
+def _history_table(history: pd.DataFrame) -> str:
+    """One table of every span of every comparator, in blocks by comparator: the whole test and the two periods per
+    year, then each calendar year, each block headed by its unit."""
+    columns = ["Span", "Difference", "Split", "The dollar", "The US stock market in dollars", "Compounding", "Volatility",
+               "Worst fall", "Band chance alone produces"]  # fmt: skip
+    numeric = set(columns[1:])
+    head = "".join(f'<th class="num">{_esc(c)}</th>' if c in numeric else f"<th>{_esc(c)}</th>" for c in columns)
+    body = []
+    for name in HISTORY_NAME:
+        own = history[history["comparator"] == name]
+        for kinds, unit in ((("whole", "period"), "points a year"), (("year",), "points")):
+            rows = own[own["kind"].isin(kinds)]
+            label = (f"{HISTORY_NAME[name]} against 70/30, " + ("the whole test and two periods" if unit == "points a year"
+                     else "calendar years") + f", in {unit}, with volatility and worst fall in per cent")  # fmt: skip
+            body.append(f'<tr class="group"><td colspan="{len(columns)}"><b>{_esc(label)}</b></td></tr>')
+            for _, r in rows.iterrows():
+                cells = [_span_name(r), _pp(r["difference"]), _pp(r["split"]), _pp(r["dollar"]), _pp(r["us_stock_market"]),
+                         _pp(r["compounding"]), fmt.pct(r["volatility"]), fmt.pct(r["worst_fall"]), _history_band(r)]  # fmt: skip
+                body.append("<tr>" + "".join(f'<td class="num">{_esc(v)}</td>' if c in numeric else f"<td>{_esc(v)}</td>"
+                                             for c, v in zip(columns, cells)) + "</tr>")  # fmt: skip
+    return (f'<div class="tw"><div class="tablewrap"><table class="history"><thead><tr>{head}</tr></thead>'
+            f'<tbody>{"".join(body)}</tbody></table></div></div>')
+
+
+def _history_windows(windows: pd.DataFrame) -> tuple:
+    """The difference per year of each comparator over rolling windows of ten calendar years, at each window's
+    last year, with the windows' effects, volatility, worst fall and band in its table."""
+    traces, annotations, ends = [], [], {}
+    for name, label in HISTORY_NAME.items():
+        own = windows[windows["comparator"] == name]
+        x, y = list(own["last_year"]), [fmt.rounded(v * 100, 2) for v in own["difference"]]
+        hover = [f"{int(r['first_year'])} to {int(r['last_year'])}<br>{label}: {_pp(r['difference'])} points a year<br>"
+                 f"Band: {_history_band(r)}<br>Volatility {fmt.pct(r['volatility'])}, worst fall {fmt.pct(r['worst_fall'])}"
+                 for _, r in own.iterrows()]  # fmt: skip
+        traces.append({"type": "scatter", "mode": "lines+markers", "name": label, "x": x, "y": y,
+                       "line": {"color": HISTORY_ROLE[name], "width": 2}, "marker": {"size": 6, "color": HISTORY_ROLE[name]},
+                       **_hover(hover)})  # fmt: skip
+        ends[name] = float(own["difference"].iloc[-1]) * 100 if len(own) else 0.0
+    values = [v * 100 for v in windows["difference"]] + [0.0]
+    placed = _spread(ends, 0.065 * (max(values) - min(values)))
+    for name, label in HISTORY_NAME.items():
+        if len(windows[windows["comparator"] == name]):
+            annotations.append({**_label(int(windows["last_year"].max()), fmt.rounded(placed[name], 2), label,
+                                         role=HISTORY_ROLE[name]), "xshift": 6})  # fmt: skip
+    layout = {"showlegend": False, "annotations": annotations, "shapes": [_hline(0, "@ink")], "margin": {"r": 200},
+              "xaxis": {"title": {"text": "Last year of the ten-year window"}, "dtick": 2,
+                        "range": [float(windows["last_year"].min()) - 0.5, float(windows["last_year"].max()) + 0.5]},
+              "yaxis": {"title": {"text": "Points a year, comparator minus 70/30"}}}  # fmt: skip
+    rows = [[f"{int(r['first_year'])} to {int(r['last_year'])}", HISTORY_NAME[r["comparator"]], _pp(r["difference"]),
+             _pp(r["split"]), _pp(r["dollar"]), _pp(r["us_stock_market"]), _pp(r["compounding"]), fmt.pct(r["volatility"]),
+             fmt.pct(r["worst_fall"]), _history_band(r)] for _, r in windows.iterrows()]  # fmt: skip
+    columns = ["Window", "Comparator", "Difference, points a year", "Split", "The dollar", "The US stock market in dollars",
+               "Compounding", "Volatility", "Worst fall", "Band chance alone produces"]  # fmt: skip
+    table = _table(columns, rows, numeric=tuple(columns[2:]), wrap_head=True)
+    # On a phone the longest label takes two lines, so that it fits beside the plot.
+    narrow = [{**a, "text": a["text"].replace("stock market at", "stock market<br>at"), "align": "left"} for a in annotations]
+    chart = {"id": "history-windows", "view": "method", "traces": traces, "layout": layout,
+             "layout_narrow": {"margin": {"r": 130}, "annotations": narrow, "yaxis": {"title": {"text": "Points a year"}},
+                               "xaxis": {"title": {"text": "Last year of the window"}, "dtick": 4}}}  # fmt: skip
+    return chart, table
+
+
+def history_pane(page, history: pd.DataFrame, windows: pd.DataFrame) -> None:
+    """The pane "The same effects on 1999 to 2025": the split and the dollar effects of 70/30 against 100/0, 60/40
+    and the US stock market at 70/30 on the allocation test's own series, history and in-sample."""
+    if not len(history):
+        return
+    whole = history[history["kind"] == "whole"].iloc[0]
+    first, last = _month_name(str(whole["first_month"])), _month_name(str(whole["last_month"]))
+    tracking = {r["comparator"]: r["tracking_error"] for _, r in history[history["kind"] == "whole"].iterrows()}
+    errors = _and([f"{v * 100:.2f} points a year for {k}" for k, v in tracking.items()])
+    notes = (
+        f"History, in-sample: the allocation test's own monthly euro series from {first} to {last}, with no contributions "
+        "and no costs, each split rebalanced by the band of rule 5 at month ends. The comparators are 100/0 and 60/40 on "
+        "the global series and the US stock market at 70/30, the test's US run, with the same bonds and the same band and "
+        "French's US stock market in place of the global equity series. Each row is the comparator's return minus 70/30's.",
+        "Split is the difference in equity weight at the previous month end times the global equity series' return in US "
+        "dollars minus the bonds' return, and the dollar is the same difference times the gap between that series' return "
+        "in euro and in US dollars. For the US stock market at 70/30, the US stock market in dollars is its equity weight "
+        "at the previous month end times the US market's return in dollars less the global series'. Both equity series "
+        "are converted at the same rate, so that comparator's dollar row holds the drift term and the conversion's cross "
+        "term only, and the currencies inside the global series' dollar return stay in that return, as on the record.",
+        "Calendar years are cumulative, in points, and 1999 runs from February. The whole test and the two periods are "
+        "per year, in points a year: the difference of the two growth rates per year, with each effect as its monthly sum "
+        "divided by the span's years. Compounding is the difference less the sum of the effects. It includes the "
+        "volatility drag of the more volatile path, which is why it can carry either sign.",
+        "The band chance alone produces is two tracking errors times the square root of the years for a calendar year, and "
+        "divided by it for a longer span. Each comparator has one tracking error, the standard deviation of its monthly "
+        f"differences over the whole test times the square root of 12: {errors}. Volatility and the worst fall are the "
+        "comparator's own within each span.",
+    )  # fmt: skip
+    table_card = _card("history", "History, in-sample: the split and the dollar effects of 70/30 against three comparators",
+                       f"Monthly euro returns, {first} to {last}", "mandate/allocation_check_history.csv", plot=False,
+                       kind="table", wide=True,
+                       extra=_history_table(history) + "".join(f'<p class="note">{_esc(n)}</p>' for n in notes))  # fmt: skip
+    chart, chart_table = _history_windows(windows)
+    chart_card = _card("history-windows", "History, in-sample: the difference per year over rolling ten-year windows",
+                       f"Monthly euro returns, {first} to {last}. Points a year, comparator minus 70/30",
+                       "mandate/allocation_check_history_windows.csv", table=chart_table, wide=True, height=320,
+                       note=("Each point is a window of ten calendar years, from 2000 to 2009 to 2016 to 2025, at its last "
+                             "year: the comparator's growth per year minus 70/30's, in points a year. The test's 27 calendar "
+                             "years, 1999 from February, give 17 overlapping windows of ten full years, so the chart smooths "
+                             "and adds no evidence. The table gives each window's effects per year, the comparator's "
+                             "volatility and worst fall, and the band chance alone produces."))  # fmt: skip
+    page.charts.append(chart)
+    page.add("method", '<div class="wide ch-panes"><details class="ch-pane" id="method-history"><summary>The same effects on '
+             f'1999 to 2025</summary><div class="ch-pane__body">{table_card}{chart_card}</div></details></div>')
 
 
 def _other_projects() -> str:
@@ -2851,7 +2989,9 @@ def build(out_dir: Path = None) -> Path:
     not_done = None if not len(us_test) else {
         "us_test": us_test, "daily": daily, "fund": references.alternative_fund()[0], "period": _test_period(),
         "added": _first_commit_day(ADDED_WITH, _built(now_row)),
-        "periods": _read("allocation_check_us_periods.csv", config.ROOT / "mandate")}  # fmt: skip
+        "periods": _read("allocation_check_us_periods.csv", config.ROOT / "mandate"),
+        "history": _read("allocation_check_history.csv", config.ROOT / "mandate"),
+        "history_windows": _read("allocation_check_history_windows.csv", config.ROOT / "mandate")}  # fmt: skip
     method(page, allocation, selection, _rules_html(), out["sources.csv"], simulated["bootstrap"], correlation,
            _read("controls.csv", config.METHOD_DIR), not_done)  # fmt: skip
     simulations(page, simulated["history"], simulated["paths"], monthly)

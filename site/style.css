@@ -181,6 +181,7 @@ footer { color: var(--ink2); background: var(--tint); font-size: 12.5px; padding
 .ch-pane__body { padding: 4px 0 26px; }
 .ch-pane__body > .card { padding-top: 0; border-top: 0; }
 .ch-pane__body > .card + .card { padding-top: 28px; }
+table.history tr.group td { background: var(--tint); padding-top: 10px; }
 .ch-select { margin: 10px 0 2px; font-size: 13.5px; color: var(--ink2); }
 .ch-select select { font: inherit; color: var(--ink); margin-left: 6px; min-height: 36px; padding: 4px 8px; border: 1px solid var(--frame); background: var(--surface); }
 footer p { margin: 0 0 6px; max-width: 820px; }

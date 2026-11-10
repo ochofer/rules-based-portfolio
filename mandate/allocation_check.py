@@ -37,7 +37,10 @@ Usage:   python3 mandate/allocation_check.py
 Output:  mandate/allocation_check_results.md, the same text on screen, and the table of every split in
          mandate/allocation_check_results.csv. The US run writes its table of every split to
          mandate/allocation_check_us_results.csv, the two series' returns over the two periods to
-         mandate/allocation_check_us_periods.csv, and its figures to the screen.
+         mandate/allocation_check_us_periods.csv, and its figures to the screen. The history of the comparisons
+         writes the split and the dollar effects of 70/30 against 100/0, 60/40 and the US stock market at 70/30 to
+         mandate/allocation_check_history.csv (each calendar year, the two periods and the whole test) and
+         mandate/allocation_check_history_windows.csv (rolling windows of ten calendar years).
 Requires Python 3.9 or later, pandas and numpy.
 """
 import io
@@ -58,6 +61,8 @@ OUT = os.path.join(ROOT, "mandate", "allocation_check_results.md")
 OUT_CSV = os.path.join(ROOT, "mandate", "allocation_check_results.csv")
 OUT_US_CSV = os.path.join(ROOT, "mandate", "allocation_check_us_results.csv")
 OUT_US_PERIODS = os.path.join(ROOT, "mandate", "allocation_check_us_periods.csv")
+OUT_HISTORY = os.path.join(ROOT, "mandate", "allocation_check_history.csv")
+OUT_HISTORY_WINDOWS = os.path.join(ROOT, "mandate", "allocation_check_history_windows.csv")
 US_PERIODS = (("2000-01", "2009-12"), ("2010-01", "2024-12"))  # the decade from 2000 and the fifteen years after it
 
 # The mandate's numbers.
@@ -67,6 +72,11 @@ EQUITY_GRID = [w / 100 for w in range(40, 101, 5)]
 EMERGING_SHARE = 0.10    # emerging markets' approximate share of a global index of developed and emerging markets
 BOND_MATURITY = 7.0      # in years, close to the average duration of a euro government bond index
 FIRST_MONTH, LAST_MONTH = "1999-01", "2025-12"
+# The history of the comparisons: 70/30 against three comparators on the test's own series, by calendar year, over
+# the two periods of US_PERIODS and over rolling windows of ten calendar years.
+HISTORY_TARGET = 0.70
+HISTORY_COMPARATORS = (("100/0", "global", 1.00), ("60/40", "global", 0.60), ("the US stock market at 70/30", "united_states", 0.70))
+WINDOW_YEARS = 10
 
 # Two expectations for the US run, written on 5 November 2026 before it ran and kept as written. The run
 # reports whether each is met, and nothing is tuned to meet them.
@@ -309,6 +319,125 @@ def us_periods():
     return pd.DataFrame(rows)
 
 
+def band_weights(returns, equity_target):
+    """The band path of band_path with the equity weight held at the start of each month, after any rebalancing at
+    the month end before it: the value at each month end and that weight."""
+    equity, bonds = equity_target, 1 - equity_target
+    values, weights = [], []
+    for r_equity, r_bonds in zip(returns["equity"].values, returns["bonds"].values):
+        weights.append(equity / (equity + bonds))
+        equity *= 1 + r_equity
+        bonds *= 1 + r_bonds
+        total = equity + bonds
+        if abs(equity / total - equity_target) > BAND_HALF_WIDTH:
+            equity, bonds = equity_target * total, (1 - equity_target) * total
+        values.append(total)
+    return pd.Series(values, index=returns.index), pd.Series(weights, index=returns.index)
+
+
+def global_dollar_returns(index):
+    """The global equity series in US dollars, before its conversion to euro: French's developed and emerging
+    markets at the test's shares."""
+    developed, _ = french_market("developed")
+    emerging, _ = french_market("emerging")
+    return ((1 - EMERGING_SHARE) * developed + EMERGING_SHARE * emerging).reindex(index)
+
+
+def history_months(returns, us, dollar, us_dollar):
+    """Month by month, for each comparator against 70/30 on the global series: both returns and the effects.
+
+    With e the equity weight of 70/30 and e_c the comparator's at the previous month end, r_e and r_d the global
+    equity series in euro and in dollars and r_b the bonds: split is (e_c - e)(r_d - r_b) and the dollar
+    (e_c - e)(r_e - r_d). For the US stock market at 70/30, the US stock market in dollars is
+    e_c (r_us,d - r_d), and its conversion cross term, e_c ((r_us - r_us,d) - (r_e - r_d)), joins the dollar.
+    The effects sum to the month's difference exactly."""
+    base_values, base_weight = band_weights(returns, HISTORY_TARGET)
+    base = base_values / base_values.shift(1, fill_value=1.0) - 1
+    frames = {}
+    for name, series, target in HISTORY_COMPARATORS:
+        own = us if series == "united_states" else returns
+        values, weight = band_weights(own, target)
+        mine = values / values.shift(1, fill_value=1.0) - 1
+        tilt = weight - base_weight
+        frame = pd.DataFrame({"comparator": mine, "base": base, "split": tilt * (dollar - returns["bonds"]),
+                              "dollar": tilt * (returns["equity"] - dollar), "us_stock_market": 0.0}, index=returns.index)
+        if series == "united_states":
+            frame["dollar"] += weight * ((us["equity"] - us_dollar) - (returns["equity"] - dollar))
+            frame["us_stock_market"] = weight * (us_dollar - dollar)
+        gap = frame["comparator"] - frame["base"]
+        if (frame[["split", "dollar", "us_stock_market"]].sum(axis=1) - gap).abs().max() > 1e-12:
+            raise SystemExit(f"The effects of {name} do not sum to its difference.")
+        frame["values"] = values
+        frames[name] = frame
+    return frames
+
+
+def _fall_within(values, months):
+    """The worst fall of a path within the months, from the level before the first of them: the fall, the peak
+    month and the low month."""
+    first = values.index.get_loc(months[0])
+    start = values.iloc[first - 1] if first > 0 else 1.0
+    start_month = months[0] - 1
+    path = pd.concat([pd.Series([start], index=[start_month]), values.loc[months]])
+    fall = path / path.cummax() - 1
+    low = fall.idxmin()
+    if fall.min() >= 0:
+        return 0.0, "", ""
+    return float(-fall.min()), str(path.loc[:low].idxmax()), str(low)
+
+
+def history_row(name, frame, months, label, kind, tracking_error):
+    """One span of one comparator. A calendar year is cumulative, in points; a longer span is per year, in points a
+    year: the difference of the two growth rates per year and each effect as its monthly sum over the years. The
+    band is two tracking errors (of the whole test) times the square root of the years for a calendar year and
+    divided by it for a longer span."""
+    part = frame.loc[months]
+    years = len(part) / 12
+    mine, base = (1 + part["comparator"]).prod(), (1 + part["base"]).prod()
+    effects = part[["split", "dollar", "us_stock_market"]].sum()
+    if kind == "year":
+        difference, unit, band = mine - base, "points", 2 * tracking_error * math.sqrt(years)
+    else:
+        difference = mine ** (1 / years) - base ** (1 / years)
+        effects = effects / years
+        unit, band = "points a year", 2 * tracking_error / math.sqrt(years)
+    fall, peak, low = _fall_within(frame["values"], months)
+    united_states = name == HISTORY_COMPARATORS[2][0]
+    return {"comparator": name, "span": label, "kind": kind, "first_month": str(months[0]), "last_month": str(months[-1]),
+            "months": len(part), "unit": unit, "difference": difference, "split": effects["split"],
+            "dollar": effects["dollar"], "us_stock_market": effects["us_stock_market"] if united_states else float("nan"),
+            "compounding": difference - effects.sum(), "volatility": part["comparator"].std() * math.sqrt(12),
+            "worst_fall": fall, "worst_fall_peak": peak, "worst_fall_low": low, "tracking_error": tracking_error,
+            "band": band, "inside_band": "yes" if abs(difference) <= band else "no"}
+
+
+def history_tables(frames):
+    """The two committed tables of the history: every span of every comparator, ordered by comparator with the
+    whole test first, then the two periods, then each calendar year; and the rolling windows of ten calendar
+    years, from the first full year."""
+    rows, windows = [], []
+    for name, frame in frames.items():
+        index = frame.index
+        tracking_error = (frame["comparator"] - frame["base"]).std() * math.sqrt(12)
+        spans = [(f"{index[0]} to {index[-1]}", "whole", index)]
+        spans += [(f"{a} to {b}", "period", index[(index >= pd.Period(a, "M")) & (index <= pd.Period(b, "M"))])
+                  for a, b in US_PERIODS]
+        spans += [(str(y), "year", index[index.year == y]) for y in sorted(set(index.year))]
+        rows += [history_row(name, frame, months, label, kind, tracking_error) for label, kind, months in spans]
+        full = [y for y in sorted(set(index.year)) if (index.year == y).sum() == 12]
+        for first in full[: len(full) - WINDOW_YEARS + 1]:
+            months = index[(index.year >= first) & (index.year < first + WINDOW_YEARS)]
+            row = history_row(name, frame, months, f"{first} to {first + WINDOW_YEARS - 1}", "window", tracking_error)
+            windows.append({"first_year": first, "last_year": first + WINDOW_YEARS - 1, **row})
+    columns = ["comparator", "span", "kind", "first_month", "last_month", "months", "unit", "difference", "split",
+               "dollar", "us_stock_market", "compounding", "volatility", "worst_fall", "worst_fall_peak", "worst_fall_low",
+               "tracking_error", "band", "inside_band"]
+    window_columns = ["comparator", "first_year", "last_year", "months", "unit", "difference", "split", "dollar",
+                      "us_stock_market", "compounding", "volatility", "worst_fall", "worst_fall_peak", "worst_fall_low",
+                      "tracking_error", "band", "inside_band"]
+    return pd.DataFrame(rows)[columns], pd.DataFrame(windows)[window_columns]
+
+
 def csv_text(table):
     """The results table as the text of its file."""
     return table.to_csv(index=False, float_format="%.6f", lineterminator="\n")
@@ -413,6 +542,13 @@ def main():
     print(us_summary(us_rows, us_header))
     periods = us_periods()
     periods.to_csv(OUT_US_PERIODS, index=False, float_format="%.6f", lineterminator="\n")
+
+    # The history of the comparisons: the split and the dollar effects of 70/30 against three comparators.
+    us_dollar = french_market("us_market")[0].reindex(returns.index)
+    frames = history_months(returns, us, global_dollar_returns(returns.index), us_dollar)
+    history, windows = history_tables(frames)
+    history.to_csv(OUT_HISTORY, index=False, float_format="%.6f", lineterminator="\n")
+    windows.to_csv(OUT_HISTORY_WINDOWS, index=False, float_format="%.6f", lineterminator="\n")
     print("")
     for r in periods.itertuples():
         print(f"{r.series}, {r.first_month} to {r.last_month}: {r.cumulative_return_usd * 100:.1f} per cent in US dollars, "
