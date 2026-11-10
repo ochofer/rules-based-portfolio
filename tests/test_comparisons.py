@@ -237,7 +237,7 @@ def test_the_comparator_funds_are_fixed_with_their_dates_and_the_ranked_ones_are
     from portfolio import config
 
     funds = references.comparator_funds()
-    assert sorted(set(funds["comparator"])) == ["first_ranked", "lifestrategy_60", "lifestrategy_80", "mag7", "msci_world", "nasdaq100"]
+    assert sorted(set(funds["comparator"])) == ["first_ranked", "lifestrategy_60", "lifestrategy_80", "mag7", "market_portfolio", "msci_world", "nasdaq100"]
     assert (funds["fixed_on"] == "2026-11-10").all() and funds["isin"].str.fullmatch(r"[A-Z]{2}[A-Z0-9]{9}\d").all()
     by = funds.set_index(["comparator", "sleeve"])["isin"]
     assert by[("first_ranked", "equity")] == "IE00B44Z5B48" and by[("first_ranked", "bonds")] == "IE00BH04GL39"
@@ -250,6 +250,38 @@ def test_the_comparator_funds_are_fixed_with_their_dates_and_the_ranked_ones_are
     ranking = pd.read_csv(config.METHOD_DIR / "selection_tracking_difference.csv").drop_duplicates("isin")
     first = ranking[(ranking["sleeve"] == "equity") & (ranking["rank"] == 1)].iloc[0]
     assert first["isin"] == "IE00B44Z5B48" and first["offered_on_the_account"] == "no"
+
+
+def test_the_market_portfolio_holds_one_fund_per_class_each_the_first_the_account_offers():
+    from portfolio import config
+
+    funds = references.comparator_funds()
+    market = funds[funds["comparator"] == "market_portfolio"].set_index("sleeve")
+    assert list(market.index) == ["equities", "aggregate", "private_equity", "real_estate", "em_debt", "inflation_linked", "high_yield"]
+    assert (market["fixed_on"] == "2026-11-10").all() and (market["hedging"] == "unhedged").all()
+    assert market.loc["equities", "isin"] == config.ISIN[config.EQUITY]
+    table = config.METHOD_DIR / "selection_market_portfolio.csv"
+    ranking = pd.read_csv(table)
+    for sleeve in ranking["sleeve"].unique():
+        first = references.first_offered(table, sleeve)
+        expected = first[1] if first else market.loc[references.MARKET_PARENT[sleeve], "isin"]
+        assert market.loc[sleeve, "isin"] == expected, sleeve
+    # The account offers no accumulating class of the aggregate funds, so the class held distributes. It offers the
+    # first inflation-linked fund only in a hedged class, and the second is a hedged class by its issuer's page, so
+    # the inflation-linked class is held in its parent, the aggregate fund.
+    funds_ranked = ranking.drop_duplicates("isin").set_index("isin")
+    assert market.loc["aggregate", "income"] == "distributing" and "ex-dates" in market.loc["aggregate", "how_chosen"]
+    assert funds_ranked.loc[market.loc["aggregate", "isin"], "rank"] == 3
+    assert references.first_offered(table, "inflation_linked") is None
+    assert market.loc["inflation_linked", "isin"] == market.loc["aggregate", "isin"]
+    hedged = funds_ranked.loc["LU0908508814"]
+    assert hedged["passes_the_criteria"] == "no" and hedged["hedging"] == "hedged" and "afgedekt" in hedged["note"]
+    # Three years of tracking difference give the average, and the values seen before the funds were fixed are
+    # named beside them.
+    for isin, group in ranking.groupby("isin"):
+        if group["average_points"].notna().any():
+            assert group["tracking_difference_points"].mean() == pytest.approx(group["average_points"].iloc[0], abs=5e-4)
+    assert ranking.drop_duplicates("isin")["value_seen_before_fixing"].notna().sum() == 3
 
 
 def test_the_published_spreadsheets_of_state_street_hanetf_and_dws(tmp_path):

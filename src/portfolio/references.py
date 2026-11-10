@@ -110,12 +110,25 @@ def alternative_fund(path: Path = None) -> tuple:
     return first_offered(path or config.METHOD_DIR / "selection_sp500.csv")
 
 
-def first_offered(path: Path) -> tuple:
-    """The first fund in rank order that the account offers, in a selection table of method/. Returns its name and
-    ISIN."""
-    frame = pd.read_csv(path).drop_duplicates("isin").sort_values("rank")
-    row = frame[frame["offered_on_the_account"] == "yes"].iloc[0]
-    return str(row["fund"]), str(row["isin"])
+# The parent of each satellite class of the global market portfolio: the class that holds it when the account offers
+# no fund of its own that passes the criteria.
+MARKET_PARENT = {"private_equity": "equities", "real_estate": "equities", "em_debt": "aggregate",
+                 "inflation_linked": "aggregate", "high_yield": "aggregate"}
+
+
+def first_offered(path: Path, sleeve: str = None) -> tuple:
+    """The first fund in rank order that the account offers, in a selection table of method/, within one sleeve
+    when the table ranks more than one. A table that marks whether each fund passes the criteria counts only those
+    that pass. Returns its name and ISIN, or None when the account offers none."""
+    frame = pd.read_csv(path).drop_duplicates("isin")
+    if sleeve is not None:
+        frame = frame[frame["sleeve"] == sleeve]
+    if "passes_the_criteria" in frame:
+        frame = frame[frame["passes_the_criteria"] == "yes"]
+    offered = frame.sort_values("rank")[lambda f: f["offered_on_the_account"] == "yes"]
+    if not len(offered):
+        return None
+    return str(offered.iloc[0]["fund"]), str(offered.iloc[0]["isin"])
 
 
 def comparator_funds(path: Path = None) -> pd.DataFrame:
@@ -127,6 +140,17 @@ def comparator_funds(path: Path = None) -> pd.DataFrame:
         _, isin = first_offered(config.METHOD_DIR / table)
         if frame.loc[frame["comparator"] == key, "isin"].tolist() != [isin]:
             raise ValueError(f"method/comparator_funds.csv: {key} is not the first fund offered in method/{table}")
+    market = frame[frame["comparator"] == "market_portfolio"].set_index("sleeve")["isin"]
+    table = "selection_market_portfolio.csv"
+    for sleeve in pd.read_csv(config.METHOD_DIR / table)["sleeve"].unique():
+        first = first_offered(config.METHOD_DIR / table, sleeve)
+        # A class whose ranking holds no fund the account offers is held in its parent class's fund.
+        expected = first[1] if first else market.get(MARKET_PARENT[sleeve])
+        if market.get(sleeve) != expected:
+            raise ValueError(f"method/comparator_funds.csv: the market portfolio's {sleeve} fund is not the first "
+                             f"offered in method/{table}, nor its parent class's when none is offered")
+    if market.get("equities") != config.ISIN[config.EQUITY]:
+        raise ValueError("method/comparator_funds.csv: the market portfolio's equities fund is not the equity fund held")
     return frame
 
 
