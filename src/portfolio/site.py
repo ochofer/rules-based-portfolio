@@ -2319,6 +2319,7 @@ OTHER_PROJECTS = (
      "tracking error, by 22 to 61 per cent. The replication of DeMiguel, Garlappi and Uppal (2009) reproduces 29 of "
      "the 30 Sharpe ratios that carry a band.",
      (("Page", STUDY_URL), ("dashboard", SITE_URL + "optimal-vs-naive-diversification/dashboard/B-P_dashboard.html"),
+      ("note", SITE_URL + "optimal-vs-naive-diversification/note/B-P_note_2026-10.pdf"),
       ("code", "https://github.com/ochofer/optimal-vs-naive-diversification"))),
     ("Climate risk as an equity signal.",
      "An ownership graph linking 328 listed companies to the 5,115 tracked assets they own. Of 19 apparent "
