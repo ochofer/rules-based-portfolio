@@ -228,6 +228,11 @@ def test_the_comparisons_part_on_the_page():
     charts = {c["id"]: c for c in data["charts"]}
     assert all(charts[c]["view"] == "performance" for c in charts if c.startswith("comparisons"))
     assert sum(t["visible"] for t in charts["comparisons-effects"]["traces"]) == 1
+    # G6, no tilted labels: on a phone a pane chart with labels at the right ticks its first and last day only, and a
+    # bar chart's value axis takes at most four ticks.
+    days = charts["comparisons-same-rules"]["traces"][0]["x"]
+    assert charts["comparisons-same-rules"]["layout_narrow"]["xaxis"]["tickvals"] == [min(days), max(days)]
+    assert charts["c12"]["layout_narrow"]["xaxis"]["nticks"] == 4
     assert [t["name"] for t in charts["c21"]["traces"]][2] == "US series"
 
 

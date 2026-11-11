@@ -1141,6 +1141,9 @@ def _pane_chart(cid: str, daily: pd.DataFrame, keys) -> tuple:
     headers = ["Date"] + [COMPARATOR_NAME[k][1] for k in keys]
     table = _table(headers, rows, numeric=tuple(headers[1:]))
     narrow = {**narrow, "yaxis": {"title": {"text": "Points"}}}
+    if annotations:  # the labels at the right narrow the plot on a phone, so the first and the last day are its two ticks
+        days = sorted({str(d)[:10] for d in dates})
+        narrow["xaxis"] = {**narrow["xaxis"], "tickmode": "array", "tickvals": [days[0], days[-1]]}
     if any(" and " in a["text"] for a in annotations):  # on a phone a label that names two lines or more takes two lines
         narrow["annotations"] = [{**a, "text": a["text"].replace(" and ", " and<br>"), "align": "left"} for a in annotations]
     chart = {"id": cid, "view": "comparisons", "traces": traces, "layout": layout, "layout_narrow": narrow}
@@ -1601,8 +1604,9 @@ def _bars(cid, frame, label, role, title, asof, source, page, view, note=None, s
     rows = [[r[label], fmt.pct(r[share_col])] + ([fmt.pct(r["share_of_sleeve"])] if len(cols) == 3 else [])
             for _, r in frame.iterrows()]  # fmt: skip
     table = _table(cols, rows, numeric=tuple(cols[1:]), rounding=rounding)
+    # On a phone the names take most of the width, so the value axis takes fewer ticks and they stay level.
     page.add(view, _card(cid, title, asof, source, table=table, note=note, height=height),
-             {"id": cid, "traces": traces, "layout": layout})
+             {"id": cid, "traces": traces, "layout": layout, "layout_narrow": {"xaxis": {"nticks": 4}}})
 
 
 def lookthrough(page, out):
