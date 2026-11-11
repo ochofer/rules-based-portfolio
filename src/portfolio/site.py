@@ -1242,31 +1242,62 @@ def _market_card(market: pd.DataFrame, fees: pd.DataFrame, as_of) -> str:
                  extra=table + f'<p class="note">{_esc(note)}</p>')  # fmt: skip
 
 
+def _bps(low: float, high: float) -> str:
+    """Basis points as a whole number, or a range when the source gives one."""
+    return f"{low:.0f}" if round(low) == round(high) else f"{low:.0f} to {high:.0f}"
+
+
+# What a single cost a year is made up of, in words, by the item the fee table gives it.
+COST_WORDS = {"Ongoing costs of the two ETFs at the portfolio's weights": "The two ETFs' TER and transaction costs, at the "
+              "portfolio's weights", "Ongoing charges figure": "The fund's ongoing charges figure"}  # fmt: skip
+
+
 def _managed_card(summary: pd.DataFrame, fees: pd.DataFrame, as_of) -> str:
-    """The bank's managed profile beside the portfolio: its published costs, and no return, since none is published."""
-    rows = []
-    for _, r in (fees[fees["comparator"] != "market_portfolio"] if len(fees) else fees).iterrows():
-        low, high = float(r["bps_low"]), float(r["bps_high"])
-        value = f"{low:.0f}" if round(low) == round(high) else f"{low:.0f} to {high:.0f}"
-        if r["comparator"] == "portfolio" and "Implementation" in r["item"]:
-            value = f"{low:.1f}".replace("-", fmt.MINUS)
-        who = COMPARATOR_NAME.get(r["comparator"], (r["comparator"],))[0]
-        dated = fmt.month_short(str(r["dated"])[:7]) if r["comparator"] == "bank_offensief" else fmt.day_short(r["dated"])
-        rows.append([who, r["item"], value, r["per"], f"{r['source']}, {dated}"])
-    columns = ["Comparator", "Cost", "Basis points", "Per", "Source"]
-    table = _table(columns, rows, numeric=("Basis points",), wrap_first=True, prose=True) if rows else ""
+    """The bank's managed profile beside the portfolio: one row for each, with its costs a year and what they are made
+    up of, since a bank publishes no return for its managed profiles. The portfolio's implementation cost, which is
+    cumulative, is a sentence under the table."""
+    fees = fees[fees["comparator"] != "market_portfolio"] if len(fees) else fees
+    rows, implementation = [], None
+    for key in dict.fromkeys(fees["comparator"]) if len(fees) else []:
+        own = fees[fees["comparator"] == key]
+        yearly = own[own["per"].str.startswith("a year")]
+        for _, r in own[~own.index.isin(yearly.index)].iterrows():
+            if key == "portfolio" and "Implementation" in r["item"]:
+                implementation = float(r["bps_low"])
+        if not len(yearly):
+            continue
+        total = yearly[yearly["item"] == "All in"]
+        parts = yearly[yearly["item"] != "All in"]
+        if len(total):
+            # The profile's charges, each named as the cost overview names it, without how often it is charged.
+            named = [f"{str(r['item']).split(',')[0]} {_bps(float(r['bps_low']), float(r['bps_high']))}"
+                     for _, r in parts.iterrows()]  # fmt: skip
+            named = named[:1] + [n[:1].lower() + n[1:] for n in named[1:]]
+            made_up = ", ".join(named[:-1]) + " and " + named[-1] if len(named) > 1 else named[0]
+            head = total.iloc[0]
+        else:
+            head = parts.iloc[0]
+            made_up = COST_WORDS.get(str(head["item"]), str(head["item"]))
+        who = COMPARATOR_NAME.get(key, (key,))[0] + (", 70/30" if key == "bank_offensief" else "")
+        dated = fmt.month_short(str(head["dated"])[:7]) if key == "bank_offensief" else fmt.day_short(head["dated"])
+        rows.append([who, _bps(float(head["bps_low"]), float(head["bps_high"])), made_up, f"{head['source']}, {dated}"])
+    columns = ["", "Costs a year, basis points", "Made up of", "Source"]
+    table = _table(columns, rows, numeric=("Costs a year, basis points",), wrap_first=True, prose=True) if rows else ""
     status = summary.loc["bank_offensief", "status"] if "bank_offensief" in summary.index else ""
-    note = ("Rabobank manages index funds for its clients in Rabo Beheerd Beleggen Basis, in four profiles from Defensief "
-            "to Zeer Offensief, and its brochure and Risicometer give Offensief 70 per cent equity and 30 per cent bonds, "
-            "the portfolio's split. Its costs are read from Rabobank's published cost overview at each build: the basic "
-            "service and the portfolio management are each charged a quarter on the first 100,000 euro invested, as the "
-            "overview's examples show, and the funds' own costs are the range the overview states. "
-            f"Its return is n/a. {_status(status)}, so the profile has no figures beside the portfolio's, and it is "
-            "not like for like. The portfolio's ongoing costs are its two ETFs' TER plus transaction costs at its "
-            "weights, from the Costs part, and its implementation cost is cumulative since the first purchase.")  # fmt: skip
+    note = (f"{_status(status)}, so this table sets the costs a year side by side and nothing else: there is no return, "
+            "volatility or worst fall to set beside the portfolio's, and the profile is not like for like. Rabobank "
+            "manages index funds for its clients in Rabo Beheerd Beleggen Basis, in four profiles from Defensief to Zeer "
+            "Offensief, and its brochure and Risicometer give Offensief 70 per cent equity and 30 per cent bonds, the "
+            "portfolio's split. Its costs are read from Rabobank's published cost overview at each build: the basic "
+            "service and the portfolio management are each charged a quarter at a time on the first 100,000 euro "
+            "invested, as the overview's examples show, and the funds' own costs are the range the overview states.")  # fmt: skip
+    after = ""
+    if implementation is not None:
+        after = (f" The portfolio's implementation cost since the first purchase, {_esc(f'{implementation:.1f}'.replace('-', fmt.MINUS))} "
+                 'basis points, is cumulative and not a cost a year, and is in <a href="#costs">Costs</a>.')  # fmt: skip
     return _card("comparisons-managed", "Not like for like: a bank's managed profile and its costs, in basis points",
                  _asof(as_of), ("outputs/comparison_fees.csv", "outputs/comparisons.csv"), plot=False, kind="table",
-                 wide=True, extra=table + f'<p class="note">{_esc(note)}</p>')  # fmt: skip
+                 wide=True, extra=table + f'<p class="note">{_esc(note)}{after}</p>')  # fmt: skip
 
 
 def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: pd.DataFrame,

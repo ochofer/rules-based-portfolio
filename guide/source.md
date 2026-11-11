@@ -140,7 +140,7 @@ The fifth pane holds the contributions at the euro short-term rate, compounded d
 
 ### ⟦comparisons-managed⟧ Not like for like: a bank's managed profile
 
-The sixth pane sets the portfolio beside what a bank charges to run the same split. Rabobank's Rabo Beheerd Beleggen Basis manages index funds in four profiles, and its profile Offensief holds 70 per cent equity and 30 per cent bonds. Rabobank publishes no return for its profiles, so the profile has no figures in the comparisons and is not like for like. ⟦comparisons-managed⟧ gives its costs a year from Rabobank's published cost overview, read at each build, beside the portfolio's ongoing costs, its implementation cost since the first purchase and the LifeStrategy funds' ongoing charges, each in basis points with its source and date.
+The sixth pane sets the portfolio beside what a bank charges to run the same split. Rabobank's Rabo Beheerd Beleggen Basis manages index funds in four profiles, and its profile Offensief holds 70 per cent equity and 30 per cent bonds. Rabobank publishes no return for its profiles, so the profile has no figures in the comparisons and is not like for like. Costs are therefore all this pane compares. ⟦comparisons-managed⟧ gives one row each for the portfolio, the two LifeStrategy funds and the profile, with the costs a year in basis points, what they are made up of, and their source and date. The profile's costs are read from Rabobank's published cost overview at each build. The portfolio's implementation cost since the first purchase is in a sentence under the table, since it is cumulative and not a cost a year.
 
 ### ⟦comparisons-effects⟧ Where each difference came from
 
