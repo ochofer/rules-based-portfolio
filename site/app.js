@@ -116,6 +116,9 @@
   function scrollToPart(id) {
     var el = document.getElementById(id);
     if (!el) return;
+    // A pane, or a part inside a closed pane, opens the pane first, so the part has its place on the page.
+    var pane = el.closest ? el.closest("details.ch-pane") : null;
+    if (pane && !pane.open) pane.open = true;
     var bar = document.querySelector(".ch-tabs");
     var offset = 12;
     if (bar) offset += bar.offsetHeight;

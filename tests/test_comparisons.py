@@ -180,14 +180,36 @@ def test_the_comparisons_part_on_the_page():
     view = page.split('id="view-performance"', 1)[1].split('<section class="view"', 1)[0]
     assert view.index('id="c3"') < view.index('id="comparisons"') < view.index('id="contributions"')
     part = view.split('id="comparisons"', 1)[1].split('id="contributions"', 1)[0]
-    # E10: the panes are the browser's disclosure element, closed by default, each under the question it answers.
-    assert re.findall(r'<details class="ch-pane"><summary>([^<]+)</summary>', part) == [
-        "The same rules without costs", "The same rules with other funds or splits", "One fund instead of two",
-        "Every asset class at its market value", "The money left in the bank",
-        "Not like for like: a bank&#x27;s managed profile", "Where each difference came from"]
+    # E10: the panes are the browser's disclosure element, closed by default, each with an address of its own, under
+    # its headline and a lighter line that names what it holds.
+    heads = re.findall(r'<details class="ch-pane" id="([^"]+)"><summary><span class="ch-pane__head"><span '
+                       r'class="ch-pane__title">([^<]+)</span><span class="ch-pane__members">([^<]+)</span>', part)  # fmt: skip
+    assert [(a, h) for a, h, _ in heads] == [
+        ("pane-same-rules", "The benchmark and the rules without costs"), ("pane-splits", "Other splits of equity and bonds"),
+        ("pane-one-fund", "One fund instead of two"), ("pane-market", "The global market portfolio"),
+        ("pane-savings", "Savings"), ("pane-managed", "A bank&#x27;s managed profile"),
+        ("pane-effects", "Where each difference came from")]  # fmt: skip
+    assert [line for _, _, line in heads] == [
+        "The index blend, 70/30 with the first-ranked funds, reference portfolios A and B", "100/0, 90/10, 80/20, 60/40",
+        "S&amp;P 500, MSCI World, Nasdaq-100, Mag7, LifeStrategy 60 and 80", "Every asset class at its market value",
+        "The contributions held at the euro short-term rate", "What Rabobank charges, not like for like",
+        "The split, the dollar, the regions"]  # fmt: skip
+    # One link to each pane, by its headline, under the part's lead and before the summary table.
+    jump = part.split('<ul class="ch-jump">', 1)[1].split("</ul>", 1)[0]
+    assert re.findall(r'<li><a href="#([^"]+)">([^<]+)</a></li>', jump) == [(a, h) for a, h, _ in heads]
+    assert part.index('<p class="sub">') < part.index('<ul class="ch-jump">') < part.index("</div>") < part.index('id="table-1"')
+    # Two groups: the six comparator panes, then the pane that explains the differences, with a line to the history pane.
+    assert re.findall(r'<p class="ch-group__label">([^<]+)</p>', part) == ["The comparators", "What explains the differences"]
+    explains = part.split("What explains the differences", 1)[1]
+    assert explains.count('<details class="ch-pane"') == 1 and ('<p class="ch-group__lead">The same effects on <a href='
+                                                               '"#method-history">history, 1999 to 2025</a>, are in the Method '
+                                                               "view.</p>") in explains  # fmt: skip
+    method = page.split('id="view-method"', 1)[1]
+    assert ('<details class="ch-pane" id="method-history"><summary><span class="ch-pane__head"><span class="ch-pane__title">'
+            'History, 1999 to 2025</span><span class="ch-pane__members">The split and the dollar effects</span>') in method
     assert "4 Nov to" in summary_rows(part, "The Mag7 fund") and "How the one-fund comparators&#x27; funds were chosen" in part
     # The market portfolio's pane: the note opens on what the comparator is, and its weight table follows the chart.
-    pane = part.split("<summary>Every asset class at its market value</summary>", 1)[1].split('<details class="ch-pane">', 1)[0]
+    pane = part.split('id="pane-market"', 1)[1].split('<details class="ch-pane"', 1)[0]
     assert pane.index("is a comparator the portfolio&#x27;s design names, and the benchmark remains the index blend") \
         < pane.index("The global market portfolio&#x27;s weights and funds, by asset class")
     # Its two sources are the first notes of the dashboard's Notes list, cited in order of mention.
@@ -196,7 +218,8 @@ def test_the_comparisons_part_on_the_page():
     assert '<details class="ch-pane" open' not in part
     summary = part.split('<div class="ch-pair">', 1)[0] if '<div class="ch-pair">' in part else part.split('ch-pair', 1)[0]
     names = re.findall(r"<tr><td>([^<]+)</td>", summary)
-    assert names[:3] == ["The portfolio", "The benchmark, the index blend", "Reference A, the same rules without costs"]
+    assert names[:5] == ["The portfolio", "The benchmark, the index blend", "70/30 with the first-ranked funds, the same rules",
+                         "Reference A, the same rules without costs", "Reference B, 70/30 every cycle day"]  # fmt: skip
     assert "inside the band" in summary and "the square root of 252" in summary
     for word in ("ahead", "behind", "beat", "trail", "outperform", "attribution"):
         assert word not in part.lower(), word
@@ -215,7 +238,7 @@ def summary_rows(part, name):
     return next(r for r in re.findall(r"<tr>(.*?)</tr>", table) if f"<td>{name}</td>" in r)
 
 
-def test_the_second_pane_is_named_for_the_splits_until_the_first_ranked_funds_are_in_it():
+def test_the_first_ranked_funds_sit_in_the_first_pane_and_each_figure_takes_its_pane_headline():
     from portfolio import config, site
 
     class Page:
@@ -227,7 +250,7 @@ def test_the_second_pane_is_named_for_the_splits_until_the_first_ranked_funds_ar
 
     out = {n: pd.read_csv(config.OUTPUTS_DIR / n) for n in ("comparisons.csv", "comparisons_daily.csv", "comparison_effects.csv",
                                                            "comparison_fees.csv", "comparison_regions.csv")}  # fmt: skip
-    for drop, headline in ((False, "The same rules with other funds or splits"), (True, "The same rules at other splits")):
+    for drop in (False, True):
         page = Page()
         summary = out["comparisons.csv"]
         effects = out["comparison_effects.csv"]
@@ -237,8 +260,15 @@ def test_the_second_pane_is_named_for_the_splits_until_the_first_ranked_funds_ar
         site.comparisons_part(page, summary, out["comparisons_daily.csv"], effects, out["comparison_fees.csv"],
                               out["comparison_regions.csv"])  # fmt: skip
         html = "".join(page.html)
-        assert f"<summary>{headline}</summary>" in html
-        assert ("70/30 with the first-ranked funds" in html.split("<summary>One fund", 1)[0].split("The same rules", 2)[-1]) is not drop
+        first = html.split('id="pane-same-rules"', 1)[1].split('<details class="ch-pane"', 1)[0].split("</summary>", 1)[1]
+        second = html.split('id="pane-splits"', 1)[1].split('<details class="ch-pane"', 1)[0]
+        assert "first-ranked" not in second
+        assert ("70/30 with the first-ranked funds, the same rules" in first) is not drop
+        assert ("Its two funds track the benchmark&#x27;s two indices" in first) is not drop
+        assert "joins this pane at the sixth month end" in first
+        assert "The benchmark and the rules without costs: the difference to the portfolio over time" in html
+        assert "Other splits of equity and bonds: the difference to the portfolio over time" in html
+        assert "Not like for like: a bank&#x27;s managed profile and its costs" in html
 
 
 def test_the_comparator_funds_are_fixed_with_their_dates_and_the_ranked_ones_are_the_first_offered():

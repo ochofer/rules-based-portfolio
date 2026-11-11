@@ -82,6 +82,7 @@ class Page:
     def __init__(self):
         self.charts = []
         self.sections = {part: [] for part, _, _ in PARTS}
+        self.heads = {}  # markup that sits in a part's heading, under its lead
 
     def add(self, part, html_block, chart=None):
         self.sections[part].append(html_block)
@@ -95,7 +96,7 @@ class Page:
         views = {v: [] for v, _ in VIEWS}
         for part, view, title in PARTS:
             if title:
-                views[view].append(_group(title, part, leads.get(part, "")))
+                views[view].append(_group(title, part, leads.get(part, ""), self.heads.get(part, "")))
             elif part in leads:
                 views[view].append(f'<p class="wide partlead">{leads[part]}</p>')
             views[view] += self.sections[part]
@@ -289,11 +290,11 @@ def _limit_lines(deepest: float, x: float = 1, anchor: str = "right", levels=(35
     return shapes, wide, narrow
 
 
-def _group(title: str, anchor: str, lead: str = "") -> str:
+def _group(title: str, anchor: str, lead: str = "", extra: str = "") -> str:
     """The heading of a part of a view, across its whole width, with an anchor for links and the part's lead, which
-    may hold links."""
+    may hold links, and any markup that sits under the lead."""
     line = f'<p class="sub">{lead}</p>' if lead else ""
-    return f'<div class="group wide" id="{anchor}"><h2>{_esc(title)}</h2>{line}</div>'
+    return f'<div class="group wide" id="{anchor}"><h2>{_esc(title)}</h2>{line}{extra}</div>'
 
 
 def _section(title: str, anchor: str, sub: str = "", tone: str = "") -> str:
@@ -881,17 +882,36 @@ EFFECT_NAME = {"implementation": "Implementation", "drift": "Drift", "split": "S
                "rate_against_yield": "The rate against the bonds' yield", "change_in_yield": "The change in yield",
                "bonds_rest": "The rest of the bond return", "timing": "Timing of contributions",
                "compounding": "Compounding"}  # fmt: skip
-OTHER_SPLITS = "The same rules at other splits"  # the second pane's headline while it holds the splits alone
+# Each comparator pane: its key, its headline, the line under the headline that names what the pane holds, the
+# comparators of its chart and table, its chart's id and the pane's own address.
 PANES = (
-    ("same_rules", "The same rules without costs", ("reference_a", "reference_b"), "comparisons-same-rules"),
-    ("other_funds_or_splits", "The same rules with other funds or splits",
-     ("split_100_0", "split_90_10", "split_80_20", "split_60_40", "first_ranked"), "comparisons-splits"),
-    ("one_fund", "One fund instead of two", ("sp500", "msci_world", "lifestrategy_60", "lifestrategy_80", "nasdaq100", "mag7"),
-     "comparisons-one-fund"),
-    ("market_portfolio", "Every asset class at its market value", ("market_portfolio",), "comparisons-market"),
-    ("bank", "The money left in the bank", ("savings",), "comparisons-savings"),
-    ("managed", "Not like for like: a bank's managed profile", ("bank_offensief",), "comparisons-managed"),
+    ("same_rules", "The benchmark and the rules without costs",
+     "The index blend, 70/30 with the first-ranked funds, reference portfolios A and B",
+     ("first_ranked", "reference_a", "reference_b"), "comparisons-same-rules", "pane-same-rules"),
+    ("other_funds_or_splits", "Other splits of equity and bonds", "100/0, 90/10, 80/20, 60/40",
+     ("split_100_0", "split_90_10", "split_80_20", "split_60_40"), "comparisons-splits", "pane-splits"),
+    ("one_fund", "One fund instead of two", "S&P 500, MSCI World, Nasdaq-100, Mag7, LifeStrategy 60 and 80",
+     ("sp500", "msci_world", "lifestrategy_60", "lifestrategy_80", "nasdaq100", "mag7"), "comparisons-one-fund",
+     "pane-one-fund"),
+    ("market_portfolio", "The global market portfolio", "Every asset class at its market value", ("market_portfolio",),
+     "comparisons-market", "pane-market"),
+    ("bank", "Savings", "The contributions held at the euro short-term rate", ("savings",), "comparisons-savings",
+     "pane-savings"),
+    ("managed", "A bank's managed profile", "What Rabobank charges, not like for like", ("bank_offensief",),
+     "comparisons-managed", "pane-managed"),
 )  # fmt: skip
+# The pane that explains the differences, and the pane of the Method view that runs the same effects on history.
+EFFECTS_PANE = ("Where each difference came from", "The split, the dollar, the regions", "pane-effects")
+HISTORY_PANE = ("History, 1999 to 2025", "The split and the dollar effects", "method-history")
+# The comparators in the order the page lists them: the first pane's, then the summary table's own order.
+PAGE_ORDER = ("portfolio", "benchmark", "first_ranked", "reference_a", "reference_b")
+
+
+def _pane(address: str, headline: str, line: str, body: str) -> str:
+    """A pane (E10): the browser's disclosure element, closed, under its headline and a lighter line naming what it holds."""
+    return (f'<details class="ch-pane" id="{address}"><summary><span class="ch-pane__head"><span class="ch-pane__title">'
+            f'{_esc(headline)}</span><span class="ch-pane__members">{_esc(line)}</span></span></summary>'
+            f'<div class="ch-pane__body">{body}</div></details>')  # fmt: skip
 MARKET_NOTE = (
     "The global market portfolio is a comparator the portfolio's design names, and the benchmark remains the index blend. "
     "It holds every asset class at its share of the world's invested market value, as Doeswijk, Lam and Swinkels "
@@ -1307,11 +1327,18 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
     if not len(summary):
         return
     summary = summary.set_index("comparator")
+    first = [k for k in PAGE_ORDER if k in summary.index]
+    summary = summary.reindex(first + [k for k in summary.index if k not in first])
     if "status" not in summary:
         summary["status"] = ""
     portfolio = summary.loc["portfolio"]
     days = int(portfolio["periods"])
     as_of = portfolio["last_day"]
+    # One link per pane, by its headline, under the part's lead: the link opens the pane at the top of the window,
+    # and the address alone lands on the headline.
+    built = [(address, headline) for _, headline, _, keys, _, address in PANES if any(k in summary.index for k in keys)]
+    links = "".join(f'<li><a href="#{a}">{_esc(h)}</a></li>' for a, h in [*built, (EFFECTS_PANE[2], EFFECTS_PANE[0])])
+    page.heads = {**getattr(page, "heads", {}), "comparisons": f'<ul class="ch-jump">{links}</ul>'}
     shown = [k for k in summary.index if k != "portfolio" and not pd.isna(summary.loc[k, "band"])]
     rows = []
     for key in summary.index:
@@ -1377,13 +1404,14 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
         "same_rules": ("Reference portfolio A follows the rules at net asset value without costs, so its difference to the "
                        "portfolio is the implementation cost with the opposite sign. Reference portfolio B goes back to "
                        "70/30 on every cycle day, so its difference to reference portfolio A is the drift effect. "
-                       "The benchmark joins this pane at the sixth month end."),
+                       + ("70/30 with the first-ranked funds runs reference portfolio A's rules with the first equity fund "
+                          "of the rules' own ranking, SPDR MSCI ACWI, which the account does not offer, in place of the held "
+                          "one, and the bond fund held, which ranks first. Its two funds track the benchmark's two indices, "
+                          "so it has daily values, while the benchmark has values at month ends only. The benchmark "
+                          "remains the index blend, and it joins this pane at the sixth month end."
+                          if first_ranked else "The benchmark joins this pane at the sixth month end.")),
         "other_funds_or_splits": ("The same two ETFs at other target weights, under rules 3 to 6 with the band of rule 5 "
-                                  "five points either side of each target, which never binds for 100/0."
-                                  + (" 70/30 with the first-ranked funds runs reference portfolio A's rules with the "
-                                     "first equity fund of the rules' own ranking, SPDR MSCI ACWI, which the account does "
-                                     "not offer, in place of the held one, and the bond fund held, which ranks first."
-                                     if first_ranked else "")),
+                                  "five points either side of each target, which never binds for 100/0."),
         "one_fund": ("Each fund takes the same contributions on the same days at its net asset value in euro, US dollar "
                      "values at the ECB's reference rate of the day, and is held throughout without costs, as the S&P 500 "
                      "alternative of the Method view is. The Mag7 fund publishes net asset values from 4 November 2026, "
@@ -1394,12 +1422,10 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
                  "360. Its volatility comes from interest landing in three-day steps over weekends, and its correlation "
                  "with the portfolio is not shown, since the rate barely moves from day to day."),
     }  # fmt: skip
-    for pane, headline, keys, cid in PANES:
+    for pane, headline, line, keys, cid, address in PANES:
         keys = tuple(k for k in keys if k in summary.index)
         if not keys:
             continue
-        if pane == "other_funds_or_splits" and not first_ranked:
-            headline, keys = OTHER_SPLITS, tuple(k for k in keys if k != "first_ranked")
         if pane == "managed":
             body = _managed_card(summary, fees, as_of)
         else:
@@ -1413,7 +1439,7 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
                 body += _selection_card(as_of)
             if pane == "market_portfolio":
                 body += _market_card(market, fees, as_of)
-        panes.append(f'<details class="ch-pane"><summary>{_esc(headline)}</summary><div class="ch-pane__body">{body}</div></details>')
+        panes.append(_pane(address, headline, line, body))
 
     with_effects = set(effects.loc[effects["period"] == "record", "comparator"]) if len(effects) else set()
     keys = [k for k in summary.index if k not in ("portfolio", "benchmark") and k in with_effects]
@@ -1472,9 +1498,11 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
     card = card.replace('<div class="plot"', select + '<div class="plot"', 1)
     page.charts.append({"id": "comparisons-effects", "view": "comparisons", "traces": traces_w, "layout": layout_w,
                         "select": "comparisons-effects-select", "layout_narrow": {"xaxis": {"title": {"text": "Per cent and points"}}}})  # fmt: skip
-    panes.append('<details class="ch-pane"><summary>Where each difference came from</summary>'
-                 f'<div class="ch-pane__body">{card}</div></details>')
-    page.add("comparisons", f'<div class="wide ch-panes">{"".join(panes)}</div>')
+    explains = _pane(EFFECTS_PANE[2], EFFECTS_PANE[0], EFFECTS_PANE[1], card)
+    page.add("comparisons", '<div class="wide ch-panes ch-panes--grouped"><div class="ch-group">'
+             f'<p class="ch-group__label">The comparators</p>{"".join(panes)}</div><div class="ch-group">'
+             '<p class="ch-group__label">What explains the differences</p><p class="ch-group__lead">The same effects on '
+             f'<a href="#{HISTORY_PANE[2]}">history, 1999 to 2025</a>, are in the Method view.</p>{explains}</div></div>')  # fmt: skip
 
 
 # Contributions -------------------------------------------------------------------------------------
@@ -2596,7 +2624,7 @@ def _history_windows(windows: pd.DataFrame) -> tuple:
 
 
 def history_pane(page, history: pd.DataFrame, windows: pd.DataFrame) -> None:
-    """The pane "The same effects on 1999 to 2025": the split and the dollar effects of 70/30 against 100/0, 60/40
+    """The pane "History, 1999 to 2025": the split and the dollar effects of 70/30 against 100/0, 60/40
     and the US stock market at 70/30 on the allocation test's own series, history and in-sample."""
     if not len(history):
         return
@@ -2640,8 +2668,7 @@ def history_pane(page, history: pd.DataFrame, windows: pd.DataFrame) -> None:
                              "and adds no evidence. The table gives each window's effects per year, the comparator's "
                              "volatility and worst fall, and the band chance alone produces."))  # fmt: skip
     page.charts.append(chart)
-    page.add("method", '<div class="wide ch-panes"><details class="ch-pane" id="method-history"><summary>The same effects on '
-             f'1999 to 2025</summary><div class="ch-pane__body">{table_card}{chart_card}</div></details></div>')
+    page.add("method", f'<div class="wide ch-panes">{_pane(HISTORY_PANE[2], HISTORY_PANE[0], HISTORY_PANE[1], table_card + chart_card)}</div>')
 
 
 def _other_projects() -> str:
