@@ -883,12 +883,12 @@ EFFECT_NAME = {"implementation": "Implementation", "drift": "Drift", "split": "S
                "bonds_rest": "The rest of the bond return", "timing": "Timing of contributions",
                "compounding": "Compounding"}  # fmt: skip
 # Each comparator pane: its key, its headline, the line under the headline that names what the pane holds, the
-# comparators of its chart and table, its chart's id and the pane's own address.
+# comparators of its table, those with daily values also in its chart, its chart's id and the pane's own address.
 PANES = (
     ("same_rules", "The benchmark and the rules without costs",
      "The index blend, 70/30 with the first-ranked funds, reference portfolios A and B",
-     ("first_ranked", "reference_a", "reference_b"), "comparisons-same-rules", "pane-same-rules"),
-    ("other_funds_or_splits", "Other splits of equity and bonds", "100/0, 90/10, 80/20, 60/40",
+     ("benchmark", "first_ranked", "reference_a", "reference_b"), "comparisons-same-rules", "pane-same-rules"),
+    ("splits", "Other splits of equity and bonds", "100/0, 90/10, 80/20, 60/40",
      ("split_100_0", "split_90_10", "split_80_20", "split_60_40"), "comparisons-splits", "pane-splits"),
     ("one_fund", "One fund instead of two", "S&P 500, MSCI World, Nasdaq-100, Mag7, LifeStrategy 60 and 80",
      ("sp500", "msci_world", "lifestrategy_60", "lifestrategy_80", "nasdaq100", "mag7"), "comparisons-one-fund",
@@ -1117,7 +1117,11 @@ def _pane_chart(cid: str, daily: pd.DataFrame, keys) -> tuple:
     keys = [k for k in keys if f"growth_{k}" in daily]
     gaps = {k: _gap(daily, k) for k in keys}
     span = max([float(g.max()) for g in gaps.values()] + [0.0]) - min([float(g.min()) for g in gaps.values()] + [0.0])
-    placed = _spread({k: float(g.iloc[-1]) for k, g in gaps.items()}, 0.065 * span)
+    # Lines that end at the same point, to two decimals, share one label that names them all.
+    together = {}
+    for k in keys:
+        together.setdefault(round(float(gaps[k].iloc[-1]), 2), []).append(k)
+    placed = _spread({group[0]: float(gaps[group[0]].iloc[-1]) for group in together.values()}, 0.065 * span)
     for k in keys:
         gap = gaps[k]
         role = COMPARATOR_ROLE[k]
@@ -1125,13 +1129,9 @@ def _pane_chart(cid: str, daily: pd.DataFrame, keys) -> tuple:
                        "y": [fmt.rounded(v, 2) for v in gap], "line": {"color": role, "width": 2,
                        "dash": "dot" if k == "reference_b" else "solid"},
                        **_hover([f"{fmt.day_words(d)}<br>{COMPARATOR_NAME[k][1]}: {_points(v / 100)}" for d, v in zip(dates, gap)])})  # fmt: skip
-        ends = {round(float(gaps[j].iloc[-1]), 2) for j in keys}
-        if len(keys) > 1:
-            label = COMPARATOR_NAME[k][1]
-            if len(ends) == 1:  # every line ends at the same point, so one label names them all
-                if k != keys[0]:
-                    continue
-                label = _and([COMPARATOR_NAME[j][1] for j in keys])
+        group = together[round(float(gap.iloc[-1]), 2)]
+        if len(keys) > 1 and k == group[0]:
+            label = _and([COMPARATOR_NAME[j][1] for j in group])
             annotations.append({**_label(dates[-1], fmt.rounded(placed[k], 2), label, role=role), "xshift": 6})
     for i, (_, r) in enumerate(daily.iterrows()):
         rows.append([_start_label(r["date"], i)] + [_points(gaps[k].iloc[i] / 100) for k in keys])
@@ -1140,8 +1140,10 @@ def _pane_chart(cid: str, daily: pd.DataFrame, keys) -> tuple:
               "shapes": [_hline(0, "@ink")], "annotations": annotations, "margin": {"r": 64 if len(keys) > 1 else 24}}  # fmt: skip
     headers = ["Date"] + [COMPARATOR_NAME[k][1] for k in keys]
     table = _table(headers, rows, numeric=tuple(headers[1:]))
-    chart = {"id": cid, "view": "comparisons", "traces": traces, "layout": layout,
-             "layout_narrow": {**narrow, "yaxis": {"title": {"text": "Points"}}}}  # fmt: skip
+    narrow = {**narrow, "yaxis": {"title": {"text": "Points"}}}
+    if any(" and " in a["text"] for a in annotations):  # on a phone a label that names two lines or more takes two lines
+        narrow["annotations"] = [{**a, "text": a["text"].replace(" and ", " and<br>"), "align": "left"} for a in annotations]
+    chart = {"id": cid, "view": "comparisons", "traces": traces, "layout": layout, "layout_narrow": narrow}
     return chart, table
 
 
@@ -1407,11 +1409,13 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
                        + ("70/30 with the first-ranked funds runs reference portfolio A's rules with the first equity fund "
                           "of the rules' own ranking, SPDR MSCI ACWI, which the account does not offer, in place of the held "
                           "one, and the bond fund held, which ranks first. Its two funds track the benchmark's two indices, "
-                          "so it has daily values, while the benchmark has values at month ends only. The benchmark "
-                          "remains the index blend, and it joins this pane at the sixth month end."
-                          if first_ranked else "The benchmark joins this pane at the sixth month end.")),
-        "other_funds_or_splits": ("The same two ETFs at other target weights, under rules 3 to 6 with the band of rule 5 "
-                                  "five points either side of each target, which never binds for 100/0."),
+                          "and it has a value every day. The benchmark remains the index blend. It" if first_ranked
+                          else "The benchmark")
+                       + " has values at month ends only, so it has a row in this pane's table and no line in "
+                         f"its chart. Its figures appear as the note under {_ref('comparisons')} says, and its growth is in "
+                         f"{_ref('c3')}."),
+        "splits": ("The same two ETFs at other target weights, under rules 3 to 6 with the band of rule 5 five points either "
+                   "side of each target, which never binds for 100/0."),
         "one_fund": ("Each fund takes the same contributions on the same days at its net asset value in euro, US dollar "
                      "values at the ECB's reference rate of the day, and is held throughout without costs, as the S&P 500 "
                      "alternative of the Method view is. The Mag7 fund publishes net asset values from 4 November 2026, "

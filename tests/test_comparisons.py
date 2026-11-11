@@ -239,6 +239,8 @@ def summary_rows(part, name):
 
 
 def test_the_first_ranked_funds_sit_in_the_first_pane_and_each_figure_takes_its_pane_headline():
+    import re
+
     from portfolio import config, site
 
     class Page:
@@ -264,11 +266,25 @@ def test_the_first_ranked_funds_sit_in_the_first_pane_and_each_figure_takes_its_
         second = html.split('id="pane-splits"', 1)[1].split('<details class="ch-pane"', 1)[0]
         assert "first-ranked" not in second
         assert ("70/30 with the first-ranked funds, the same rules" in first) is not drop
-        assert ("Its two funds track the benchmark&#x27;s two indices" in first) is not drop
-        assert "joins this pane at the sixth month end" in first
+        assert ("Its two funds track the benchmark&#x27;s two indices, and it has a value every day" in first) is not drop
+        assert "so it has a row in this pane&#x27;s table and no line in its chart" in first and "joins" not in first
+        # The benchmark's row sits directly under the portfolio's in the pane's table, read from the summary.
+        names = re.findall(r"<tr><td>([^<]+)</td>", first)
+        assert names[:2] == ["The portfolio", "The benchmark, the index blend"]
+        assert "Benchmark" not in [t["name"] for c in page.charts if c["id"] == "comparisons-same-rules" for t in c["traces"]]
         assert "The benchmark and the rules without costs: the difference to the portfolio over time" in html
         assert "Other splits of equity and bonds: the difference to the portfolio over time" in html
         assert "Not like for like: a bank&#x27;s managed profile and its costs" in html
+
+
+def test_the_summary_table_files_each_comparator_under_its_pane():
+    from portfolio import config
+
+    table = pd.read_csv(config.OUTPUTS_DIR / "comparisons.csv")
+    assert list(table["comparator"]) == [k for k, _, _ in comparisons.ROWS if k in set(table["comparator"])]
+    panes = dict(zip(table["comparator"], table["pane"]))
+    assert panes["first_ranked"] == "same_rules" and {panes[k] for k, _, _ in comparisons.SPLITS} == {"splits"}
+    assert "other_funds_or_splits" not in set(table["pane"])
 
 
 def test_the_comparator_funds_are_fixed_with_their_dates_and_the_ranked_ones_are_the_first_offered():
