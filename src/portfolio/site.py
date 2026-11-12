@@ -2330,14 +2330,14 @@ OTHER_PROJECTS = (
       ("code", "https://github.com/ochofer/paper1-hazard-exposure-data"))),
     ("Volatility-managed portfolios: a replication, the real-time critique, and the months after the sample.",
      "Volatility estimation and position sizing on Ken French's equity factors, backtested out of sample and without "
-     "look-ahead, replicating Moreira and Muir (2017) and Cederburg, O'Doherty, Wang and Yan (2020). In build: the data "
-     "and the signal are in place, and nothing in it is a result yet.",
+     "look-ahead, replicating Moreira and Muir (2017) and Cederburg, O'Doherty, Wang and Yan (2020). In build: its "
+     "findings are stated when the study is complete.",
      (("Page", PROJECTS_URL + "volatility-managed-portfolios/"),
       ("code", "https://github.com/ochofer/volatility-managed-portfolios"))),
     ("Stock-level index tracking: a point-in-time benchmark, a long-only mandate, and its performance attribution by sector.",
      "A point-in-time S&P 500 universe from CRSP and Compustat, a long-only mandate held close to its cap-weighted "
-     "benchmark, and an attribution of its active return by sector. In build: the data layer is in place and checked, "
-     "and nothing of the mandate is a result yet.",
+     "benchmark, and an attribution of its active return by sector. In build: its findings are stated when the study "
+     "is complete.",
      (("Page", PROJECTS_URL + "stock-level-tracking/"), ("code", "https://github.com/ochofer/stock-level-tracking"))),
 )
 
