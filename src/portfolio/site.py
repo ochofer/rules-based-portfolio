@@ -3199,6 +3199,22 @@ BLEND = "MSCI ACWI and Vanguard's monthly factsheet for the index blend"
 CALC = "author's calculations"
 TEST = ("Kenneth French's data library, the ECB's euro reference rate, its yield curve and its ten-year government "
         "bond yield")
+# The issuer of a comparator's fund, from the first words of the fund's name in method/comparator_funds.csv, and the
+# order the source lines name the issuers in.
+ISSUER_PREFIX = (("iShares", "iShares"), ("Vanguard", "Vanguard"), ("State Street", "State Street"), ("SPDR", "State Street"),
+                 ("HSBC", "HSBC"), ("Xtrackers", "DWS"), ("HANetf", "HANetf"))  # fmt: skip
+ISSUER_ORDER = ("iShares", "Vanguard", "State Street", "HSBC", "DWS", "HANetf")
+
+
+def _issuer(fund: str) -> str:
+    for prefix, issuer in ISSUER_PREFIX:
+        if fund.startswith(prefix):
+            return issuer
+    raise ValueError(f"The fund {fund} has no issuer in site.ISSUER_PREFIX.")
+
+
+def _count_word(n: int) -> str:
+    return NUMBER_WORD.get(n, str(n)).lower()
 
 
 def _source_line(key: str, files, before: str = "") -> str:
@@ -3275,10 +3291,73 @@ def _bases(out: dict, simulated: dict, correlation: tuple) -> dict:
             f"weights of {weights_at}, the equity ETF's holdings, per cent of the portfolio")  # fmt: skip
     bonds = (f"the Vanguard holdings of {bonds_at}, {LEDGER}, {HELD}, {FX} and {CALC}. Holdings of {bonds_at} at the weights "
              f"of {weights_at}, the bond ETF's holdings, per cent of the portfolio")  # fmt: skip
-    risk = (f"MSCI's month-end levels of its four regional indices in euro, the ECB's yield curve, the look-through "
-            f"weights from the iShares and Vanguard holdings, and {CALC}. Monthly, {window}, four equity regions and "
-            "three bond maturity groups, EUR")  # fmt: skip
+    risk_head = (f"MSCI's month-end levels of its four regional indices in euro, the ECB's yield curve, the look-through "
+                 f"weights from the iShares and Vanguard holdings, and {CALC}")  # fmt: skip
+    groups = "four equity regions and three bond maturity groups"
+    risk = f"{risk_head}. Monthly, {window}, {groups}, EUR"
+    risk_summary = out.get("risk_summary.csv", pd.DataFrame())
+    both_windows = (f"{risk_head}. Monthly, {month(risk_summary['earlier_window_start'].iloc[0])} to "
+                    f"{month(risk_summary['earlier_window_end'].iloc[0])} and {month(risk_summary['window_start'].iloc[0])} "
+                    f"to {month(risk_summary['window_end'].iloc[0])}, {groups}, EUR"
+                    if len(risk_summary) and "earlier_window_start" in risk_summary
+                    and risk_summary["earlier_window_start"].notna().iloc[0] else risk)  # fmt: skip
     test = f"{TEST}, and {CALC}. Monthly, {test_span}"
+    # Figures 4, 5 and 11 name the providers of the comparators they show, which enter by date.
+    funds = pd.read_csv(config.METHOD_DIR / "comparator_funds.csv", dtype=str)
+    fund_of = {k: list(g["fund"]) for k, g in funds.groupby("comparator")}
+    equity_fund_of = {k: list(g["fund"]) for k, g in funds[funds["sleeve"] == "equity"].groupby("comparator")}
+    alternative = references.alternative_fund()
+    if alternative:
+        fund_of["sp500"] = equity_fund_of["sp500"] = [alternative[0]]
+
+    def issuers(names) -> str:
+        return _and(sorted({_issuer(n) for n in names}, key=ISSUER_ORDER.index))
+
+    by_comparator = summary.set_index("comparator") if len(summary) else pd.DataFrame(columns=["band"])
+    shown = [k for k in by_comparator.index if k != "portfolio" and not pd.isna(by_comparator.loc[k, "band"])]
+    benchmark_shown = "benchmark" in shown
+    differences = (f"{LEDGER}, the net asset values of the funds held and compared from "
+                   + issuers(["iShares", "Vanguard"] + [f for k in shown for f in fund_of.get(k, [])])
+                   + (", MSCI ACWI and Vanguard's monthly factsheet for the benchmark" if benchmark_shown else "")
+                   + ", the ECB's euro reference rate" + (" and euro short-term rate" if "savings" in shown else "")
+                   + (", the weights of Doeswijk, Lam and Swinkels (2024)" if "market_portfolio" in shown else "")
+                   + f", and {CALC}. Daily from the first purchase on {day(first)}" + (bench if benchmark_shown else "")
+                   + ", each comparator with a band, EUR")  # fmt: skip
+    effects = out.get("comparison_effects.csv", pd.DataFrame())
+    with_effects = set(effects.loc[effects["period"] == "record", "comparator"]) if len(effects) else set()
+    in_effects = [k for k in by_comparator.index if k not in ("portfolio", "benchmark") and k in with_effects]
+    lifestrategy = any(k.startswith("lifestrategy") for k in in_effects)
+    # Region weights come from the holdings of the equity fund held and of the MSCI World and first-ranked funds; a
+    # LifeStrategy fund's equity part takes the regions of the held fund and the MSCI World fund.
+    holders = {k for k in in_effects if k in ("msci_world", "first_ranked")} | ({"msci_world"} if lifestrategy else set())
+    effects_line = (f"{LEDGER}, the net asset values of the funds held and compared, MSCI's daily levels of its four "
+                    "regional indices in euro, the holdings of "
+                    + issuers(["iShares"] + [f for k in sorted(holders) for f in equity_fund_of.get(k, [])])
+                    + (", Vanguard's monthly factsheets for the LifeStrategy funds" if lifestrategy else "")
+                    + (", the weights of Doeswijk, Lam and Swinkels (2024)" if "market_portfolio" in in_effects else "")
+                    + ", the ECB's euro reference rate" + (", euro short-term rate and" if "savings" in in_effects else " and")
+                    + f" yield curve, and {CALC}. Daily from the first purchase on {day(first)}, summed by month, each "
+                    "comparator with a band, EUR")  # fmt: skip
+    classes = pd.read_csv(config.METHOD_DIR / "market_portfolio_weights.csv")["asset_class"].nunique()
+    in_funds = (f"{_count_word(classes)} asset classes in "
+                f"{_count_word(market['isin'].nunique() if len(market) else 0)} funds")  # fmt: skip
+    currency = out.get("lookthrough_currency.csv", pd.DataFrame())
+    currency_at = day(currency["holdings_as_of"].iloc[0]) if len(currency) else equity_at
+    currency_weights = day(currency["weights_as_of"].iloc[0]) if len(currency) else weights_at
+    daily_loadings = loadings[loadings["method"].str.startswith("daily")]
+    in_table = (f", and in the table daily returns from {day(daily_loadings['window_start'].iloc[0])}, "
+                f"{int(daily_loadings['observations'].iloc[0])} days" if len(daily_loadings) else "")  # fmt: skip
+    if len(boot):
+        main_horizon, main_block = boot["horizon_years"].iloc[0], boot["block_months"].iloc[0]
+        horizons = sorted(set(boot["horizon_years"]) - {main_horizon})
+        other_blocks = boot[boot["block_months"] != main_block]
+        boot_extra = (", with paths of " + _and([f"{_count_word(int(h))}" for h in horizons]) + " years" if horizons else "")
+        if len(other_blocks):
+            boot_extra += ((" and, for " if horizons else ", for ") + _and(sorted(set(other_blocks["split"]))) + ", blocks of "
+                           + _and([str(int(b)) for b in sorted(set(other_blocks["block_months"]))]) + " months")
+        boot_extra += " in the table" if boot_extra else ""
+    else:
+        boot_extra = ""
     bases = {
         "key-figures": f"{LEDGER}, {HELD}, {FX} and {CALC}. {held_days}, two UCITS ETFs and cash, EUR",
         "c2": f"{LEDGER}, {HELD}, {FX} and {CALC}. At the close of {weights_at}, two UCITS ETFs and cash, EUR",
@@ -3286,13 +3365,10 @@ def _bases(out: dict, simulated: dict, correlation: tuple) -> dict:
         "c3": f"{LEDGER}, {HELD}, {FX}, {BLEND}, and {CALC}. {held_days}{blend}, two UCITS ETFs, EUR",
         "comparisons": (f"{LEDGER}, the net asset values of the funds held and compared from iShares, Vanguard, State "
                         "Street, HSBC, DWS and HANetf, MSCI ACWI and Vanguard's monthly factsheet for the benchmark, the "
-                        "ECB's euro reference rate and euro short-term rate, the weights of Doeswijk, Lam and Swinkels, "
-                        f"Rabobank's cost overview, and {CALC}. Daily from the first purchase on {day(first)}{bench}, "
+                        "ECB's euro reference rate and euro short-term rate, the weights of Doeswijk, Lam and Swinkels "
+                        f"(2024), Rabobank's cost overview, and {CALC}. Daily from the first purchase on {day(first)}{bench}, "
                         f"the portfolio and {len(summary) - 1} comparators, EUR"),
-        "comparisons-differences": (f"{LEDGER}, the net asset values of the funds held and compared from iShares, "
-                                    "Vanguard, State Street, HSBC, DWS and HANetf, the ECB's euro reference rate and euro "
-                                    f"short-term rate, the weights of Doeswijk, Lam and Swinkels, and {CALC}. Daily from "
-                                    f"the first purchase on {day(first)}, each comparator with a band, EUR"),
+        "comparisons-differences": differences,
         "comparisons-same-rules": (f"{LEDGER}, {HELD}, State Street's for the first-ranked equity fund, {FX}, MSCI ACWI "
                                    f"and Vanguard's monthly factsheet for the benchmark, and {CALC}. {held_days}{bench}, "
                                    "the benchmark and three comparators, EUR"),
@@ -3307,12 +3383,12 @@ def _bases(out: dict, simulated: dict, correlation: tuple) -> dict:
                                   "the MSCI World and the Nasdaq-100, percentage points"),
         "comparisons-market": (f"{LEDGER}, {HELD}, the class funds' net asset values from iShares and State Street, "
                                "with the distributions of the aggregate fund, the weights of Doeswijk, Lam and Swinkels "
-                               f"(2024), {FX} and {CALC}. {held_days}, eight asset classes in seven funds, EUR"),
+                               f"(2024), {FX} and {CALC}. {held_days}, {in_funds}, EUR"),
         "comparisons-market-weights": ((f"the weights of Doeswijk, Lam and Swinkels (2024), version 6, the class funds' "
                                         f"factsheets and net asset values from iShares and State Street, {FX} and {CALC}. "
                                         f"Weights of {day(market['published_as_of'].iloc[0])}, carried to "
                                         f"{day(market['start_as_of'].iloc[0])} and held to {day(market['current_as_of'].iloc[0])}, "
-                                        "eight asset classes in seven funds, EUR") if len(market) else ""),
+                                        f"{in_funds}, EUR") if len(market) else ""),
         "comparisons-savings": (f"{LEDGER}, {HELD}, the ECB's euro short-term rate and euro reference rate, and {CALC}. "
                                 f"{held_days}, the contributions held at the rate, EUR"),
         "comparisons-managed": ((f"Rabobank's cost overview of Rabo Beheerd Beleggen Basis of {month(bank.iloc[0])}, "
@@ -3320,11 +3396,7 @@ def _bases(out: dict, simulated: dict, correlation: tuple) -> dict:
                                  f"information documents of {kids}, {LEDGER}, {HELD}, {FX} and {CALC}. Costs a year at the "
                                  "latest documents, the implementation cost since the first purchase, four portfolios, "
                                  "basis points") if len(bank) and len(vanguard_sheets) else ""),
-        "comparisons-effects": (f"{LEDGER}, the net asset values of the funds held and compared, MSCI's daily levels of "
-                                "its four regional indices in euro, the holdings of iShares and State Street, Vanguard's "
-                                "monthly factsheets for the LifeStrategy funds, the ECB's euro reference rate, euro "
-                                f"short-term rate and yield curve, and {CALC}. Daily from the first purchase on "
-                                f"{day(first)}, summed by month, every comparator with daily values, EUR"),
+        "comparisons-effects": effects_line,
         "c9": f"{LEDGER}, {HELD}, {FX} and {CALC}. {held_days}, two UCITS ETFs and cash, units of the starting amount",
         "c10": f"{LEDGER}, {HELD}, {FX} and {CALC}. {months}, two UCITS ETFs and cash, EUR",
         "c7": (f"{LEDGER}, with each order's price and fee from the broker's confirmation and the Tradegate bid and ask "
@@ -3341,9 +3413,9 @@ def _bases(out: dict, simulated: dict, correlation: tuple) -> dict:
         "c11b": look,
         "c12": look,
         "c14": look,
-        "c13": (f"the iShares holdings of {equity_at} and the Vanguard holdings of {bonds_at}, {LEDGER}, {HELD}, {FX} "
-                f"and {CALC}. Holdings at the weights of {weights_at}, both ETFs' holdings, per cent of each sleeve and of "
-                "the portfolio"),
+        "c13": (f"the iShares holdings of {currency_at}, {LEDGER}, {HELD}, {FX} and {CALC}. Holdings of {currency_at} at "
+                f"the weights of {currency_weights}, the equity ETF's holdings by currency with the bond ETF and cash in "
+                "euro, per cent of the portfolio by sleeve"),
         "c15": bonds,
         "c16": bonds.replace(f"{FX} and {CALC}.", f"{FX}, Vanguard's monthly factsheet of {sheet_at} for the "
                              f"duration, and {CALC}.", 1),
@@ -3351,15 +3423,17 @@ def _bases(out: dict, simulated: dict, correlation: tuple) -> dict:
                 f"weights of {weights_at}, the bond ETF, per cent of the portfolio"),
         "c18": (f"the daily developed-market five factors and momentum of Kenneth French's data library, the equity ETF's "
                 f"net asset values from iShares, and {CALC}. Weekly returns, {day(weekly['window_start'])} to "
-                f"{day(weekly['window_end'])}, {int(weekly['observations'])} weeks, the equity ETF, USD"),
+                f"{day(weekly['window_end'])}, {int(weekly['observations'])} weeks{in_table}, the equity ETF, USD"),
         "c19": (f"the daily developed-market five factors and momentum of Kenneth French's data library, the equity ETF's "
                 f"net asset values from iShares, and {CALC}. Weekly returns in 36-month windows ending "
                 f"{month(rolling['window_end'].min())} to {month(rolling['window_end'].max())}, the equity ETF, USD"),
         "attribution": (f"{LEDGER}, {HELD}, {FX}, {BLEND}, and {CALC}. Month ends"
                         + (f", {day(attribution['period_start'].iloc[0])} to {day(attribution['period_end'].iloc[0])}"
                            if len(attribution) else "") + ", two UCITS ETFs, EUR"),
-        "c30": risk, "c31": risk, "c32": risk,
-        "risk-tiles": risk.replace(f", and {CALC}.", f", the bootstrap of the allocation test, and {CALC}.", 1),
+        "c30": risk, "c31": risk, "c32": both_windows,
+        "risk-tiles": (risk_head.replace(f", and {CALC}", f", the bootstrap of the allocation test, and {CALC}", 1)
+                       + f". Monthly, {window}, {groups}, and for the bootstrap {test_span} on the allocation test's two "
+                       "series, EUR"),
         "risk-tail": risk,
         "stress": ((f"MSCI's month-end levels of its four regional indices in euro and the ECB's yield curve, the "
                     f"allocation test's two series for {test_only}, the look-through weights of {weights_at}, and {CALC}. "
@@ -3373,7 +3447,7 @@ def _bases(out: dict, simulated: dict, correlation: tuple) -> dict:
         "c21": f"{test}, the global and the US equity series beside euro government bonds, EUR",
         "c33": f"{test}, the global and the US equity series beside euro government bonds, EUR",
         "c25": (f"{TEST}, and {CALC}. Monthly returns of {test_span} resampled in blocks of 12 months into {paths} paths "
-                "of ten years, every split from 40/60 to 100/0, EUR"),
+                f"of ten years, every split from 40/60 to 100/0{boot_extra}, EUR"),
         "c29": ((f"{TEST}, {HELD}, and {CALC}. Monthly, 36-month windows ending {month(test_corr['window_end'].iloc[0])} "
                  f"to {month(test_corr['window_end'].iloc[-1])} on the allocation test's series and "
                  f"{month(etf_corr['window_end'].iloc[0])} to {month(etf_corr['window_end'].iloc[-1])} on the two ETFs, EUR")
