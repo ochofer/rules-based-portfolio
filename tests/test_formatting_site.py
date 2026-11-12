@@ -297,3 +297,21 @@ def test_the_sleeves_take_navy_and_slate_and_the_band_its_shade():
     palette = json.loads((config.SITE_DIR / "palette.json").read_text())["light"]
     assert (palette["equity"], palette["bonds"], palette["band"]) == ("#16213a", "#8d9ab0", "#e9edf3")
 
+
+def test_every_source_line_says_where_the_data_come_from_before_the_files():
+    """C6: each source line gives, for readers, the sources and the calculation, then the frequency, dates, coverage
+    and currency, and only then the files that hold the numbers."""
+    import html
+    import re
+
+    from portfolio import config
+
+    page = (config.ROOT / "index.html").read_text(encoding="utf-8")
+    lines = re.findall(r'<p class="source">(.*?)</p>', page, re.S)
+    assert len(lines) >= 50 and "\u2e28source:" not in page
+    for line in lines:
+        text = html.unescape(re.sub(r"<[^>]+>", "", line)).split("Source: ", 1)[1]
+        reader, files = text.rsplit(". ", 1)
+        assert reader.count(". ") >= 1, text
+        assert all(re.match(r"(outputs|mandate|method|cycles|notes|quarterly)/", f) for f in files.rstrip(".").split(", ")), text
+

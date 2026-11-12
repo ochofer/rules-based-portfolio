@@ -161,7 +161,7 @@ def _card(cid, title, asof, source, plot=True, table=None, note=None, wide=False
     if extra:
         parts.append(extra)
     if source:
-        parts.append(f'<p class="source">Source: {_files(source)}</p>')
+        parts.append(_source_line(cid, source))
     if table:
         parts.append(f'<details class="twin"><summary>Table</summary>{table}</details>')
     parts.append("</article>")
@@ -606,7 +606,7 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
     allocation_card, allocation_chart = _allocation(w_now, pending)
     drawdown_card, drawdown_chart = _drawdown(daily, empty)
     page.charts += [c for c in (allocation_chart, drawdown_chart) if c]
-    source = '<p class="source">Source: outputs/allocation_now.csv, outputs/portfolio_daily.csv, outputs/metrics_monthly.csv</p>'
+    source = _source_line("key-figures", ("outputs/allocation_now.csv", "outputs/portfolio_daily.csv", "outputs/metrics_monthly.csv"))
     page.add("overview", f'<div class="wide ch-top"><div class="ch-main">{_key_figures(w_now, last, month_orders)}'
              f'<p class="ch-returns">{_returns(daily, monthly)}</p>{source}'
              f'<div class="ch-pair">{allocation_card}{drawdown_card}</div></div>{_key_facts(first_order, costs)}</div>')  # fmt: skip
@@ -1765,8 +1765,8 @@ def _risk_tiles(page, summary, boot, weight_equity, monthly):
             "monthly volatility estimated at the end of the month before. 1 means the estimates matched the returns, and "
             "above 1 that they were too low. Every estimate is kept as first written, in outputs/ex_ante_risk.csv.")  # fmt: skip
     page.add("risk", f'<div class="wide"><div class="tiles three">{tile_html}</div><p class="tilenote">{_esc(line)}</p>'
-             '<p class="source">Estimated on index returns, at today\'s weights, and not the record. Source: '
-             'outputs/risk_summary.csv, mandate/simulation_bootstrap.csv</p></div>')  # fmt: skip
+             + _source_line("risk-tiles", ("outputs/risk_summary.csv", "mandate/simulation_bootstrap.csv"),
+                            "Estimated on index returns, at today's weights, and not the record. ") + '</div>')  # fmt: skip
 
 
 def _tail_tiles(page, summary):
@@ -1793,8 +1793,8 @@ def _tail_tiles(page, summary):
             "years. Each month end's value at risk is kept as first written, in outputs/ex_ante_risk.csv, and twelve months "
             "give the count of months beyond it almost no power. It starts to say something at about sixty.")  # fmt: skip
     page.add("risk", f'<div class="wide"><div class="tiles four">{tile_html}</div><p class="tilenote">{_esc(line)}</p>'
-             '<p class="source">Estimated on index returns, at today\'s weights, and not the record. Source: '
-             'outputs/risk_summary.csv, outputs/ex_ante_risk.csv</p></div>')  # fmt: skip
+             + _source_line("risk-tail", ("outputs/risk_summary.csv", "outputs/ex_ante_risk.csv"),
+                            "Estimated on index returns, at today's weights, and not the record. ") + '</div>')  # fmt: skip
 
 
 def _correlation_heatmap(page, components, pairs, summary):
@@ -2971,7 +2971,7 @@ def _log_quarterly(page, issues, orders):
                      f'<span class="asof">Figures as of {_esc(fmt.day_words(as_of))}, from commit {_esc(commit)}</span></li>')  # fmt: skip
     page.add("log", '<article class="card wide quarterly"><h3>Quarterly reports</h3><p class="note">Each issue is built '
              "once from the tables at the commit it names and is never rebuilt. A correction goes in the next issue as "
-             f'an erratum.</p><ul class="issues">{"".join(items)}</ul><p class="source">Source: quarterly/</p></article>')  # fmt: skip
+             f'an erratum.</p><ul class="issues">{"".join(items)}</ul>{_source_line("quarterly", "quarterly/")}</article>')  # fmt: skip
 
 
 def _log_notes(page, notes_list, next_cycle):
@@ -2985,7 +2985,7 @@ def _log_notes(page, notes_list, next_cycle):
         body = "".join(f"<p>{_esc(para)}</p>" for para in n.body.split("\n\n"))
         page.add("log", f'<article class="card wide notebody"><h3>{_esc(pd.Period(n.month, "M").strftime("%B %Y"))}</h3>'
                  f'<p class="asof">Cycle day {_esc(fmt.day_words(n.cycle_day))}. Committed in {_history(path)}</p>'
-                 f'<p class="figures">{_esc(n.figures)}</p>{body}<p class="source">Source: {_esc(path)}</p></article>')  # fmt: skip
+                 f'<p class="figures">{_esc(n.figures)}</p>{body}{_source_line("notes", path)}</article>')  # fmt: skip
 
 
 def _log_reports(page, reports, orders, next_cycle):
@@ -3006,7 +3006,7 @@ def _log_reports(page, reports, orders, next_cycle):
                   if rows else '<p class="note">No order is in the record for this day.</p>')  # fmt: skip
         page.add("log", f'<article class="card wide report"><h3>{_esc(title)}</h3><p class="asof">Committed in {_history(path)}</p>'
                  f'<div class="reportbody">{body}</div><p class="label">The orders of {_esc(fmt.day_words(day))} in the record</p>{placed}'
-                 f'<p class="source">Source: {_esc(path)}, outputs/orders.csv</p></article>')  # fmt: skip
+                 f'{_source_line("cycles", (path, "outputs/orders.csv"))}</article>')  # fmt: skip
 
 
 def _log_register(page, register):
@@ -3189,6 +3189,215 @@ def _rules_html() -> str:
     return body.replace("<table>", '<div class="tw"><div class="tablewrap"><table>').replace("</table>", "</table></div></div>")
 
 
+# Source lines ---------------------------------------------------------------------------------------
+
+SOURCE_MARK = re.compile("⸨source:([a-z0-9_-]+)⸩")
+LEDGER = "the portfolio's ledger"
+HELD = "the two ETFs' net asset values from iShares and Vanguard"
+FX = "the ECB's euro reference rate"
+BLEND = "MSCI ACWI and Vanguard's monthly factsheet for the index blend"
+CALC = "author's calculations"
+TEST = ("Kenneth French's data library, the ECB's euro reference rate, its yield curve and its ten-year government "
+        "bond yield")
+
+
+def _source_line(key: str, files, before: str = "") -> str:
+    """A source line in two parts: for readers, where the data come from, how they were calculated, how often and over
+    which dates, what they cover and the currency, written in by the build from the tables (_bases); then the files
+    that hold the numbers."""
+    return f'<p class="source">{before}Source: ⸨source:{key}⸩ {_files(files)}.</p>'
+
+
+def _fill_sources(sections: dict, bases: dict) -> None:
+    """Write each source line's first part in its place. A source line without one stops the build."""
+    def basis(match):
+        key = match.group(1)
+        if key not in bases:
+            raise ValueError(f"The source line of {key} has no first part in site._bases.")
+        return _esc(bases[key]) + "."
+    for view, blocks in sections.items():
+        sections[view] = [SOURCE_MARK.sub(basis, block) for block in blocks]
+
+
+def _bases(out: dict, simulated: dict, correlation: tuple) -> dict:
+    """The first part of every source line, from the tables the exhibit draws: the sources, the calculation, the
+    frequency and dates, what the exhibit covers and the currency."""
+    def day(x) -> str:
+        return fmt.day_words(str(x)[:10])
+
+    def month(x) -> str:
+        return fmt.month_words(str(x)[:7])
+
+    daily = out["portfolio_daily.csv"]
+    base, last = daily["date"].iloc[0], daily["date"].iloc[-1]
+    blend_days = daily.loc[daily["growth_index_blend"].notna(), "date"] if "growth_index_blend" in daily else pd.Series(dtype=str)
+    blend = f", the index blend monthly from {day(blend_days.iloc[0])}" if len(blend_days) else ""
+    summary = out.get("comparisons.csv", pd.DataFrame())
+    first = (summary.set_index("comparator").loc["portfolio", "first_day"] if len(summary) else base)
+    bench = summary.set_index("comparator").loc["benchmark", "first_day"] if "benchmark" in set(summary.get("comparator", [])) else None
+    bench = f", the benchmark monthly from {day(bench)}" if isinstance(bench, str) else ""
+    mag7 = summary.set_index("comparator").loc["mag7", "first_day"] if "mag7" in set(summary.get("comparator", [])) else None
+    now = out["allocation_now.csv"].iloc[0]
+    held_days = f"Daily from {day(base)}"
+    monthly = out.get("metrics_monthly.csv", pd.DataFrame())
+    months = f"Monthly from {month(monthly['month'].iloc[0])}" if len(monthly) and monthly["month"].notna().any() else "Monthly"
+    orders = out["orders.csv"]
+    impl = out["implementation_cost.csv"]
+    own = out.get("cost_of_ownership.csv", pd.DataFrame())
+    kids = _and([day(d) for d in sorted(set(own["document_date"].dropna()))]) if len(own) else ""
+    fees = out.get("comparison_fees.csv", pd.DataFrame())
+    bank = fees.loc[fees["comparator"] == "bank_offensief", "dated"] if len(fees) else pd.Series(dtype=str)
+    vanguard_sheets = fees.loc[fees["comparator"].str.startswith("lifestrategy"), "dated"] if len(fees) else pd.Series(dtype=str)
+    market = out.get("comparison_market.csv", pd.DataFrame())
+    region = out["lookthrough_equity_region.csv"]
+    bond_country = out["lookthrough_bonds_country.csv"]
+    rating = out["lookthrough_bonds_rating.csv"]
+    equity_at, bonds_at, sheet_at = (day(region["holdings_as_of"].iloc[0]), day(bond_country["holdings_as_of"].iloc[0]),
+                                     day(rating["holdings_as_of"].iloc[0]))  # fmt: skip
+    weights_at = day(now["weights_as_of"])
+    loadings, rolling = out["factor_loadings.csv"], out["factor_rolling.csv"]
+    weekly = loadings[loadings["method"] == "weekly"].iloc[0]
+    components = out.get("risk_components.csv", pd.DataFrame())
+    window = (f"{month(components['window_start'].iloc[0])} to {month(components['window_end'].iloc[0])}"
+              if len(components) else "")  # fmt: skip
+    stress = out.get("stress.csv", pd.DataFrame())
+    test_only = _and(list(stress.loc[stress["series"] != "the components", "episode"])) if len(stress) else ""
+    path = simulated["history"]["month"] if len(simulated["history"]) else pd.Series(["1999-01", "1999-02", "2025-12"])
+    test_span = f"{month(path.iloc[1])} to {month(path.iloc[-1])}"
+    boot = simulated["bootstrap"]
+    paths = f"{int(boot['paths'].iloc[0]):,}" if len(boot) else ""
+    test_corr, etf_corr = correlation
+    selection = pd.concat([pd.read_csv(config.METHOD_DIR / n) for _, n in SELECTIONS])
+    sheets = selection["factsheet_date"].dropna()
+    ranked = pd.read_csv(config.METHOD_DIR / "selection_tracking_difference.csv")
+    attribution = out.get("attribution.csv", pd.DataFrame())
+    look = (f"the iShares holdings of {equity_at}, {LEDGER}, {HELD}, {FX} and {CALC}. Holdings of {equity_at} at the "
+            f"weights of {weights_at}, the equity ETF's holdings, per cent of the portfolio")  # fmt: skip
+    bonds = (f"the Vanguard holdings of {bonds_at}, {LEDGER}, {HELD}, {FX} and {CALC}. Holdings of {bonds_at} at the weights "
+             f"of {weights_at}, the bond ETF's holdings, per cent of the portfolio")  # fmt: skip
+    risk = (f"MSCI's month-end levels of its four regional indices in euro, the ECB's yield curve, the look-through "
+            f"weights from the iShares and Vanguard holdings, and {CALC}. Monthly, {window}, four equity regions and "
+            "three bond maturity groups, EUR")  # fmt: skip
+    test = f"{TEST}, and {CALC}. Monthly, {test_span}"
+    bases = {
+        "key-figures": f"{LEDGER}, {HELD}, {FX} and {CALC}. {held_days}, two UCITS ETFs and cash, EUR",
+        "c2": f"{LEDGER}, {HELD}, {FX} and {CALC}. At the close of {weights_at}, two UCITS ETFs and cash, EUR",
+        "c4": f"{LEDGER}, {HELD}, {FX}, {BLEND}, and {CALC}. {held_days}{blend}, two UCITS ETFs, EUR",
+        "c3": f"{LEDGER}, {HELD}, {FX}, {BLEND}, and {CALC}. {held_days}{blend}, two UCITS ETFs, EUR",
+        "comparisons": (f"{LEDGER}, the net asset values of the funds held and compared from iShares, Vanguard, State "
+                        "Street, HSBC, DWS and HANetf, MSCI ACWI and Vanguard's monthly factsheet for the benchmark, the "
+                        "ECB's euro reference rate and euro short-term rate, the weights of Doeswijk, Lam and Swinkels, "
+                        f"Rabobank's cost overview, and {CALC}. Daily from the first purchase on {day(first)}{bench}, "
+                        f"the portfolio and {len(summary) - 1} comparators, EUR"),
+        "comparisons-differences": (f"{LEDGER}, the net asset values of the funds held and compared from iShares, "
+                                    "Vanguard, State Street, HSBC, DWS and HANetf, the ECB's euro reference rate and euro "
+                                    f"short-term rate, the weights of Doeswijk, Lam and Swinkels, and {CALC}. Daily from "
+                                    f"the first purchase on {day(first)}, each comparator with a band, EUR"),
+        "comparisons-same-rules": (f"{LEDGER}, {HELD}, State Street's for the first-ranked equity fund, {FX}, MSCI ACWI "
+                                   f"and Vanguard's monthly factsheet for the benchmark, and {CALC}. {held_days}{bench}, "
+                                   "the benchmark and three comparators, EUR"),
+        "comparisons-splits": f"{LEDGER}, {HELD}, {FX} and {CALC}. {held_days}, the two ETFs at four other splits, EUR",
+        "comparisons-one-fund": (f"{LEDGER}, {HELD}, the six funds' net asset values from HSBC, State Street, Vanguard, "
+                                 f"DWS and HANetf, {FX} and {CALC}. {held_days}"
+                                 + (f", the Mag7 fund from {day(mag7)}" if isinstance(mag7, str) else "")
+                                 + ", six single funds, EUR"),
+        "comparisons-selection": (f"the issuers' factsheets of {month(sheets.min())} to "
+                                  f"{month(sheets.max())} and {CALC}. Calendar years "
+                                  f"{selection['year'].min()} to {selection['year'].max()}, UCITS ETFs on the S&P 500, "
+                                  "the MSCI World and the Nasdaq-100, percentage points"),
+        "comparisons-market": (f"{LEDGER}, {HELD}, the class funds' net asset values from iShares and State Street, "
+                               "with the distributions of the aggregate fund, the weights of Doeswijk, Lam and Swinkels "
+                               f"(2024), {FX} and {CALC}. {held_days}, eight asset classes in seven funds, EUR"),
+        "comparisons-market-weights": ((f"the weights of Doeswijk, Lam and Swinkels (2024), version 6, the class funds' "
+                                        f"factsheets and net asset values from iShares and State Street, {FX} and {CALC}. "
+                                        f"Weights of {day(market['published_as_of'].iloc[0])}, carried to "
+                                        f"{day(market['start_as_of'].iloc[0])} and held to {day(market['current_as_of'].iloc[0])}, "
+                                        "eight asset classes in seven funds, EUR") if len(market) else ""),
+        "comparisons-savings": (f"{LEDGER}, {HELD}, the ECB's euro short-term rate and euro reference rate, and {CALC}. "
+                                f"{held_days}, the contributions held at the rate, EUR"),
+        "comparisons-managed": ((f"Rabobank's cost overview of Rabo Beheerd Beleggen Basis of {month(bank.iloc[0])}, "
+                                 f"Vanguard's monthly factsheets of {day(vanguard_sheets.iloc[0])}, the two ETFs' key "
+                                 f"information documents of {kids}, {LEDGER}, {HELD}, {FX} and {CALC}. Costs a year at the "
+                                 "latest documents, the implementation cost since the first purchase, four portfolios, "
+                                 "basis points") if len(bank) and len(vanguard_sheets) else ""),
+        "comparisons-effects": (f"{LEDGER}, the net asset values of the funds held and compared, MSCI's daily levels of "
+                                "its four regional indices in euro, the holdings of iShares and State Street, Vanguard's "
+                                "monthly factsheets for the LifeStrategy funds, the ECB's euro reference rate, euro "
+                                f"short-term rate and yield curve, and {CALC}. Daily from the first purchase on "
+                                f"{day(first)}, summed by month, every comparator with daily values, EUR"),
+        "c9": f"{LEDGER}, {HELD}, {FX} and {CALC}. {held_days}, two UCITS ETFs and cash, units of the starting amount",
+        "c10": f"{LEDGER}, {HELD}, {FX} and {CALC}. {months}, two UCITS ETFs and cash, EUR",
+        "c7": (f"{LEDGER}, with each order's price and fee from the broker's confirmation and the Tradegate bid and ask "
+               f"saved before it, {HELD}, {FX} and {CALC}. {months}, every order, basis points of the portfolio"),
+        "c8": (f"{LEDGER}, {HELD}, {FX} and {CALC}. Daily from {day(impl['date'].iloc[0])}, the portfolio against "
+               "reference portfolio A, basis points"),
+        "ownership": (f"the two ETFs' key information documents of {kids}, {LEDGER}, {HELD}, {FX} and {CALC}. Ongoing "
+                      f"costs at the weights of {weights_at}, the implementation cost from {day(impl['date'].iloc[0])}, "
+                      "two UCITS ETFs, basis points"),
+        "c5": f"{LEDGER}, {HELD}, {FX} and {CALC}. {held_days}, with every order, two UCITS ETFs and cash, EUR",
+        "c6": (f"{LEDGER} and {CALC}. Every order since {day(orders['date'].min())}, counted by month"
+               if len(orders) else f"{LEDGER}. Every order, counted by month"),
+        "c11a": look.replace(f"{FX} and {CALC}.", f"{FX}, MSCI's market classification and {CALC}.", 1),
+        "c11b": look,
+        "c12": look,
+        "c14": look,
+        "c13": (f"the iShares holdings of {equity_at} and the Vanguard holdings of {bonds_at}, {LEDGER}, {HELD}, {FX} "
+                f"and {CALC}. Holdings at the weights of {weights_at}, both ETFs' holdings, per cent of each sleeve and of "
+                "the portfolio"),
+        "c15": bonds,
+        "c16": bonds.replace(f"{FX} and {CALC}.", f"{FX}, Vanguard's monthly factsheet of {sheet_at} for the "
+                             f"duration, and {CALC}.", 1),
+        "c17": (f"Vanguard's monthly factsheet of {sheet_at}, {LEDGER}, {HELD}, {FX} and {CALC}. Ratings of {sheet_at} at the "
+                f"weights of {weights_at}, the bond ETF, per cent of the portfolio"),
+        "c18": (f"the daily developed-market five factors and momentum of Kenneth French's data library, the equity ETF's "
+                f"net asset values from iShares, and {CALC}. Weekly returns, {day(weekly['window_start'])} to "
+                f"{day(weekly['window_end'])}, {int(weekly['observations'])} weeks, the equity ETF, USD"),
+        "c19": (f"the daily developed-market five factors and momentum of Kenneth French's data library, the equity ETF's "
+                f"net asset values from iShares, and {CALC}. Weekly returns in 36-month windows ending "
+                f"{month(rolling['window_end'].min())} to {month(rolling['window_end'].max())}, the equity ETF, USD"),
+        "attribution": (f"{LEDGER}, {HELD}, {FX}, {BLEND}, and {CALC}. Month ends"
+                        + (f", {day(attribution['period_start'].iloc[0])} to {day(attribution['period_end'].iloc[0])}"
+                           if len(attribution) else "") + ", two UCITS ETFs, EUR"),
+        "c30": risk, "c31": risk, "c32": risk,
+        "risk-tiles": risk.replace(f", and {CALC}.", f", the bootstrap of the allocation test, and {CALC}.", 1),
+        "risk-tail": risk,
+        "stress": ((f"MSCI's month-end levels of its four regional indices in euro and the ECB's yield curve, the "
+                    f"allocation test's two series for {test_only}, the look-through weights of {weights_at}, and {CALC}. "
+                    f"Monthly, {NUMBER_WORD[len(stress)].lower()} episodes from {month(stress['from_month_end'].min())} to "
+                    f"{month(stress['to_month_end'].max())}, today's portfolio, EUR") if len(stress) else ""),
+        "c26": f"{test}, the allocation test's global equity and euro government bond series, EUR",
+        "c27a": f"{test}, the allocation test's global equity and euro government bond series, EUR",
+        "c27b": f"{test}, the allocation test's global equity and euro government bond series, EUR",
+        "c28": (f"{TEST}, and {CALC}. Monthly returns of {test_span} resampled in blocks of 12 months into {paths} paths "
+                "of ten years from the first purchase, with the top-up and the rules, units of the starting amount"),
+        "c21": f"{test}, the global and the US equity series beside euro government bonds, EUR",
+        "c33": f"{test}, the global and the US equity series beside euro government bonds, EUR",
+        "c25": (f"{TEST}, and {CALC}. Monthly returns of {test_span} resampled in blocks of 12 months into {paths} paths "
+                "of ten years, every split from 40/60 to 100/0, EUR"),
+        "c29": ((f"{TEST}, {HELD}, and {CALC}. Monthly, 36-month windows ending {month(test_corr['window_end'].iloc[0])} "
+                 f"to {month(test_corr['window_end'].iloc[-1])} on the allocation test's series and "
+                 f"{month(etf_corr['window_end'].iloc[0])} to {month(etf_corr['window_end'].iloc[-1])} on the two ETFs, EUR")
+                if len(test_corr) and len(etf_corr) else ""),
+        "c34": (f"{LEDGER}, {HELD}, HSBC's net asset values for the S&P 500 fund, {FX} and {CALC}. {held_days}, "
+                "reference portfolio A and the S&P 500 alternative, EUR"),
+        "history": f"{test}, 70/30 against 100/0, 60/40 and the US stock market at 70/30, EUR",
+        "history-windows": f"{test}, 70/30 against 100/0, 60/40 and the US stock market at 70/30, EUR",
+        "c22": (f"the issuers' factsheets of {month(ranked['factsheet_date'].dropna().min())} to "
+                f"{month(ranked['factsheet_date'].dropna().max())} and {CALC}. Calendar years {ranked['year'].min()} to "
+                f"{ranked['year'].max()}, the equity and bond ETFs that pass the rules' criteria, percentage points"),
+        "sources": "each provider's own publication, read on the date shown. At each build, every source of the record",
+        "controls": "the controls the portfolio is run with, in a fixed table. Each control at its own frequency, with its evidence",
+        "departures": f"{LEDGER} checked against the rules, and {CALC}. Each departure since the first purchase",
+        "c24": f"{LEDGER}, {HELD}, {FX} and {CALC}. {months}, two UCITS ETFs and cash, EUR",
+        "quarterly": "each issue, built once from the tables of the commit it names. Quarterly",
+        "notes": "the monthly note, written by hand after each cycle day, with its line of figures from the record. Monthly",
+        "cycles": ("the cycle report, which the program writes on the cycle day before any order, and the orders from "
+                   f"{LEDGER}. Monthly, on each cycle day"),
+    }
+    bases["comparisons-ladder"] = bases["comparisons-differences"]
+    return {k: v for k, v in bases.items() if v}
+
+
 def build(out_dir: Path = None) -> Path:
     out = {p.name: pd.read_csv(p) for p in sorted(config.OUTPUTS_DIR.glob("*.csv"))}
     palette = json.loads((config.SITE_DIR / "palette.json").read_text())
@@ -3232,6 +3441,7 @@ def build(out_dir: Path = None) -> Path:
     glossary = "".join(f"<dt>{_esc(a)}</dt><dd>{_esc(b)}</dd>" for a, b in terms())
     page.add("glossary", f'<div class="wide"><dl class="terms">{glossary}</dl></div>')
     page.views(_part_leads())
+    _fill_sources(page.sections, _bases(out, simulated, correlation))
     numbers = _number(page.sections)
     _number_notes(page.sections)
     # The guide to the dashboard is built with it, and the build stops when a part of the page has no entry in it.

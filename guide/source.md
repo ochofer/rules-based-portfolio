@@ -34,7 +34,7 @@ The entries that follow assume twelve ideas, which recur across the views of the
 
 **Growth per year, volatility and correlation.** Growth per year is the compound annual return, with contributions removed. Volatility is the standard deviation of returns, a measure of how widely they spread around their average, and the dashboard gives it for a year. A correlation runs from −1, when two returns always move in opposite directions, through 0, when they are unrelated, to 1, when they always move together.
 
-**Exhibits and their parts.** Every chart is a figure, and every table that stands on its own is a table, each numbered in page order across the views. Under the title, a line gives the unit or the dates and the basis of the numbers. A note explains what the exhibit shows, a source line names the file in the repository that holds its numbers, and a Table toggle opens the numbers behind the chart. Nothing depends on hovering over a chart, since every value is in its table.
+**Exhibits and their parts.** Every chart is a figure, and every table that stands on its own is a table, each numbered in page order across the views. Under the title, a line gives the unit or the dates and the basis of the numbers. A note explains what the exhibit shows. The source line gives where its data come from, how they were calculated, how often and over which dates, what they cover and the currency, then the file in the repository that holds its numbers. A Table toggle opens the numbers behind the chart. Nothing depends on hovering over a chart, since every value is in its table.
 
 ## The page around the views
 
