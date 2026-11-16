@@ -3,6 +3,7 @@
 The files are synthetic, written in each source's format with invented values.
 """
 
+import io
 import json
 
 import pandas as pd
@@ -112,3 +113,25 @@ def test_cached_file_is_used_without_a_download(tmp_path, monkeypatch):
     cached.write_text("x")
     monkeypatch.setattr(prices.urllib.request, "urlopen", lambda *a, **k: pytest.fail("downloaded"))
     assert prices.fetch("ecb/rates.csv", "https://example.org", cache_dir=tmp_path) == cached
+
+
+def test_a_refused_download_is_tried_again_without_the_accept_header(tmp_path, monkeypatch):
+    seen = []
+
+    class Response(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def urlopen(request, timeout):
+        seen.append(request.get_header("Accept"))
+        if request.get_header("Accept"):
+            raise prices.urllib.error.HTTPError(request.full_url, 404, "Not Found", None, None)
+        return Response(b"zip")
+
+    monkeypatch.setattr(prices.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(prices.time, "sleep", lambda s: None)
+    path = prices.fetch("french/x_CSV.zip", "https://example.org/x", refresh=True, cache_dir=tmp_path)
+    assert seen == ["*/*", None] and path.read_bytes() == b"zip"

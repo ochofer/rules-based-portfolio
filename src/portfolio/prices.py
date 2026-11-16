@@ -116,7 +116,9 @@ def fetch(
 
     A download is tried three times, 10 seconds apart, and written to a temporary file first, so that an
     interrupted download never leaves a partial file in the cache. payload, when given, is sent as JSON
-    in a POST request.
+    in a POST request. The first try sends Accept: */* and the next ones alternate without it and with it,
+    because some networks answer the same file with a 404 for one of the two (Kenneth French's library,
+    16 November 2026).
     """
     path = Path(cache_dir) / name
     if path.exists() and not refresh:
@@ -127,8 +129,9 @@ def fetch(
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
         headers.update({"Content-Type": "application/json", "x-consumer-id": "uk0"})
-    request = urllib.request.Request(url, data=data, headers=headers)
     for attempt in range(1, attempts + 1):
+        sent = headers if attempt % 2 else {k: v for k, v in headers.items() if k != "Accept"}
+        request = urllib.request.Request(url, data=data, headers=sent)
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
                 body = response.read()
