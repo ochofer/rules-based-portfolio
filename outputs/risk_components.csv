@@ -1,9 +1,9 @@
 as_of,component,sleeve,weight,risk_contribution,estimated_volatility,estimated_return,series,window_start,window_end
-2026-11-06,North America,equity,0.4678652381,0.6637515332,0.1470416745,0.1465895375,"MSCI North America, net total return in euro",2016-11,2026-10
-2026-11-06,Europe and Middle East,equity,0.0982199686,0.1085234645,0.132469683,0.0986315842,"MSCI Europe, net total return in euro",2016-11,2026-10
-2026-11-06,Pacific,equity,0.0487436722,0.0497040735,0.1209804044,0.0881029797,"MSCI Pacific, net total return in euro",2016-11,2026-10
-2026-11-06,Emerging markets,equity,0.0759597094,0.0792851173,0.1484426917,0.0877610161,"MSCI Emerging Markets, net total return in euro",2016-11,2026-10
-2026-11-06,"Bonds, short",bonds,0.1302797456,0.0122588939,0.0218187472,-0.0005496819,"ECB curve, 3-year zero-coupon bond",2016-11,2026-10
-2026-11-06,"Bonds, medium",bonds,0.0986350454,0.0289862543,0.0555514463,-0.009080757,"ECB curve, 7.5-year zero-coupon bond",2016-11,2026-10
-2026-11-06,"Bonds, long",bonds,0.0768538129,0.0574906632,0.1413625446,-0.0267576343,"ECB curve, 20-year zero-coupon bond",2016-11,2026-10
-2026-11-06,Cash,cash,0.0034423789,0,0,0,no return,2016-11,2026-10
+2026-11-13,North America,equity,0.4735929974,0.666733223,0.1470416745,0.1465895375,"MSCI North America, net total return in euro",2016-11,2026-10
+2026-11-13,Europe and Middle East,equity,0.0983628487,0.1077586609,0.132469683,0.0986315842,"MSCI Europe, net total return in euro",2016-11,2026-10
+2026-11-13,Pacific,equity,0.0497819502,0.05035901,0.1209804044,0.0881029797,"MSCI Pacific, net total return in euro",2016-11,2026-10
+2026-11-13,Emerging markets,equity,0.0774001432,0.080186935,0.1484426917,0.0877610161,"MSCI Emerging Markets, net total return in euro",2016-11,2026-10
+2026-11-13,"Bonds, short",bonds,0.1258387874,0.0116210991,0.0218187472,-0.0005496819,"ECB curve, 3-year zero-coupon bond",2016-11,2026-10
+2026-11-13,"Bonds, medium",bonds,0.0949411775,0.0274275659,0.0555514463,-0.009080757,"ECB curve, 7.5-year zero-coupon bond",2016-11,2026-10
+2026-11-13,"Bonds, long",bonds,0.0760051796,0.0559135062,0.1413625446,-0.0267576343,"ECB curve, 20-year zero-coupon bond",2016-11,2026-10
+2026-11-13,Cash,cash,0.0040767672,0,0,0,no return,2016-11,2026-10

@@ -1,33 +1,33 @@
 as_of,comparator,snapshot,region,weight
-2026-11-06,first_ranked,2026-11-09,Emerging markets,0.1087899963
-2026-11-06,first_ranked,2026-11-09,Europe and Middle East,0.1416942413
-2026-11-06,first_ranked,2026-11-09,North America,0.6788331918
-2026-11-06,first_ranked,2026-11-09,Pacific,0.0706825706
-2026-11-06,held,2026-11-06,Emerging markets,0.1099608632
-2026-11-06,held,2026-11-06,Europe and Middle East,0.1421852797
-2026-11-06,held,2026-11-06,North America,0.6772914984
-2026-11-06,held,2026-11-06,Pacific,0.0705623587
-2026-11-06,lifestrategy_60,2026-09-30,Emerging markets,0.1046729248
-2026-11-06,lifestrategy_60,2026-09-30,Europe and Middle East,0.140987137
-2026-11-06,lifestrategy_60,2026-09-30,North America,0.670041818
-2026-11-06,lifestrategy_60,2026-09-30,Pacific,0.0842981202
-2026-11-06,lifestrategy_80,2026-09-30,Emerging markets,0.1023940804
-2026-11-06,lifestrategy_80,2026-09-30,Europe and Middle East,0.1396715202
-2026-11-06,lifestrategy_80,2026-09-30,North America,0.6671298357
-2026-11-06,lifestrategy_80,2026-09-30,Pacific,0.0908045637
-2026-11-06,mag7,2026-11-10,Emerging markets,0
-2026-11-06,mag7,2026-11-10,Europe and Middle East,0
-2026-11-06,mag7,2026-11-10,North America,1
-2026-11-06,mag7,2026-11-10,Pacific,0
-2026-11-06,msci_world,2026-11-09,Emerging markets,0
-2026-11-06,msci_world,2026-11-09,Europe and Middle East,0.1591423407
-2026-11-06,msci_world,2026-11-09,North America,0.761595849
-2026-11-06,msci_world,2026-11-09,Pacific,0.0792618103
-2026-11-06,nasdaq100,2026-11-10,Emerging markets,0
-2026-11-06,nasdaq100,2026-11-10,Europe and Middle East,0
-2026-11-06,nasdaq100,2026-11-10,North America,1
-2026-11-06,nasdaq100,2026-11-10,Pacific,0
-2026-11-06,sp500,2026-11-10,Emerging markets,0
-2026-11-06,sp500,2026-11-10,Europe and Middle East,0
-2026-11-06,sp500,2026-11-10,North America,1
-2026-11-06,sp500,2026-11-10,Pacific,0
+2026-11-13,first_ranked,2026-11-13,Emerging markets,0.1102400777
+2026-11-13,first_ranked,2026-11-13,Europe and Middle East,0.1408191199
+2026-11-13,first_ranked,2026-11-13,North America,0.6776677774
+2026-11-13,first_ranked,2026-11-13,Pacific,0.071273025
+2026-11-13,held,2026-11-13,Emerging markets,0.1107079716
+2026-11-13,held,2026-11-13,Europe and Middle East,0.1406916192
+2026-11-13,held,2026-11-13,North America,0.6773956478
+2026-11-13,held,2026-11-13,Pacific,0.0712047614
+2026-11-13,lifestrategy_60,2026-09-30,Emerging markets,0.1049116532
+2026-11-13,lifestrategy_60,2026-09-30,Europe and Middle East,0.1402759528
+2026-11-13,lifestrategy_60,2026-09-30,North America,0.6700537354
+2026-11-13,lifestrategy_60,2026-09-30,Pacific,0.0847586586
+2026-11-13,lifestrategy_80,2026-09-30,Emerging markets,0.102573647
+2026-11-13,lifestrategy_80,2026-09-30,Europe and Middle East,0.1391365821
+2026-11-13,lifestrategy_80,2026-09-30,North America,0.6671387998
+2026-11-13,lifestrategy_80,2026-09-30,Pacific,0.0911509711
+2026-11-13,mag7,2026-11-10,Emerging markets,0
+2026-11-13,mag7,2026-11-10,Europe and Middle East,0
+2026-11-13,mag7,2026-11-10,North America,1
+2026-11-13,mag7,2026-11-10,Pacific,0
+2026-11-13,msci_world,2026-11-13,Emerging markets,0
+2026-11-13,msci_world,2026-11-13,Europe and Middle East,0.1584103262
+2026-11-13,msci_world,2026-11-13,North America,0.7615289958
+2026-11-13,msci_world,2026-11-13,Pacific,0.080060678
+2026-11-13,nasdaq100,2026-11-10,Emerging markets,0
+2026-11-13,nasdaq100,2026-11-10,Europe and Middle East,0
+2026-11-13,nasdaq100,2026-11-10,North America,1
+2026-11-13,nasdaq100,2026-11-10,Pacific,0
+2026-11-13,sp500,2026-11-10,Emerging markets,0
+2026-11-13,sp500,2026-11-10,Europe and Middle East,0
+2026-11-13,sp500,2026-11-10,North America,1
+2026-11-13,sp500,2026-11-10,Pacific,0
