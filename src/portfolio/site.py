@@ -2330,9 +2330,13 @@ OTHER_PROJECTS = (
       ("code", "https://github.com/ochofer/paper1-hazard-exposure-data"))),
     ("Volatility-managed portfolios: a replication, the real-time critique, and the months after the sample.",
      "Volatility estimation and position sizing on Ken French's equity factors, backtested out of sample and without "
-     "look-ahead, replicating Moreira and Muir (2017) and Cederburg, O'Doherty, Wang and Yan (2020). In build: its "
-     "findings are stated when the study is complete.",
+     "look-ahead, replicating Moreira and Muir (2017) and Cederburg, O'Doherty, Wang and Yan (2020). Scaled by "
+     "the inverse of last month's realised variance, a factor has a Sharpe ratio above the original's beyond its 95 "
+     "per cent interval for one of six factors, momentum, and the 136 months after Moreira and Muir's sample cannot "
+     "tell any difference from zero.",
      (("Page", PROJECTS_URL + "volatility-managed-portfolios/"),
+      ("dashboard", SITE_URL + "volatility-managed-portfolios/dashboard/B-Q_dashboard.html"),
+      ("note", SITE_URL + "volatility-managed-portfolios/note/B-Q_note_2026-11.pdf"),
       ("code", "https://github.com/ochofer/volatility-managed-portfolios"))),
     ("Stock-level index tracking: a point-in-time benchmark, a long-only mandate, and its performance attribution by sector.",
      "A point-in-time S&P 500 universe from CRSP and Compustat, a long-only mandate held close to its cap-weighted "
