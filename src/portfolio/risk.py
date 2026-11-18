@@ -396,8 +396,9 @@ def tail(window_returns: pd.DataFrame, weights: pd.Series, volatility_a_year: fl
 # own cash line, part of the fund's tracking of its index, is not counted as cash; the portfolio's own cash is.
 # A component's active weight is its weight in the portfolio less its weight in the benchmark. The estimated
 # tracking error is the standard deviation of the active return over a year that the covariance implies for the
-# active weights, the tracking-error volatility of Jorion (2003). It covers the split, the portfolio's cash and any
-# difference in region and maturity weights, and leaves out the funds' own tracking of their indices and all costs.
+# active weights, the tracking-error volatility of Jorion (2003). It covers the split between equity and bonds and the
+# portfolio's cash. Inside each sleeve the benchmark's shares of the components are taken as the fund's, so the figure
+# leaves out the two funds' own tracking of their indices, and it leaves out all costs.
 
 
 def invested_shares(regions: pd.DataFrame, maturities: pd.DataFrame) -> pd.Series:

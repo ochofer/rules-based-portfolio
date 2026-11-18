@@ -1744,9 +1744,10 @@ def _window_text(summary) -> str:
 TRACKING_NOTE = (
     "The estimated tracking error is the standard deviation of the portfolio's return less the benchmark's over a year "
     "that the components' covariance implies for today's active weights, the tracking-error volatility of Jorion "
-    "(2003).\u2e28note:jorion_2003\u2e29 It covers what the look-through sees in the seven components: the split, the "
-    "portfolio's cash and any difference in region and maturity weights. It leaves out the two funds' own tracking of "
-    "their indices and all costs. It is no limit, and under rule 8 it is never a reason for an order.")
+    "(2003).\u2e28note:jorion_2003\u2e29 It covers the split between equity and bonds and the portfolio's cash. Inside "
+    "each sleeve the benchmark's shares of the components are taken as the fund's, so the figure leaves out the two "
+    "funds' own tracking of their indices, and it leaves out all costs. It is no limit, and under rule 8 it is never a "
+    "reason for an order.")
 TRACKING_STUDY = (
     "{study} has the same measure as its objective: a constrained optimiser keeps a portfolio of French's 49 industries "
     "close to its benchmark, and five covariance estimators understate their own tracking error, by 22 to 61 per cent. "
@@ -1776,7 +1777,7 @@ def _tracking_tile(summary) -> list:
     if _has(summary, "realised_tracking_error"):
         line += (f". Realised {_basis_points(summary['realised_tracking_error'])} basis points a year, on "
                  f"{int(summary['realised_tracking_error_months'])} monthly differences")  # fmt: skip
-    return [("Estimated tracking error", f"{_basis_points(summary['estimated_tracking_error'])} basis points", line)]
+    return [("Estimated tracking error", f"{_basis_points(summary['estimated_tracking_error'])} bp", line)]
 
 
 def _tracking_notes(summary) -> str:
@@ -1787,11 +1788,14 @@ def _tracking_notes(summary) -> str:
     parts = [TRACKING_NOTE]
     if _has(summary, "tracking_error_highest"):
         waiting = str(summary.get("tracking_error_highest_top_up_waiting", "")) == "yes"
-        parts.append(("The figure moves within a month. " + ("With the top-up waiting for the cycle day it" if waiting else "It")
-                      + f" was {_basis_points(summary['tracking_error_highest'])} basis points on "
-                      f"{fmt.day_words(str(summary['tracking_error_highest_day'])[:10])}, at "
-                      f"{float(summary['tracking_error_highest_equity']) * 100:.1f} per cent in equity and "
-                      f"{float(summary['tracking_error_highest_cash']) * 100:.1f} in cash, the highest since the first purchase."))  # fmt: skip
+        # The figure for a past day is computed at today's covariance, so the sentence is in the present tense.
+        parts.append(f"The figure moves within a month. At the weights of "
+                     f"{fmt.day_words(str(summary['tracking_error_highest_day'])[:10])}, "
+                     f"{float(summary['tracking_error_highest_equity']) * 100:.1f} per cent in equity and "
+                     f"{float(summary['tracking_error_highest_cash']) * 100:.1f} in cash"
+                     + (" with the top-up waiting for the cycle day" if waiting else "")
+                     + f", it is {_basis_points(summary['tracking_error_highest'])} basis points, the highest of any day "
+                     "since the first purchase.")  # fmt: skip
     low, high = config.BAND
     parts.append(f"The estimated tracking error at the band's edge, fully invested, is "
                  f"{_basis_points(summary['tracking_error_band_edge'])} basis points a year, at {round(high * 100)}/"
