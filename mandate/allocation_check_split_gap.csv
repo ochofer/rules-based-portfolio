@@ -1,0 +1,2 @@
+first_split,second_split,first_month,last_month,months,first_split_growth_per_year,second_split_growth_per_year,gap_per_year,mean_difference_per_year,difference_standard_deviation_per_year,standard_error,lower_bound,upper_bound
+100/0,40/60,1999-02,2025-12,323,0.078212,0.052924,0.025288,0.032094,0.089788,0.017306,-0.009325,0.059901

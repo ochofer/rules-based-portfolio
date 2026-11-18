@@ -29,10 +29,15 @@ def test_the_values_in_the_text_are_computed_from_the_committed_files():
     first, last, months = site._test_period()
     assert (first, last, months) == ("1999-02", "2025-12", 323)
     error = allocation.loc["100/0", "volatility"] / (months / 12) ** 0.5 * 100
-    gap = (allocation.loc["100/0", "growth_per_year"] - allocation.loc["40/60", "growth_per_year"]) * 100
+    split_gap = pd.read_csv(MANDATE / "allocation_check_split_gap.csv").iloc[0]
+    gap, gap_error = split_gap["gap_per_year"] * 100, split_gap["standard_error"] * 100
     _, html = _section()
-    assert f"is about {error:.1f} percentage points" in html and f"a gap in growth per year of {gap:.1f} points" in html
-    assert "over the test&#x27;s 27 years" in html
+    assert f"mean yearly return is {error:.1f} percentage points" in html
+    assert f"the 100/0 and the 40/60 split on the same history is {gap:.1f} points" in html
+    assert (f"over the square root of the years, is {gap_error:.1f} points. Two standard errors either side put the gap "
+            "between \u22120.9 and +6.0 points a year, so 27 years leave it uncertain by more than its own size.") in html
+    assert "On 18 November 2026 this comparison was corrected" in html and "The rules and the split are unchanged." in html
+    assert "Over the test&#x27;s 27 years" in html
     assert ("the largest split within 35 per cent is 65/35, and the worst fall at 70/30 is 36.0 per cent, from August "
             "2000 to February 2003") in html  # fmt: skip
     assert "would be in An S&amp;P 500 fund, the S&amp;P 500 ETF" in html

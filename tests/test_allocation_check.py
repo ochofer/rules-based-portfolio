@@ -4,6 +4,7 @@ which has the same columns and chooses nothing."""
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,3 +38,22 @@ def test_the_us_run_uses_the_same_bonds_and_months_and_chooses_nothing():
     header = (ROOT / "mandate" / "allocation_check_results.csv").read_text(encoding="utf-8").splitlines()[0]
     assert text.splitlines()[0] == header
     assert all(line.endswith(",no") for line in text.splitlines()[1:])
+
+
+def test_the_split_gap_holds_the_two_splits_growth_and_the_standard_error_of_their_gap():
+    gap = pd.read_csv(ROOT / "mandate" / "allocation_check_split_gap.csv").iloc[0]
+    results = pd.read_csv(ROOT / "mandate" / "allocation_check_results.csv").set_index("split")
+    assert (gap["first_split"], gap["second_split"], gap["months"]) == ("100/0", "40/60", 323)
+    assert gap["first_split_growth_per_year"] == pytest.approx(results.loc["100/0", "growth_per_year"], abs=1e-6)
+    assert gap["second_split_growth_per_year"] == pytest.approx(results.loc["40/60", "growth_per_year"], abs=1e-6)
+    assert gap["gap_per_year"] == pytest.approx(gap["first_split_growth_per_year"] - gap["second_split_growth_per_year"], abs=2e-6)
+    assert gap["standard_error"] == pytest.approx(gap["difference_standard_deviation_per_year"] / (323 / 12) ** 0.5, abs=2e-6)
+    assert gap["lower_bound"] == pytest.approx(gap["gap_per_year"] - 2 * gap["standard_error"], abs=3e-6)
+    assert gap["upper_bound"] == pytest.approx(gap["gap_per_year"] + 2 * gap["standard_error"], abs=3e-6)
+
+
+def test_the_split_gap_file_reproduces_exactly():
+    cached(*GLOBAL)
+    returns, _ = ac.monthly_returns()
+    text = ac.split_gap(returns).to_csv(index=False, float_format="%.6f", lineterminator="\n")
+    assert text == (ROOT / "mandate" / "allocation_check_split_gap.csv").read_text(encoding="utf-8")

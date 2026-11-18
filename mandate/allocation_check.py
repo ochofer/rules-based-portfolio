@@ -438,6 +438,26 @@ def history_tables(frames):
     return pd.DataFrame(rows)[columns], pd.DataFrame(windows)[window_columns]
 
 
+def split_gap(returns, first=1.0, second=0.4):
+    """The gap in growth per year between two splits on the same months, 100/0 and 40/60, and its standard error:
+    the standard deviation of their monthly differences times the square root of 12, over the square root of the
+    years, as the history's bands are built, with the arithmetic mean of the monthly differences a year and the
+    bounds at two standard errors either side of the gap."""
+    years = len(returns) / 12
+    a, b = band_path(returns, first), band_path(returns, second)
+    differences = (a / a.shift(1, fill_value=1.0) - 1) - (b / b.shift(1, fill_value=1.0) - 1)
+    growth_first, growth_second = a.iloc[-1] ** (1 / years) - 1, b.iloc[-1] ** (1 / years) - 1
+    gap = growth_first - growth_second
+    deviation = differences.std() * math.sqrt(12)
+    error = deviation / math.sqrt(years)
+    name = lambda w: f"{round(w * 100)}/{round((1 - w) * 100)}"  # noqa: E731
+    return pd.DataFrame([{"first_split": name(first), "second_split": name(second), "first_month": str(returns.index[0]),
+                          "last_month": str(returns.index[-1]), "months": len(returns),
+                          "first_split_growth_per_year": growth_first, "second_split_growth_per_year": growth_second,
+                          "gap_per_year": gap, "mean_difference_per_year": differences.mean() * 12,
+                          "difference_standard_deviation_per_year": deviation, "standard_error": error,
+                          "lower_bound": gap - 2 * error, "upper_bound": gap + 2 * error}])
+
 def csv_text(table):
     """The results table as the text of its file."""
     return table.to_csv(index=False, float_format="%.6f", lineterminator="\n")
@@ -549,6 +569,9 @@ def main():
     history, windows = history_tables(frames)
     history.to_csv(OUT_HISTORY, index=False, float_format="%.6f", lineterminator="\n")
     windows.to_csv(OUT_HISTORY_WINDOWS, index=False, float_format="%.6f", lineterminator="\n")
+    # The gap between the 100/0 and the 40/60 split that the Method view sets beside its own standard error.
+    split_gap(returns).to_csv(os.path.join(ROOT, "mandate", "allocation_check_split_gap.csv"), index=False,
+                              float_format="%.6f", lineterminator="\n")
     print("")
     for r in periods.itertuples():
         print(f"{r.series}, {r.first_month} to {r.last_month}: {r.cumulative_return_usd * 100:.1f} per cent in US dollars, "

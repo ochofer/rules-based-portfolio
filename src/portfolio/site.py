@@ -2560,7 +2560,7 @@ def _per_cent(x: float) -> str:
 
 
 def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.DataFrame, fund: str, period: tuple,
-              added, periods: pd.DataFrame = None) -> None:  # fmt: skip
+              added, periods: pd.DataFrame = None, split_gap: pd.DataFrame = None) -> None:  # fmt: skip
     """What the portfolio does not do, and why: a card of text across the Method view, with the US run of the
     allocation test and the S&P 500 alternative inside it. Every value in the text is read from a committed file."""
     first, last, months = period
@@ -2569,14 +2569,24 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
     cumulative = periods.set_index(["series", "first_month"])["cumulative_return_usd"]
     test = allocation.set_index("split")
     error = test.loc["100/0", "volatility"] / (months / 12) ** 0.5 * 100
-    gap = (test.loc["100/0", "growth_per_year"] - test.loc["40/60", "growth_per_year"]) * 100
+    # The gap between the 100/0 and the 40/60 split and its own standard error, from the two splits' monthly
+    # differences on the same months (mandate/allocation_check_split_gap.csv).
+    if split_gap is None:
+        split_gap = _read("allocation_check_split_gap.csv", config.ROOT / "mandate")
+    gap_row = split_gap.iloc[0]
+    if (gap_row["first_split"], gap_row["second_split"]) != ("100/0", "40/60"):
+        raise ValueError("mandate/allocation_check_split_gap.csv does not hold the 100/0 and the 40/60 split")
+    if gap_row["upper_bound"] - gap_row["lower_bound"] <= gap_row["gap_per_year"]:
+        raise ValueError("The gap's two standard errors either side no longer span more than the gap itself")
+    bound = lambda x: f"{x * 100:+.1f}".replace("-", fmt.MINUS)  # noqa: E731
     within = us_test[us_test["within_limit"] == "yes"]
     u70 = us_test.set_index("split").loc["70/30"]
     costs = '<a href="#costs">Costs</a> in the Performance view'
     fields = {
         "test": _ref("c21"), "frontier": _ref("c32"), "growth": _ref("c3"), "us_test": _ref("c33"),
         "alternative": _ref("c34"), "costs": costs, "years": f"{months / 12:.0f}", "error": f"{error:.1f}",
-        "gap": f"{gap:.1f}", "us_split": _esc(within.loc[within["equity_weight"].idxmax(), "split"]),
+        "gap": f"{gap_row['gap_per_year'] * 100:.1f}", "gap_error": f"{gap_row['standard_error'] * 100:.1f}",
+        "gap_low": bound(gap_row["lower_bound"]), "gap_high": bound(gap_row["upper_bound"]), "us_split": _esc(within.loc[within["equity_weight"].idxmax(), "split"]),
         "us_fall": f"{u70['worst_fall'] * 100:.1f}", "us_peak": _month_name(u70["peak"]),
         "us_low": _month_name(u70["low"]), "fund": _esc(fund), **{f"n{i}": _note(key) for i, key in enumerate(ESSAY_NOTES, start=1)},
         "us_after": _per_cent(cumulative[("US stock market", "2010-01")]),
@@ -2588,10 +2598,15 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
         ("No optimiser.",
          "The split is set by the risk limit: 70 per cent equity is the largest target weight whose worst fall on the "
          "test's history stayed within 35 per cent ({test}). An optimiser would need the expected return of each "
-         "sleeve, and that is the input the data cannot supply. The standard error of the equity series' mean yearly "
-         "return over the test's {years} years is about {error} percentage points, computed as the series' yearly "
-         "volatility over the square root of its years, against a gap in growth per year of {gap} points between the "
-         "40/60 and the 100/0 split on the same history (the table under {test}). DeMiguel, Garlappi and Uppal "
+         "sleeve, and that is the input the data cannot supply. Over the test's {years} years the standard error of the "
+         "equity series' mean yearly return is {error} percentage points, its yearly volatility over the square root of "
+         "its years: the uncertainty of that input. The gap in growth per year between the 100/0 and the 40/60 split "
+         "on the same history is {gap} points (the table under {test}). Its own standard error, from the two splits' "
+         "monthly differences, their standard deviation times the square root of 12 over the square root of the years, "
+         "is {gap_error} points. Two standard errors either side put the gap between {gap_low} and {gap_high} points a "
+         "year, so {years} years leave it uncertain by more than its own size. On 18 November 2026 this comparison was "
+         "corrected: it had set the gap against the standard error of the equity mean, which is not the yardstick for "
+         "two splits on the same months. The rules and the split are unchanged. DeMiguel, Garlappi and Uppal "
          "measured how much history a sample-based optimiser needs before it beats an equal split out of sample: about "
          "3,000 months for 25 assets and about 6,000 for 50.{n1} A replication of their study by the same author finds "
          "that none of the seven optimising rules it tests earns a higher Sharpe ratio than the equal split at the 5 "
