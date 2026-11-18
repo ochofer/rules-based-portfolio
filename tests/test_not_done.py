@@ -57,7 +57,8 @@ def test_the_sentence_on_the_us_market_is_written_from_the_committed_periods():
 
 def test_every_footnote_links_to_one_note_and_every_note_has_one_link():
     # The dashboard's notes are numbered in order of first mention across the views, so the market portfolio's two
-    # sources in the Performance view come before the six this section cites, and the Notes list closes this section.
+    # sources in the Performance view and Jorion (2003) in the Risk view come before the six this section cites, and
+    # the Notes list closes this section.
     html = (config.ROOT / "index.html").read_text(encoding="utf-8")
     marks = re.findall(r'<sup class="fn"><a href="#note-(\d+)"', html)
     assert marks == [str(n) for n in range(1, len(site.CITATIONS) + 1)]
@@ -67,18 +68,19 @@ def test_every_footnote_links_to_one_note_and_every_note_has_one_link():
     assert all(body.count("<a href=") == 1 for _, body in notes)
     assert notes[0][1].startswith("Doeswijk, R., Lam, T. and Swinkels, L. (2014). The global multi-asset market portfolio")
     assert notes[1][1].startswith("Doeswijk, R., Lam, T. and Swinkels, L. (2024). Data update:")
-    assert notes[2][1].startswith("DeMiguel, V., Garlappi, L. and Uppal, R. (2009).")
+    assert notes[2][1].startswith("Jorion, P. (2003). Portfolio optimization with tracking-error constraints.")
+    assert notes[3][1].startswith("DeMiguel, V., Garlappi, L. and Uppal, R. (2009).")
     # A web page without a DOI carries its link on its title, with no address written out, and a DOI is written out.
-    assert notes[3][1].startswith('<a href="https://www.carlohofer.com/projects/optimal-vs-naive-diversification/">'
+    assert notes[4][1].startswith('<a href="https://www.carlohofer.com/projects/optimal-vs-naive-diversification/">'
                                   'Optimal versus naive diversification</a>, the replication')
-    assert notes[4][1] == ('<a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">Kenneth '
+    assert notes[5][1] == ('<a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">Kenneth '
                            'French&#x27;s data library</a>, the US market return and the developed markets outside the '
                            'United States.')
-    assert all("https://doi.org/" in body.split("</a>")[0] for i, (_, body) in enumerate(notes) if i not in (3, 4, 7))
-    assert notes[7][1] == ('The agenda of the review, <a href="https://github.com/ochofer/rules-based-portfolio/blob/main/'
+    assert all("https://doi.org/" in body.split("</a>")[0] for i, (_, body) in enumerate(notes) if i not in (4, 5, 8))
+    assert notes[8][1] == ('The agenda of the review, <a href="https://github.com/ochofer/rules-based-portfolio/blob/main/'
                            'mandate/REVIEW_2027.md">mandate/REVIEW_2027.md</a> in the repository.')
     section = html.split('id="method-not-done"', 1)[1].split('<p class="label">Notes</p>', 1)[0]
-    assert re.findall(r'<sup class="fn"><a href="#note-(\d+)"', section) == [str(n) for n in range(3, 9)]
+    assert re.findall(r'<sup class="fn"><a href="#note-(\d+)"', section) == [str(n) for n in range(4, 10)]
     with pytest.raises(ValueError):
         site._number_notes({v: ([site._note("no_such_note")] if v == "method" else []) for v, _ in site.VIEWS})
 

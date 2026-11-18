@@ -389,18 +389,114 @@ def tail(window_returns: pd.DataFrame, weights: pd.Series, volatility_a_year: fl
             "tail_months": worst}  # fmt: skip
 
 
+# Tracking error ------------------------------------------------------------------------------------
+#
+# The benchmark is the policy the rules implement: the target weights of rule 1, with each sleeve's shares of the
+# components taken as its fund's. Each fund's look-through is rescaled to its invested holdings, so that the fund's
+# own cash line, part of the fund's tracking of its index, is not counted as cash; the portfolio's own cash is.
+# A component's active weight is its weight in the portfolio less its weight in the benchmark. The estimated
+# tracking error is the standard deviation of the active return over a year that the covariance implies for the
+# active weights, the tracking-error volatility of Jorion (2003). It covers the split, the portfolio's cash and any
+# difference in region and maturity weights, and leaves out the funds' own tracking of their indices and all costs.
+
+
+def invested_shares(regions: pd.DataFrame, maturities: pd.DataFrame) -> pd.Series:
+    """Each sleeve's shares of its components, from its fund's look-through rescaled to the invested holdings:
+    the equity regions sum to one, and so do the maturity groups."""
+    shares = pd.Series(0.0, index=list(COMPONENTS))
+    for _, r in regions.iterrows():
+        if r["region"] not in CASH_LINES:
+            shares[r["region"]] += r["share_of_portfolio"]
+    for _, r in maturities.iterrows():
+        if r["maturity"] not in CASH_LINES:
+            shares[_group_of(r["maturity"])] += r["share_of_portfolio"]
+    for sleeve in config.SLEEVES:
+        names = [c for c in COMPONENTS if SLEEVE_OF[c] == sleeve]
+        total = float(shares[names].sum())
+        if total <= 0:
+            raise ValueError(f"the {sleeve} sleeve's look-through holds no invested component")
+        shares[names] = shares[names] / total
+    return shares
+
+
+def shares_from_components(components: pd.DataFrame) -> pd.Series:
+    """The same shares, from outputs/risk_components.csv, whose component weights leave the funds' cash lines in
+    cash."""
+    weights = components.set_index("component")["weight"].reindex(list(COMPONENTS)).fillna(0.0)
+    for sleeve in config.SLEEVES:
+        names = [c for c in COMPONENTS if SLEEVE_OF[c] == sleeve]
+        weights[names] = weights[names] / float(weights[names].sum())
+    return weights
+
+
+def covariance_from_tables(components: pd.DataFrame, pairs: pd.DataFrame) -> pd.DataFrame:
+    """The components' covariance a year, from outputs/risk_components.csv and outputs/risk_correlation.csv."""
+    vol = components.set_index("component")["estimated_volatility"].reindex(list(COMPONENTS))
+    corr = pairs.pivot(index="component_a", columns="component_b", values="correlation").loc[list(COMPONENTS), list(COMPONENTS)]
+    return corr * np.outer(vol, vol)
+
+
+def active_weights(equity: float, bonds: float, shares: pd.Series) -> pd.Series:
+    """The components' active weights at the given sleeve weights, in shares of the portfolio. The rest of the
+    portfolio is its own cash, whose active weight is the cash itself and which has no return."""
+    sleeve_weight = {config.EQUITY: equity, config.BONDS: bonds}
+    return pd.Series({c: (sleeve_weight[SLEEVE_OF[c]] - config.TARGET[SLEEVE_OF[c]]) * shares[c] for c in COMPONENTS})
+
+
+def tracking_error(active: pd.Series, cov: pd.DataFrame) -> float:
+    """The estimated tracking error a year: the square root of a'Va for the active weights a."""
+    a = active.reindex(cov.index).fillna(0.0).values
+    return float(np.sqrt(max(a @ cov.values @ a, 0.0)))
+
+
+def active_tail(window_returns: pd.DataFrame, active: pd.Series, tracking_error_a_year: float) -> dict:
+    """The value at risk of the active return over one month at 95 per cent, the loss against the benchmark.
+    Historical: the active return of each month of the window at today's active weights, the sixth worst of 120.
+    Normal: 1.645 times the monthly tracking error, with zero mean."""
+    names = [c for c in window_returns.columns if c in active.index]
+    returns = (window_returns[names] * active[names]).sum(axis=1).sort_values()
+    worst = max(int(round(TAIL * len(returns))), 1)
+    return {"value_at_risk_active_historical": float(-returns.iloc[worst - 1]),
+            "value_at_risk_active_normal": float(Z95 * tracking_error_a_year / np.sqrt(12))}  # fmt: skip
+
+
+def band_edge_tracking_error(shares: pd.Series, cov: pd.DataFrame) -> float:
+    """The estimated tracking error at the band's edge, fully invested: the equity weight at the band's upper
+    bound and the bonds at the rest. The lower bound gives the same figure, since its active weights are the same
+    with the opposite sign."""
+    upper = config.BAND[1]
+    return tracking_error(active_weights(upper, 1 - upper, shares), cov)
+
+
+def tracking_error_by_day(daily: pd.DataFrame, shares: pd.Series, cov: pd.DataFrame, first_purchase) -> pd.DataFrame:
+    """The estimated tracking error at each day's close weights since the first purchase, at today's covariance
+    and shares within each sleeve: how far the figure moves within a month as cash waits and the weights drift."""
+    days = daily[pd.to_datetime(daily["date"]) >= pd.Timestamp(pd.Timestamp(first_purchase).date())].dropna(
+        subset=["weight_equity", "weight_bonds"])
+    rows = [{"date": d, "weight_equity": e, "weight_cash": c,
+             "tracking_error": tracking_error(active_weights(e, b, shares), cov)}
+            for d, e, b, c in zip(days["date"], days["weight_equity"], days["weight_bonds"], days["weight_cash"])]  # fmt: skip
+    return pd.DataFrame(rows, columns=["date", "weight_equity", "weight_cash", "tracking_error"])
+
+
 def record_estimate(history: pd.DataFrame, month_end: pd.Period, value: float, start: pd.Period, first_purchase,
-                    value_at_risk: float = float("nan")) -> pd.DataFrame:  # fmt: skip
-    """The record of the estimated volatility and the historical value at risk at each month end, kept as they
-    were first written: a month end is added once, at the first build after it, and never rewritten."""
-    columns = ["month_end", "estimated_volatility", "value_at_risk", "window_start", "window_end"]
+                    value_at_risk: float = float("nan"), tracking: float = float("nan"),
+                    realised: float = float("nan"), realised_months: float = float("nan")) -> pd.DataFrame:  # fmt: skip
+    """The record of the estimated volatility, the estimated tracking error and the historical value at risk at
+    each month end, with the realised tracking error against the benchmark and the number of monthly differences
+    it rests on, all kept as they were first written: a month end is added once, at the first build after it, and
+    never rewritten. A month end written before a column existed keeps that column empty."""
+    columns = ["month_end", "estimated_volatility", "estimated_tracking_error", "value_at_risk", "window_start",
+               "window_end", "realised_tracking_error", "realised_tracking_error_months"]  # fmt: skip
     history = history.reindex(columns=columns) if len(history) else pd.DataFrame(columns=columns)
     if month_end >= pd.Period(pd.Timestamp(first_purchase), "M") and str(month_end) not in set(history["month_end"].astype(str)):
-        row = {"month_end": str(month_end), "estimated_volatility": value, "value_at_risk": value_at_risk,
-               "window_start": str(start), "window_end": str(month_end)}  # fmt: skip
+        row = {"month_end": str(month_end), "estimated_volatility": value, "estimated_tracking_error": tracking,
+               "value_at_risk": value_at_risk, "window_start": str(start), "window_end": str(month_end),
+               "realised_tracking_error": realised, "realised_tracking_error_months": realised_months}  # fmt: skip
         history = pd.concat([history, pd.DataFrame([row])], ignore_index=True) if len(history) else pd.DataFrame([row])
     history = history.reset_index(drop=True)
-    for column in ("estimated_volatility", "value_at_risk"):
+    for column in ("estimated_volatility", "estimated_tracking_error", "value_at_risk", "realised_tracking_error",
+                   "realised_tracking_error_months"):  # fmt: skip
         history[column] = history[column].astype(float)
     for column in ("month_end", "window_start", "window_end"):
         history[column] = history[column].astype(str)

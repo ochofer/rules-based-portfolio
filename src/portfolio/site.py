@@ -1416,7 +1416,7 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
                           else "The benchmark")
                        + " has values at month ends only, so it has a row in this pane's table and no line in "
                          f"its chart. Its figures appear as the note under {_ref('comparisons')} says, and its growth is in "
-                         f"{_ref('c3')}."),
+                         f"{_ref('c3')}.", _realised_tracking_text(summary)),
         "splits": ("The same two ETFs at other target weights, under rules 3 to 6 with the band of rule 5 five points either "
                    "side of each target, which never binds for 100/0."),
         "one_fund": ("Each fund takes the same contributions on the same days at its net asset value in euro, US dollar "
@@ -1740,6 +1740,85 @@ def _window_text(summary) -> str:
     return f"the 120 months from {_month_name(summary['window_start'])} to {_month_name(summary['window_end'])}"
 
 
+# The estimated tracking error against the benchmark (risk.py), beside the estimated volatility.
+TRACKING_NOTE = (
+    "The estimated tracking error is the standard deviation of the portfolio's return less the benchmark's over a year "
+    "that the components' covariance implies for today's active weights, the tracking-error volatility of Jorion "
+    "(2003).\u2e28note:jorion_2003\u2e29 It covers what the look-through sees in the seven components: the split, the "
+    "portfolio's cash and any difference in region and maturity weights. It leaves out the two funds' own tracking of "
+    "their indices and all costs. It is no limit, and under rule 8 it is never a reason for an order.")
+TRACKING_STUDY = (
+    "{study} has the same measure as its objective: a constrained optimiser keeps a portfolio of French's 49 industries "
+    "close to its benchmark, and five covariance estimators understate their own tracking error, by 22 to 61 per cent. "
+    "Here the rules set the weights, so nothing has searched for the weights that make the estimate small. The realised "
+    "tracking error against the benchmark appears from the sixth month end, with the number of monthly differences it "
+    "rests on. It also holds the two funds' tracking of their indices and their costs, which the estimate leaves out, so "
+    "the two figures stand side by side and neither tests the other.")
+
+
+def _basis_points(x) -> str:
+    """A tracking error or a value at risk of the active return in whole basis points, unsigned."""
+    return str(int(round(float(x) * 1e4)))
+
+
+def _has(summary, key) -> bool:
+    return key in summary and pd.notna(summary[key])
+
+
+def _tracking_tile(summary) -> list:
+    """The estimated tracking error's tile, with the value at risk of the active return on its line, and the
+    realised tracking error beside it once the benchmark has one. No tile while the summary has no estimate."""
+    if not _has(summary, "estimated_tracking_error"):
+        return []
+    line = (f"A year, against the benchmark, at the weights of {fmt.day_words(summary['weights_as_of'])}. Value at risk "
+            f"of the active return over one month: {_basis_points(summary['value_at_risk_active_normal'])} basis points "
+            f"normal, {_basis_points(summary['value_at_risk_active_historical'])} historical")  # fmt: skip
+    if _has(summary, "realised_tracking_error"):
+        line += (f". Realised {_basis_points(summary['realised_tracking_error'])} basis points a year, on "
+                 f"{int(summary['realised_tracking_error_months'])} monthly differences")  # fmt: skip
+    return [("Estimated tracking error", f"{_basis_points(summary['estimated_tracking_error'])} basis points", line)]
+
+
+def _tracking_notes(summary) -> str:
+    """The note under the tiles on the estimated tracking error: what it is and leaves out, how far it moves within a
+    month, the band's edge and the value at risk of the active return; then the study that has the same measure."""
+    if not _has(summary, "estimated_tracking_error"):
+        return ""
+    parts = [TRACKING_NOTE]
+    if _has(summary, "tracking_error_highest"):
+        waiting = str(summary.get("tracking_error_highest_top_up_waiting", "")) == "yes"
+        parts.append(("The figure moves within a month. " + ("With the top-up waiting for the cycle day it" if waiting else "It")
+                      + f" was {_basis_points(summary['tracking_error_highest'])} basis points on "
+                      f"{fmt.day_words(str(summary['tracking_error_highest_day'])[:10])}, at "
+                      f"{float(summary['tracking_error_highest_equity']) * 100:.1f} per cent in equity and "
+                      f"{float(summary['tracking_error_highest_cash']) * 100:.1f} in cash, the highest since the first purchase."))  # fmt: skip
+    low, high = config.BAND
+    parts.append(f"The estimated tracking error at the band's edge, fully invested, is "
+                 f"{_basis_points(summary['tracking_error_band_edge'])} basis points a year, at {round(high * 100)}/"
+                 f"{round((1 - high) * 100)} or {round(low * 100)}/{round((1 - low) * 100)}.")  # fmt: skip
+    parts.append("The value at risk of the active return is the loss against the benchmark over one month at 95 per "
+                 "cent: 1.645 times the monthly figure, and the sixth worst of the 120 months at today's active weights.")
+    study = TRACKING_STUDY.split("{study}")
+    linked = (f'{_esc(study[0])}<a href="{_esc(STUDY_URL)}">{_esc(STUDY_NAME)}</a>{_esc(study[1])}')
+    return f'<p class="tilenote">{_esc(" ".join(parts))}</p><p class="tilenote">{linked}</p>'
+
+
+def _realised_tracking_text(summary) -> str:
+    """The benchmark pane's line on the realised tracking error: the figure and its count from the sixth month end,
+    and until then the month it appears."""
+    bench = summary.loc["benchmark"] if "benchmark" in summary.index else None
+    definition = "the standard deviation of the monthly active returns, times the square root of 12"
+    if bench is not None and pd.notna(bench["tracking_error"]):
+        return (f"The realised tracking error against the benchmark is {_basis_points(bench['tracking_error'])} basis "
+                f"points a year, on {int(bench['periods'])} monthly differences: {definition}.")
+    months = comparisons_module.BENCHMARK_MONTH_ENDS
+    start = bench["first_day"] if bench is not None and isinstance(bench["first_day"], str) else None
+    when = (f"the sixth month end, {_month_name(str(pd.Period(start[:7], 'M') + months - 1))}," if start
+            else "the sixth month end,")
+    return (f"The realised tracking error against the benchmark, {definition}, appears from {when} on "
+            f"{NUMBER_WORD[months - 1].lower()} monthly differences.")
+
+
 def _risk_tiles(page, summary, boot, weight_equity, monthly):
     """Item 3: the estimated volatility, the estimated worst fall at the nearest split, and from month 12 the
     forecast's calibration."""
@@ -1755,6 +1834,7 @@ def _risk_tiles(page, summary, boot, weight_equity, monthly):
         calibration = ("n/a", "From the October 2027 month end, when twelve months of returns exist, with the realised volatility")
     tiles = [("Estimated volatility", fmt.pct(summary["estimated_volatility"]),
               f"A year, at the look-through weights of {fmt.day_words(summary['weights_as_of'])}, on {_window_text(summary)}"),
+             *_tracking_tile(summary),
              ("Estimated worst fall over ten years", fall[0],
               f"Median of the bootstrap at {split}, the split nearest the equity weight of {fmt.day_words(summary['weights_as_of'])}, "
               f"on the returns from February 1999 to December 2025. 95th percentile {fall[1]}"),
@@ -1764,7 +1844,9 @@ def _risk_tiles(page, summary, boot, weight_equity, monthly):
     line = ("The forecast's calibration is the standard deviation, over the months, of each month's return divided by the "
             "monthly volatility estimated at the end of the month before. 1 means the estimates matched the returns, and "
             "above 1 that they were too low. Every estimate is kept as first written, in outputs/ex_ante_risk.csv.")  # fmt: skip
-    page.add("risk", f'<div class="wide"><div class="tiles three">{tile_html}</div><p class="tilenote">{_esc(line)}</p>'
+    size = "four" if len(tiles) == 4 else "three"
+    page.add("risk", f'<div class="wide"><div class="tiles {size}">{tile_html}</div><p class="tilenote">{_esc(line)}</p>'
+             + _tracking_notes(summary)
              + _source_line("risk-tiles", ("outputs/risk_summary.csv", "mandate/simulation_bootstrap.csv"),
                             "Estimated on index returns, at today's weights, and not the record. ") + '</div>')  # fmt: skip
 
@@ -2291,6 +2373,8 @@ TEST_PERIOD = re.compile(r"from (\d{4}-\d{2}) to (\d{4}-\d{2}), (\d+) months")
 CITATIONS = {
     "doeswijk_2014": ("Doeswijk, R., Lam, T. and Swinkels, L. (2014). The global multi-asset market portfolio, "
                       "1959\u20132012. Financial Analysts Journal 70(2), 26 to 41.", "https://doi.org/10.2469/faj.v70.n2.1"),
+    "jorion_2003": ("Jorion, P. (2003). Portfolio optimization with tracking-error constraints. Financial Analysts "
+                    "Journal 59(5), 70 to 82.", "https://doi.org/10.2469/faj.v59.n5.2565"),
     "doeswijk_2024": ("Doeswijk, R., Lam, T. and Swinkels, L. (2024). Data update: the global multi-asset market "
                       "portfolio, 1959\u20132012, version 6. Licence CC BY 4.0.", "https://doi.org/10.25397/eur.9371741"),
 }  # fmt: skip
@@ -3435,7 +3519,8 @@ def _bases(out: dict, simulated: dict, correlation: tuple) -> dict:
                         + (f", {day(attribution['period_start'].iloc[0])} to {day(attribution['period_end'].iloc[0])}"
                            if len(attribution) else "") + ", two UCITS ETFs, EUR"),
         "c30": risk, "c31": risk, "c32": both_windows,
-        "risk-tiles": (risk_head.replace(f", and {CALC}", f", the bootstrap of the allocation test, and {CALC}", 1)
+        "risk-tiles": (risk_head.replace(f", and {CALC}", ", the target weights of rule 1 for the benchmark, the "
+                                         f"bootstrap of the allocation test, and {CALC}", 1)
                        + f". Monthly, {window}, {groups}, and for the bootstrap {test_span} on the allocation test's two "
                        "series, EUR"),
         "risk-tail": risk,

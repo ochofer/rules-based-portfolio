@@ -154,10 +154,6 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     written.append(_write(loadings, "factor_loadings.csv", loadings["window_end"].max(), out_dir))
     written.append(_write(rolling, "factor_rolling.csv", rolling["window_end"].max(), out_dir))
 
-    risk_written, risk_sources = _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, records,
-                                       now["nav_date"])  # fmt: skip
-    written += risk_written
-
     extra, comparison_sources = _comparison_inputs(refresh, today, navs, table, alt_usd, alt_eur, look, equity_as_of,
                                                    factsheets.iloc[-1], out_dir)  # fmt: skip
     compared = comparisons.build(records, navs, values, table, ref_a, ref_b, blend, rate, today, extra)
@@ -167,6 +163,12 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
                         (_market_table(compared["market"], extra["market_funds"]), "comparison_market.csv")):  # fmt: skip
         written.append(_write(frame, name, as_of, out_dir))
     written.append(_write(metrics.attribution(daily_out), "attribution.csv", as_of, out_dir))
+
+    # The risk comes after the comparisons, since the month-end record keeps the realised tracking error against the
+    # benchmark beside the estimate.
+    risk_written, risk_sources = _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, records,
+                                       now["nav_date"], daily_out, compared["summary"])  # fmt: skip
+    written += risk_written
 
     checks = _checks(records, navs, look, weights_now, loadings)
     written.append(_write(checks, "checks.csv", as_of, out_dir))
@@ -201,9 +203,10 @@ def _checks(records, navs, look, weights_now, loadings) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["check", "result", "detail"])
 
 
-def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, records, nav_date) -> tuple:
+def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, records, nav_date, daily, compared) -> tuple:
     """The look-through's risk (risk.py): components, correlations, risk contributions, the frontier, the
-    estimate and its record, the episodes, and the cost of ownership."""
+    estimates and their record, the estimated tracking error against the benchmark, the episodes, and the cost of
+    ownership."""
     levels = risk.fetch_regions(refresh, today)
     spot = risk.fetch_curve(refresh)
     components = risk.component_returns(levels, spot)
@@ -238,8 +241,19 @@ def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, re
     history = pd.read_csv(history_path).drop(columns=["as_of"], errors="ignore") if history_path.exists() else pd.DataFrame()
     first_purchase = records.orders["moment"].min()
     tails = risk.tail(current, weights, estimate)
+    # The estimated tracking error against the benchmark, at the sleeve weights of the record's date with each
+    # fund's look-through rescaled to its invested holdings, and the realised one from the comparisons.
+    shares = risk.invested_shares(regions, maturities)
+    active = risk.active_weights(weights_now[E], weights_now[B], shares)
+    tracking = risk.tracking_error(active, cov)
+    active_tails = risk.active_tail(current, active, tracking)
+    by_day = risk.tracking_error_by_day(daily, shares, cov, first_purchase)
+    highest = by_day.loc[by_day["tracking_error"].idxmax()] if len(by_day) else None
+    bench = compared.set_index("comparator").loc["benchmark"] if "benchmark" in set(compared["comparator"]) else None
+    realised = float(bench["tracking_error"]) if bench is not None and pd.notna(bench["tracking_error"]) else float("nan")
+    realised_months = float(bench["periods"]) if pd.notna(realised) else float("nan")
     history = risk.record_estimate(history, end, estimate, current.index[0], first_purchase,
-                                   tails["value_at_risk_historical"])
+                                   tails["value_at_risk_historical"], tracking, realised, realised_months)
     calibration, calibration_months = risk.calibration(history, monthly)
     beyond, beyond_months = risk.exceedances(history, monthly)
     complete = monthly[monthly["complete"] == "yes"] if len(monthly) else monthly
@@ -251,7 +265,16 @@ def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, re
                              "minimum_variance_return": float(mean @ minimum), "israel_share_of_portfolio": israel,
                              "cash_weight": weights[risk.CASH], "calibration": calibration,
                              "calibration_months": calibration_months, "realised_volatility_12m": realised,
-                             **tails, "months_beyond_value_at_risk": beyond, "months_with_value_at_risk": beyond_months}])  # fmt: skip
+                             **tails, "months_beyond_value_at_risk": beyond, "months_with_value_at_risk": beyond_months,
+                             "estimated_tracking_error": tracking, **active_tails,
+                             "tracking_error_band_edge": risk.band_edge_tracking_error(shares, cov),
+                             "tracking_error_highest": highest["tracking_error"] if highest is not None else float("nan"),
+                             "tracking_error_highest_day": highest["date"] if highest is not None else None,
+                             "tracking_error_highest_equity": highest["weight_equity"] if highest is not None else float("nan"),
+                             "tracking_error_highest_cash": highest["weight_cash"] if highest is not None else float("nan"),
+                             "tracking_error_highest_top_up_waiting": (_top_up_waiting(records, highest["date"])
+                                                                       if highest is not None else ""),
+                             "realised_tracking_error": realised, "realised_tracking_error_months": realised_months}])  # fmt: skip
     test = risk.allocation_test_returns()
     episodes = risk.stress(components, test, weights)
     kids = risk.fetch_kids(refresh)
@@ -285,6 +308,19 @@ def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, re
         _write(episodes, "stress.csv", as_of, out_dir),
         _write(costs, "cost_of_ownership.csv", as_of, out_dir),
     ], sources
+
+
+def _top_up_waiting(records, day) -> str:
+    """Whether a top-up was waiting for the cycle day at the close of the day: a contribution after the first
+    purchase and on or before the day, with no order between it and the day's close."""
+    close = pd.Timestamp(day).normalize() + pd.Timedelta(days=1)
+    first = records.orders["moment"].min()
+    paid = records.contributions[(records.contributions["moment"] > first) & (records.contributions["moment"] < close)]
+    if not len(paid):
+        return "no"
+    last = paid["moment"].max()
+    placed = records.orders[(records.orders["moment"] >= last) & (records.orders["moment"] < close)]
+    return "yes" if not len(placed) else "no"
 
 
 UNREADABLE = (SystemExit, ValueError, OSError, KeyError)

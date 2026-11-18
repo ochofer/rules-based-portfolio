@@ -272,3 +272,80 @@ def test_the_committed_portfolio_point_reproduces_from_the_look_through_weights(
     frontier = committed("risk_frontier.csv")
     current = frontier[frontier["window"] == "current"]
     assert current["estimated_volatility"].iloc[0] == pytest.approx(summary["minimum_variance_volatility"], abs=1e-8)
+
+
+def _shares():
+    regions = pd.DataFrame({"region": ["North America", "Europe and Middle East", "Pacific", "Emerging markets",
+                                       "Cash and derivatives"],
+                            "share_of_portfolio": [0.47, 0.09, 0.05, 0.08, 0.003]})  # fmt: skip
+    maturities = pd.DataFrame({"maturity": ["1 to 3 years", "3 to 5 years", "5 to 7 years", "7 to 10 years",
+                                            "10 to 15 years", "Over 15 years", "Cash and derivatives"],
+                               "share_of_portfolio": [0.07, 0.06, 0.04, 0.05, 0.03, 0.045, 0.002]})  # fmt: skip
+    return risk.invested_shares(regions, maturities)
+
+
+def test_each_funds_look_through_is_rescaled_to_its_invested_holdings():
+    shares = _shares()
+    equity = [c for c in NAMES if risk.SLEEVE_OF[c] == E]
+    bonds = [c for c in NAMES if risk.SLEEVE_OF[c] == B]
+    assert shares[equity].sum() == pytest.approx(1.0) and shares[bonds].sum() == pytest.approx(1.0)
+    assert shares["North America"] == pytest.approx(0.47 / 0.69) and risk.CASH not in shares.index
+
+
+def test_the_estimated_tracking_error_is_zero_at_the_benchmarks_weights(moments):
+    _, cov = moments
+    active = risk.active_weights(config.TARGET[E], config.TARGET[B], _shares())
+    assert risk.tracking_error(active, cov) == pytest.approx(0.0, abs=1e-12)
+
+
+def test_the_estimated_tracking_error_is_the_same_at_both_edges_of_the_band(moments):
+    _, cov = moments
+    shares = _shares()
+    low, high = config.BAND
+    at_low = risk.tracking_error(risk.active_weights(low, 1 - low, shares), cov)
+    at_high = risk.tracking_error(risk.active_weights(high, 1 - high, shares), cov)
+    assert at_low == pytest.approx(at_high) and at_high == pytest.approx(risk.band_edge_tracking_error(shares, cov))
+    assert at_high > 0
+
+
+def test_the_portfolios_own_cash_counts_as_an_active_weight(moments):
+    _, cov = moments
+    shares = _shares()
+    invested = risk.tracking_error(risk.active_weights(0.70, 0.30, shares), cov)
+    with_cash = risk.tracking_error(risk.active_weights(0.70 * 0.95, 0.30 * 0.95, shares), cov)
+    assert invested == pytest.approx(0.0, abs=1e-12) and with_cash > 0
+
+
+def test_the_tail_of_the_active_return_is_the_sixth_worst_month_and_the_normal_quantile(moments):
+    _, cov = moments
+    window = sample()
+    active = risk.active_weights(0.75, 0.25, _shares())
+    te = risk.tracking_error(active, cov)
+    tail = risk.active_tail(window, active, te)
+    active_returns = (window[NAMES] * active[NAMES]).sum(axis=1).sort_values()
+    assert tail["value_at_risk_active_historical"] == pytest.approx(-active_returns.iloc[5])
+    assert tail["value_at_risk_active_normal"] == pytest.approx(risk.Z95 * te / np.sqrt(12))
+
+
+def test_the_covariance_rebuilt_from_the_committed_tables_gives_the_committed_estimates():
+    components = pd.read_csv(config.OUTPUTS_DIR / "risk_components.csv")
+    pairs = pd.read_csv(config.OUTPUTS_DIR / "risk_correlation.csv")
+    summary = pd.read_csv(config.OUTPUTS_DIR / "risk_summary.csv").iloc[0]
+    if "estimated_tracking_error" not in summary:
+        pytest.skip("the committed summary has no estimated tracking error yet")
+    cov = risk.covariance_from_tables(components, pairs)
+    shares = risk.shares_from_components(components)
+    now = pd.read_csv(config.OUTPUTS_DIR / "allocation_now.csv").iloc[0]
+    active = risk.active_weights(now["weight_equity"], now["weight_bonds"], shares)
+    assert risk.tracking_error(active, cov) == pytest.approx(summary["estimated_tracking_error"], abs=1e-9)
+    assert risk.band_edge_tracking_error(shares, cov) == pytest.approx(summary["tracking_error_band_edge"], abs=1e-9)
+
+
+def test_the_record_keeps_the_tracking_errors_as_first_written():
+    record = risk.record_estimate(pd.DataFrame(), pd.Period("2026-11", "M"), 0.10, pd.Period("2016-12", "M"), "2026-10-08",
+                                  0.05, 0.0004, float("nan"), float("nan"))  # fmt: skip
+    again = risk.record_estimate(record, pd.Period("2026-11", "M"), 0.20, pd.Period("2016-12", "M"), "2026-10-08",
+                                 0.06, 0.0009, 0.002, 5)  # fmt: skip
+    row = again.iloc[0]
+    assert row["estimated_tracking_error"] == pytest.approx(0.0004) and pd.isna(row["realised_tracking_error"])
+    assert list(again.columns[:3]) == ["month_end", "estimated_volatility", "estimated_tracking_error"]

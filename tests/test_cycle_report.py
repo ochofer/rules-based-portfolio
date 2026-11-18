@@ -147,3 +147,10 @@ def test_the_proposal_recomputed_from_the_ledger(records):
     values, rules = cr.proposal_on(records(), navs, DAY)
     assert values == pytest.approx({E: 690.0, B: 310.0, "cash": 50.0}, abs=1e-6)
     assert [(o.sleeve, o.amount_eur) for o in rules.orders] == [(E, 45.0), (B, 5.0)]
+
+
+def test_the_report_carries_the_estimated_tracking_error_as_information(records):
+    text = cr.write_before(records(), DAY, AT, VALUES, plan().orders, "2026-11-04")
+    line = cr.tracking_line(VALUES, plan().orders)
+    assert line.startswith("Information, no check: the estimated tracking error") and line in text
+    assert "It triggers nothing." in line and "checks pass" in text.split(line)[0]

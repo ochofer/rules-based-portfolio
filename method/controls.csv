@@ -7,3 +7,4 @@ No private value in a public file,Before each push,"tests/test_privacy.py, run w
 The fingerprint of the private values,Before each push,The section The private values in rules/RULES.md
 The public-text and style checks,Before each push,Run on every public file. The checking scripts are kept outside the repository
 The build reproduces the page,Before each push,"index.html rebuilt from the committed tables, and mandate/allocation_check.py and mandate/simulations.py rewriting their tables unchanged"
+The estimated tracking error against the benchmark,Each build,"outputs/risk_summary.csv, and each month end's estimate as first written in outputs/ex_ante_risk.csv. Information only, never a reason for an order under rule 8"

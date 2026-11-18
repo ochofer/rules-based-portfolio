@@ -69,6 +69,11 @@ DATED = re.compile(r"^Dated: (\d{4}-\d{2}-\d{2})$")
 COMPLIANCE = notes_module.COMPLIANCE  # the record shows each order and the departures register, no more
 
 
+def _basis_points(x) -> str:
+    """A tracking error or a value at risk of the active return, in whole basis points."""
+    return f"{int(round(float(x) * 1e4))} basis points"
+
+
 class ReportError(ValueError):
     """An issue that cannot be built or does not pass its checks. The message names the issue and the fault."""
 
@@ -586,6 +591,17 @@ class Issue:
                 ["Expected shortfall, one month, historical", fmt.pct(s["expected_shortfall_historical"])],
                 ["Value at risk, one month, normal", fmt.pct(s["value_at_risk_normal"])],
                 ["Expected shortfall, one month, normal", fmt.pct(s["expected_shortfall_normal"])]]  # fmt: skip
+        tracking = "estimated_tracking_error" in s and pd.notna(s["estimated_tracking_error"])
+        if tracking:
+            rows += [["Estimated tracking error against the benchmark, a year", _basis_points(s["estimated_tracking_error"])],
+                     ["Value at risk of the active return, one month, historical",
+                      _basis_points(s["value_at_risk_active_historical"])],
+                     ["Value at risk of the active return, one month, normal", _basis_points(s["value_at_risk_active_normal"])]]  # fmt: skip
+        realised = "realised_tracking_error" in s and pd.notna(s["realised_tracking_error"])
+        if realised:
+            rows.append([f"Realised tracking error against the benchmark, a year, on "
+                         f"{int(s['realised_tracking_error_months'])} monthly differences",
+                         _basis_points(s["realised_tracking_error"])])  # fmt: skip
         if len(row):
             rows += [[f"Worst fall over ten years, the bootstrap's median at {split}", fmt.pct(row["median_worst_fall"].iloc[0])],
                      [f"Worst fall over ten years, the bootstrap's 95th percentile at {split}", fmt.pct(row["p95_worst_fall"].iloc[0])]]  # fmt: skip
@@ -597,7 +613,14 @@ class Issue:
                    f"value at risk is the sixth worst of the 120 months and the expected shortfall the mean of those six, "
                    f"and the normal figures are 1.645 times the monthly volatility and the normal tail mean. The worst falls "
                    f"are the bootstrap's figures at the split nearest the equity weight, on the allocation test's returns "
-                   f"from February 1999 to December 2025. None is a limit, and none is a reason to sell, under rule 8."
+                   f"from February 1999 to December 2025. "
+                   + ("The estimated tracking error is the standard deviation of the portfolio's return less the "
+                      "benchmark's over a year at today's active weights, and the value at risk of the active return is "
+                      "the loss against the benchmark over one month at 95 per cent. Both leave out the two funds' own "
+                      "tracking of their indices and all costs. " if tracking else "")
+                   + ("The realised tracking error is the standard deviation of the monthly active returns, times the "
+                      "square root of 12, and holds what the estimate leaves out. " if realised else "")
+                   + "None is a limit, and none is a reason for an order, under rule 8."
                    + ("" if months >= 12 else " The forecast's calibration is given from the October 2027 month end."))  # fmt: skip
         return Exhibit("table", "Estimated risk at the quarter end", caption, _table(["Estimate", "Value"], rows),
                        ("outputs/risk_summary.csv", "mandate/simulation_bootstrap.csv"),

@@ -18,7 +18,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from . import config, ledger as ledger_module, rules_engine, trading_days
+from . import config, ledger as ledger_module, risk, rules_engine, trading_days
 from . import formatting as fmt
 
 E, B = config.EQUITY, config.BONDS
@@ -286,8 +286,34 @@ def write_before(records, day: date, at: datetime, values: dict, proposed: list,
                   _table(["Order", "Sleeve", "Side", "Share of the portfolio", "Rule"], proposal_rows(values, proposed)), ""]  # fmt: skip
     else:
         lines += ["No order is proposed.", ""]
+    tracking = tracking_line(values, proposed)
+    if tracking:
+        lines += [tracking, ""]
     lines += ["## After the orders", "", PENDING, ""]
     return "\n".join(lines)
+
+
+def tracking_line(values: dict, proposed: list, out_dir=None) -> str:
+    """One information line: the estimated tracking error against the benchmark at the weights before the orders
+    and at the weights the proposed orders give, at the covariance and look-through of the last build. It is no
+    check and triggers nothing. Empty when the build's risk tables are missing."""
+    out_dir = out_dir or config.OUTPUTS_DIR
+    try:
+        components = pd.read_csv(out_dir / "risk_components.csv")
+        pairs = pd.read_csv(out_dir / "risk_correlation.csv")
+    except FileNotFoundError:
+        return ""
+    cov = risk.covariance_from_tables(components, pairs)
+    shares = risk.shares_from_components(components)
+    total = values[E] + values[B] + values["cash"]
+    after = {s: values[s] + sum(_signed(o) for o in proposed if o.sleeve == s) for s in config.SLEEVES}
+    before_te = risk.tracking_error(risk.active_weights(values[E] / total, values[B] / total, shares), cov)
+    after_te = risk.tracking_error(risk.active_weights(after[E] / total, after[B] / total, shares), cov)
+    return (f"Information, no check: the estimated tracking error (the standard deviation over a year of the "
+            f"portfolio's return less the benchmark's, 70 per cent equity and 30 per cent bonds, estimated from index "
+            f"returns at the covariance and look-through of the build of {components['as_of'].iloc[0]}) is "
+            f"{round(before_te * 1e4)} basis points at the weights before the orders and {round(after_te * 1e4)} at the "
+            f"weights the proposed orders give. It triggers nothing.")  # fmt: skip
 
 
 def state_before(records, day: date) -> dict:
