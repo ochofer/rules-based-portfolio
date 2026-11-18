@@ -389,8 +389,8 @@ def _fall_within(values, months):
 def history_row(name, frame, months, label, kind, tracking_error):
     """One span of one comparator. A calendar year is cumulative, in points; a longer span is per year, in points a
     year: the difference of the two growth rates per year and each effect as its monthly sum over the years. The
-    band is two tracking errors (of the whole test) times the square root of the years for a calendar year and
-    divided by it for a longer span."""
+    band is twice the comparator's tracking error, from monthly differences over the whole test, times the square
+    root of the years for a calendar year and divided by it for a longer span."""
     part = frame.loc[months]
     years = len(part) / 12
     mine, base = (1 + part["comparator"]).prod(), (1 + part["base"]).prod()

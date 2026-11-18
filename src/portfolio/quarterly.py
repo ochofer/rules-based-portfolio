@@ -70,7 +70,8 @@ COMPLIANCE = notes_module.COMPLIANCE  # the record shows each order and the depa
 
 
 def _basis_points(x) -> str:
-    """A tracking error or a value at risk of the active return, in whole basis points."""
+    """An estimated or realised tracking error against the benchmark, or a value at risk of the active return, in
+    whole basis points."""
     return f"{int(round(float(x) * 1e4))} basis points"
 
 
@@ -618,7 +619,8 @@ class Issue:
                       "benchmark's over a year at today's active weights, and the value at risk of the active return is "
                       "the loss against the benchmark over one month at 95 per cent. Both leave out the two funds' own "
                       "tracking of their indices and all costs. " if tracking else "")
-                   + ("The realised tracking error is the standard deviation of the monthly active returns, times the "
+                   + ("The realised tracking error against the benchmark is the standard deviation of the monthly active "
+                      "returns, times the "
                       "square root of 12, and holds what the estimate leaves out. " if realised else "")
                    + "None is a limit, and none is a reason for an order, under rule 8."
                    + ("" if months >= 12 else " The forecast's calibration is given from the October 2027 month end."))  # fmt: skip

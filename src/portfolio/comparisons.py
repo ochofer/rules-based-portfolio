@@ -8,9 +8,9 @@ valued in euro at the issuers' net asset values or at the published rate, withou
 For the portfolio and each comparator the module measures the return since the first purchase, time-weighted
 and money-weighted and not annualised; the volatility of daily returns times the square root of 252; the worst
 fall with its dates; the correlation of daily returns with the portfolio's; the difference of time-weighted
-return to the portfolio's; and the band chance alone produces over the same span, plus or minus two tracking
-errors times the square root of the years, where the tracking error is the standard deviation of the daily
-differences times the square root of 252. The band ignores compounding and treats the daily differences as
+return to the portfolio's; and the band chance alone produces over the same span, plus or minus twice the
+tracking error against the comparator, from daily differences, times the square root of the years, where that
+tracking error is the standard deviation of the daily differences times the square root of 252. The band ignores compounding and treats the daily differences as
 independent.
 
 Each difference is split into effects computed day by day, summed by month and then over the months. For a

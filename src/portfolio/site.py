@@ -940,9 +940,10 @@ SELECTIONS = (("S&P 500", "selection_sp500.csv"), ("MSCI World", "selection_msci
               ("Nasdaq-100", "selection_nasdaq100.csv"))  # fmt: skip
 CHANCE = ("Volatility, worst falls and correlations become informative within months, and differences of return over "
           "years. Over the record's {days} trading days a difference says nothing about either rule set.")  # fmt: skip
-BAND_NOTE = ("The band is the one chance alone produces over the same span: plus or minus two tracking errors times the "
-             "square root of the years, where the tracking error is the standard deviation of the daily differences "
-             "between the two series times the square root of 252.")  # fmt: skip
+BAND_NOTE = ("The band is the one chance alone produces over the same span: plus or minus twice the tracking error "
+             "against the comparator, from daily differences, times the square root of the years. The tracking error "
+             "against the comparator, from daily differences, is the standard deviation of the daily differences "
+             "between the comparator's return and the portfolio's, times the square root of 252.")  # fmt: skip
 MINIMUM_NOTE = (f"A daily comparator's volatility, correlation, difference and band are shown from its "
                 f"{comparisons_module.MIN_DAILY_RETURNS}th daily return, about a month, and its effects with them.")  # fmt: skip
 
@@ -1356,7 +1357,8 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
     bench_note = ("The benchmark has values at month ends only, because the bond index has no public daily series. Its "
                   "return runs from the first month end and is shown from the second, and its volatility, worst fall, "
                   "correlation, difference and band come from monthly values times the square root of 12 and are shown "
-                  f"from the sixth month end, since a tracking error from fewer monthly differences is not an estimate.")  # fmt: skip
+                  f"from the sixth month end, since a tracking error against the benchmark from fewer monthly differences is "
+                  "not an estimate.")  # fmt: skip
     late = [k for k in summary.index if k != "benchmark" and isinstance(summary.loc[k, "first_day"], str)
             and summary.loc[k, "first_day"] > portfolio["first_day"]]  # fmt: skip
     window_note = "".join(f" {COMPARATOR_NAME[k][0]}'s series starts on {fmt.day_words(summary.loc[k, 'first_day'])}, so its "
@@ -1758,7 +1760,8 @@ TRACKING_STUDY = (
 
 
 def _basis_points(x) -> str:
-    """A tracking error or a value at risk of the active return in whole basis points, unsigned."""
+    """An estimated or realised tracking error against the benchmark, or a value at risk of the active return, in
+    whole basis points, unsigned."""
     return str(int(round(float(x) * 1e4)))
 
 
@@ -1767,8 +1770,9 @@ def _has(summary, key) -> bool:
 
 
 def _tracking_tile(summary) -> list:
-    """The estimated tracking error's tile, with the value at risk of the active return on its line, and the
-    realised tracking error beside it once the benchmark has one. No tile while the summary has no estimate."""
+    """The tile of the estimated tracking error against the benchmark, with the value at risk of the active return
+    on its line, and the realised tracking error against the benchmark beside it once it exists. No tile while the
+    summary has no estimate."""
     if not _has(summary, "estimated_tracking_error"):
         return []
     line = (f"A year, against the benchmark, at the weights of {fmt.day_words(summary['weights_as_of'])}. Value at risk "
@@ -1781,7 +1785,7 @@ def _tracking_tile(summary) -> list:
 
 
 def _tracking_notes(summary) -> str:
-    """The note under the tiles on the estimated tracking error: what it is and leaves out, how far it moves within a
+    """The note under the tiles on the estimated tracking error against the benchmark: what it is and leaves out, how far it moves within a
     month, the band's edge and the value at risk of the active return; then the study that has the same measure."""
     if not _has(summary, "estimated_tracking_error"):
         return ""
@@ -1797,7 +1801,7 @@ def _tracking_notes(summary) -> str:
                      + f", it is {_basis_points(summary['tracking_error_highest'])} basis points, the highest of any day "
                      "since the first purchase.")  # fmt: skip
     low, high = config.BAND
-    parts.append(f"The estimated tracking error at the band's edge, fully invested, is "
+    parts.append(f"The estimated tracking error against the benchmark at the band's edge, fully invested, is "
                  f"{_basis_points(summary['tracking_error_band_edge'])} basis points a year, at {round(high * 100)}/"
                  f"{round((1 - high) * 100)} or {round(low * 100)}/{round((1 - low) * 100)}.")  # fmt: skip
     parts.append("The value at risk of the active return is the loss against the benchmark over one month at 95 per "
@@ -1808,7 +1812,7 @@ def _tracking_notes(summary) -> str:
 
 
 def _realised_tracking_text(summary) -> str:
-    """The benchmark pane's line on the realised tracking error: the figure and its count from the sixth month end,
+    """The benchmark pane's line on the realised tracking error against the benchmark: the figure and its count from the sixth month end,
     and until then the month it appears."""
     bench = summary.loc["benchmark"] if "benchmark" in summary.index else None
     definition = "the standard deviation of the monthly active returns, times the square root of 12"
@@ -2755,9 +2759,10 @@ def history_pane(page, history: pd.DataFrame, windows: pd.DataFrame) -> None:
         "per year, in points a year: the difference of the two growth rates per year, with each effect as its monthly sum "
         "divided by the span's years. Compounding is the difference less the sum of the effects. It includes the "
         "volatility drag of the more volatile path, which is why it can carry either sign.",
-        "The band chance alone produces is two tracking errors times the square root of the years for a calendar year, and "
-        "divided by it for a longer span. Each comparator has one tracking error, the standard deviation of its monthly "
-        f"differences over the whole test times the square root of 12: {errors}. Volatility and the worst fall are the "
+        "The band chance alone produces is twice the tracking error against the comparator, from monthly differences, "
+        "times the square root of the years for a calendar year, and divided by it for a longer span. Each comparator's "
+        "tracking error, from monthly differences, is the standard deviation of its monthly return less 70/30's over the "
+        f"whole test, times the square root of 12: {errors}. Volatility and the worst fall are the "
         "comparator's own within each span.",
     )  # fmt: skip
     table_card = _card("history", "History, in-sample: the split and the dollar effects of 70/30 against three comparators",

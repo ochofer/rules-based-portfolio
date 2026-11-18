@@ -389,13 +389,13 @@ def tail(window_returns: pd.DataFrame, weights: pd.Series, volatility_a_year: fl
             "tail_months": worst}  # fmt: skip
 
 
-# Tracking error ------------------------------------------------------------------------------------
+# Tracking error against the benchmark ----------------------------------------------------------------
 #
 # The benchmark is the policy the rules implement: the target weights of rule 1, with each sleeve's shares of the
 # components taken as its fund's. Each fund's look-through is rescaled to its invested holdings, so that the fund's
 # own cash line, part of the fund's tracking of its index, is not counted as cash; the portfolio's own cash is.
 # A component's active weight is its weight in the portfolio less its weight in the benchmark. The estimated
-# tracking error is the standard deviation of the active return over a year that the covariance implies for the
+# tracking error against the benchmark is the standard deviation of the active return over a year that the covariance implies for the
 # active weights, the tracking-error volatility of Jorion (2003). It covers the split between equity and bonds and the
 # portfolio's cash. Inside each sleeve the benchmark's shares of the components are taken as the fund's, so the figure
 # leaves out the two funds' own tracking of their indices, and it leaves out all costs.
@@ -445,7 +445,8 @@ def active_weights(equity: float, bonds: float, shares: pd.Series) -> pd.Series:
 
 
 def tracking_error(active: pd.Series, cov: pd.DataFrame) -> float:
-    """The estimated tracking error a year: the square root of a'Va for the active weights a."""
+    """The estimated tracking error against the benchmark, a year: the square root of a'Va for the active weights
+    a."""
     a = active.reindex(cov.index).fillna(0.0).values
     return float(np.sqrt(max(a @ cov.values @ a, 0.0)))
 
@@ -453,7 +454,7 @@ def tracking_error(active: pd.Series, cov: pd.DataFrame) -> float:
 def active_tail(window_returns: pd.DataFrame, active: pd.Series, tracking_error_a_year: float) -> dict:
     """The value at risk of the active return over one month at 95 per cent, the loss against the benchmark.
     Historical: the active return of each month of the window at today's active weights, the sixth worst of 120.
-    Normal: 1.645 times the monthly tracking error, with zero mean."""
+    Normal: 1.645 times the estimated tracking error against the benchmark over one month, with zero mean."""
     names = [c for c in window_returns.columns if c in active.index]
     returns = (window_returns[names] * active[names]).sum(axis=1).sort_values()
     worst = max(int(round(TAIL * len(returns))), 1)
@@ -462,7 +463,7 @@ def active_tail(window_returns: pd.DataFrame, active: pd.Series, tracking_error_
 
 
 def band_edge_tracking_error(shares: pd.Series, cov: pd.DataFrame) -> float:
-    """The estimated tracking error at the band's edge, fully invested: the equity weight at the band's upper
+    """The estimated tracking error against the benchmark at the band's edge, fully invested: the equity weight at the band's upper
     bound and the bonds at the rest. The lower bound gives the same figure, since its active weights are the same
     with the opposite sign."""
     upper = config.BAND[1]
@@ -470,7 +471,7 @@ def band_edge_tracking_error(shares: pd.Series, cov: pd.DataFrame) -> float:
 
 
 def tracking_error_by_day(daily: pd.DataFrame, shares: pd.Series, cov: pd.DataFrame, first_purchase) -> pd.DataFrame:
-    """The estimated tracking error at each day's close weights since the first purchase, at today's covariance
+    """The estimated tracking error against the benchmark at each day's close weights since the first purchase, at today's covariance
     and shares within each sleeve: how far the figure moves within a month as cash waits and the weights drift."""
     days = daily[pd.to_datetime(daily["date"]) >= pd.Timestamp(pd.Timestamp(first_purchase).date())].dropna(
         subset=["weight_equity", "weight_bonds"])
@@ -483,7 +484,8 @@ def tracking_error_by_day(daily: pd.DataFrame, shares: pd.Series, cov: pd.DataFr
 def record_estimate(history: pd.DataFrame, month_end: pd.Period, value: float, start: pd.Period, first_purchase,
                     value_at_risk: float = float("nan"), tracking: float = float("nan"),
                     realised: float = float("nan"), realised_months: float = float("nan")) -> pd.DataFrame:  # fmt: skip
-    """The record of the estimated volatility, the estimated tracking error and the historical value at risk at
+    """The record of the estimated volatility, the estimated tracking error against the benchmark and the
+    historical value at risk at
     each month end, with the realised tracking error against the benchmark and the number of monthly differences
     it rests on, all kept as they were first written: a month end is added once, at the first build after it, and
     never rewritten. A month end written before a column existed keeps that column empty."""

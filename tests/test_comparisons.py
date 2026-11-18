@@ -110,7 +110,7 @@ def test_savings_accrue_on_every_calendar_day_over_360(record):
     assert value.iloc[2] == pytest.approx(1000 * 1.0001**4)  # Friday to Monday is three days
 
 
-def test_the_band_is_two_tracking_errors_times_the_square_root_of_the_years():
+def test_the_band_is_twice_the_tracking_error_against_the_comparator_from_daily_differences_times_the_root_of_the_years():
     days = pd.bdate_range("2026-10-07", periods=6)
     base = pd.Series([100, 101, 100.5, 102, 101, 103.0], index=days)
     other = pd.Series([100, 100.8, 100.9, 101.5, 101.4, 102.0], index=days)

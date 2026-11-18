@@ -298,7 +298,7 @@ def test_the_estimated_tracking_error_is_zero_at_the_benchmarks_weights(moments)
     assert risk.tracking_error(active, cov) == pytest.approx(0.0, abs=1e-12)
 
 
-def test_the_estimated_tracking_error_is_the_same_at_both_edges_of_the_band(moments):
+def test_the_estimated_tracking_error_against_the_benchmark_is_the_same_at_both_edges_of_the_band(moments):
     _, cov = moments
     shares = _shares()
     low, high = config.BAND
@@ -332,7 +332,7 @@ def test_the_covariance_rebuilt_from_the_committed_tables_gives_the_committed_es
     pairs = pd.read_csv(config.OUTPUTS_DIR / "risk_correlation.csv")
     summary = pd.read_csv(config.OUTPUTS_DIR / "risk_summary.csv").iloc[0]
     if "estimated_tracking_error" not in summary:
-        pytest.skip("the committed summary has no estimated tracking error yet")
+        pytest.skip("the committed summary has no estimated tracking error against the benchmark yet")
     cov = risk.covariance_from_tables(components, pairs)
     shares = risk.shares_from_components(components)
     now = pd.read_csv(config.OUTPUTS_DIR / "allocation_now.csv").iloc[0]
@@ -341,7 +341,7 @@ def test_the_covariance_rebuilt_from_the_committed_tables_gives_the_committed_es
     assert risk.band_edge_tracking_error(shares, cov) == pytest.approx(summary["tracking_error_band_edge"], abs=1e-9)
 
 
-def test_the_record_keeps_the_tracking_errors_as_first_written():
+def test_the_record_keeps_both_tracking_errors_against_the_benchmark_as_first_written():
     record = risk.record_estimate(pd.DataFrame(), pd.Period("2026-11", "M"), 0.10, pd.Period("2016-12", "M"), "2026-10-08",
                                   0.05, 0.0004, float("nan"), float("nan"))  # fmt: skip
     again = risk.record_estimate(record, pd.Period("2026-11", "M"), 0.20, pd.Period("2016-12", "M"), "2026-10-08",

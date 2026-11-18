@@ -1,5 +1,6 @@
 """The history of the comparisons on invented monthly series: the effects sum to each month's difference, the
-spans are in their units, and every band comes from one tracking error per comparator."""
+spans are in their units, and every band comes from each comparator's tracking error, from monthly
+differences over the whole test."""
 
 import math
 import sys
