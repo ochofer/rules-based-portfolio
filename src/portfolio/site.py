@@ -2432,9 +2432,14 @@ OTHER_PROJECTS = (
       ("code", "https://github.com/ochofer/volatility-managed-portfolios"))),
     ("Stock-level index tracking: a point-in-time benchmark, a long-only mandate, and its performance attribution by sector.",
      "A point-in-time S&P 500 universe from CRSP and Compustat, a long-only mandate held close to its cap-weighted "
-     "benchmark, and an attribution of its active return by sector. In build: its findings are stated when the study "
-     "is complete.",
-     (("Page", PROJECTS_URL + "stock-level-tracking/"), ("code", "https://github.com/ochofer/stock-level-tracking"))),
+     "benchmark, and an attribution of its active return by sector. Under the mandate, simulated from 1999 to 2024, "
+     "four covariance estimators realise 78.9 to 83.6 basis points a year of tracking error, and each forecast "
+     "understates it: realised over forecast is 1.48 to 1.85. Index changes force 11.4 per cent of the turnover on the "
+     "Ledoit-Wolf estimator, and no active return is distinguishable from zero.",
+     (("Page", PROJECTS_URL + "stock-level-tracking/"),
+      ("dashboard", SITE_URL + "stock-level-tracking/dashboard/"),
+      ("note", SITE_URL + "stock-level-tracking/note/stock-level-tracking_note_2026-11.pdf"),
+      ("code", "https://github.com/ochofer/stock-level-tracking"))),
 )
 
 
