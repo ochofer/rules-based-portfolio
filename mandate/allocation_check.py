@@ -18,15 +18,15 @@ US stock market and of the developed markets outside the United States over
 January 2000 to December 2009 and over January 2010 to December 2024, the
 figures behind one sentence of the dashboard's Method view.
 
-On 19 November 2026, after a referee's report, a third run was added: the same test with the constructed series
-built at other settings of their two choices, the emerging markets' share of the equity series and the bond's
-maturity, on a grid of four shares and four maturities that the report gave. It writes the worst fall of 70/30
-and of 65/35 and the largest split within the limit at each pair, and it chooses nothing. The referee's own run
-of the same functions had already given the outcome, so the table was written knowing it. Four rows were added
-the same day after MSCI's share of emerging markets in MSCI ACWI for 2002 was read: a share of 4.0 per cent at
-the grid's four maturities. Four more were added after the referee's second report of the same day, at 6.8 per
-cent, MSCI's share for 1997, and the run finds with the test's own functions the share at which the worst fall of
-70/30 equals the limit, with the bond at 7 years and at 6.7. The referee's run had already given both outcomes.
+On 19 November 2026 a third run was added: the same test with the constructed series built at other settings
+of their two choices, the emerging markets' share of the equity series and the bond's maturity, on a grid of four
+shares and four maturities. It writes the worst fall of 70/30 and of 65/35 and the largest split within the
+limit at each pair, and it chooses nothing. A run of the same functions had already given the outcome, so the
+table was written knowing it. Four rows were added the same day after MSCI's share of emerging markets in MSCI
+ACWI for 2002 was read: a share of 4.0 per cent at the grid's four maturities. Four more were added the same day,
+at 6.8 per cent, MSCI's share for 1997, and the run finds with the test's own functions the share at which the
+worst fall of 70/30 equals the limit, with the bond at 7 years and at 6.7. Both were added after their outcomes
+were known.
 
 Data, downloaded at run time and cached in cache/ (never committed):
   - Kenneth French's developed-market and emerging-market factor files (the
@@ -96,13 +96,13 @@ WINDOW_YEARS = 10
 GAP_BLOCK_MONTHS = 12
 GAP_DRAWS = 9999
 GAP_SEED = 20261119
-# The run at other settings, added on 19 November 2026 after a referee's report: the grid the report used, and
+# The run at other settings, added on 19 November 2026: a grid added after its outcome was known, and
 # four rows added after MSCI's share of emerging markets in MSCI ACWI for 2002, 3.98 per cent (MSCI, Emerging
 # Markets: A 20-year Perspective, 2008, p. 22), was read, at a share of 4.0 per cent and the grid's maturities.
 SETTINGS_EMERGING_SHARES = (0.0, 0.05, 0.10, 0.15)
 SETTINGS_BOND_MATURITIES = (5.0, 6.7, 7.0, 9.0)
 SETTINGS_SOURCED_SHARE = 0.04
-# Four more rows, added after the referee's second report of 19 November 2026: MSCI's share for 1997, 6.83 per cent,
+# Four more rows, added on 19 November 2026 after their outcome was known: MSCI's share for 1997, 6.83 per cent,
 # at 6.8 per cent. The worst fall of 2000 to 2003 lies between MSCI's two years, and the share at which 70/30's
 # worst fall equals the limit is found by bisection at the test's maturity and at the bond fund's duration.
 SETTINGS_SOURCED_SHARE_1997 = 0.068
@@ -508,9 +508,10 @@ def split_gap(returns, first=1.0, second=0.4):
 def settings_grid():
     """The test at other settings of the constructed series: at each pair of an emerging markets' share and a bond
     maturity, the worst fall of 70/30 and of 65/35 and the largest split whose worst fall is within the limit,
-    every other choice as the test makes it. The pairs are the referee's grid, then the shares of 4.0 and 6.8 per
-    cent at the grid's maturities, and the last column says which. Nothing is chosen from it."""
-    pairs = [(s, m, "the referee's grid") for s in SETTINGS_EMERGING_SHARES for m in SETTINGS_BOND_MATURITIES]
+    every other choice as the test makes it. The pairs are a grid added after its outcome was known, then the shares
+    of 4.0 and 6.8 per cent at the grid's maturities, and the last column says which. Nothing is chosen from it."""
+    pairs = [(s, m, "grid added after its outcome was known") for s in SETTINGS_EMERGING_SHARES
+             for m in SETTINGS_BOND_MATURITIES]
     pairs += [(SETTINGS_SOURCED_SHARE, m, "MSCI's share for 2002") for m in SETTINGS_BOND_MATURITIES]
     pairs += [(SETTINGS_SOURCED_SHARE_1997, m, "MSCI's share for 1997") for m in SETTINGS_BOND_MATURITIES]
     rows = []
@@ -531,10 +532,10 @@ def settings_grid():
 
 def turning_shares():
     """The emerging markets' share at which the worst fall of 70/30 equals the limit, at each maturity of
-    TURNING_MATURITIES, by bisection with the test's own functions. A lower share gives a deeper fall on these
-    series, so the bisection keeps a share whose fall is above the limit and one whose fall is within it, and
-    halves the interval until it is narrower than TURNING_INTERVAL. The share given is the one whose fall is within
-    the limit."""
+    TURNING_MATURITIES, by bisection with the test's own functions. At these two maturities a lower share gives a
+    deeper fall on these series, so the bisection keeps a share whose fall is above the limit and one whose fall
+    is within it, and halves the interval until it is narrower than TURNING_INTERVAL. The share given is the one
+    whose fall is within the limit."""
     rows = []
     for maturity in TURNING_MATURITIES:
         def fall(share):
@@ -547,7 +548,7 @@ def turning_shares():
             middle = (low + high) / 2
             low, high = (middle, high) if fall(middle) > RISK_LIMIT else (low, middle)
         rows.append({"bond_maturity_years": maturity, "turning_share": high, "worst_fall_70_30": fall(high),
-                     "last_interval": TURNING_INTERVAL, "added_with": "the referee's second report"})
+                     "last_interval": TURNING_INTERVAL, "added_with": "added after its outcome was known"})
     return pd.DataFrame(rows)
 
 
@@ -665,10 +666,10 @@ def main():
     # The gap between the 100/0 and the 40/60 split that the Method view sets beside its own standard error.
     split_gap(returns).to_csv(os.path.join(ROOT, "mandate", "allocation_check_split_gap.csv"), index=False,
                               float_format="%.6f", lineterminator="\n")
-    # The test at other settings of the constructed series, added after a referee's report of 19 November 2026.
+    # The test at other settings of the constructed series, added on 19 November 2026.
     settings_grid().to_csv(os.path.join(ROOT, "mandate", "allocation_check_settings.csv"), index=False,
                            float_format="%.6f", lineterminator="\n")
-    # The share at which 70/30 meets the limit, added after the referee's second report of 19 November 2026.
+    # The share at which 70/30 meets the limit, added on 19 November 2026 after its outcome was known.
     turning_shares().to_csv(os.path.join(ROOT, "mandate", "allocation_check_settings_turning.csv"), index=False,
                             float_format="%.6f", lineterminator="\n")
     print("")

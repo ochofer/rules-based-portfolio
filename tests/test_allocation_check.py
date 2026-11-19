@@ -69,11 +69,11 @@ def test_the_split_gap_bootstrap_resamples_paired_months_in_circular_blocks():
     assert once["gap_standard_error"].iloc[0] > 0 and once.equals(again)
 
 
-def test_the_settings_table_holds_the_referees_grid_and_the_shares_for_2002_and_1997():
+def test_the_settings_table_holds_the_grid_and_the_shares_for_2002_and_1997():
     table = pd.read_csv(ROOT / "mandate" / "allocation_check_settings.csv")
     results = pd.read_csv(ROOT / "mandate" / "allocation_check_results.csv").set_index("split")
     assert len(table) == 24
-    grid = table[table["added_with"] == "the referee's grid"]
+    grid = table[table["added_with"] == "grid added after its outcome was known"]
     assert sorted(set(grid["emerging_share"])) == list(ac.SETTINGS_EMERGING_SHARES)
     assert sorted(set(grid["bond_maturity_years"])) == list(ac.SETTINGS_BOND_MATURITIES) and len(grid) == 16
     for year, share in ((2002, ac.SETTINGS_SOURCED_SHARE), (1997, ac.SETTINGS_SOURCED_SHARE_1997)):
