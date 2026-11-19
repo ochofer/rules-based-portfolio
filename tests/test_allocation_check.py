@@ -69,15 +69,16 @@ def test_the_split_gap_bootstrap_resamples_paired_months_in_circular_blocks():
     assert once["gap_standard_error"].iloc[0] > 0 and once.equals(again)
 
 
-def test_the_settings_table_holds_the_referees_grid_and_the_share_for_2002():
+def test_the_settings_table_holds_the_referees_grid_and_the_shares_for_2002_and_1997():
     table = pd.read_csv(ROOT / "mandate" / "allocation_check_settings.csv")
     results = pd.read_csv(ROOT / "mandate" / "allocation_check_results.csv").set_index("split")
-    assert len(table) == 20
+    assert len(table) == 24
     grid = table[table["added_with"] == "the referee's grid"]
     assert sorted(set(grid["emerging_share"])) == list(ac.SETTINGS_EMERGING_SHARES)
     assert sorted(set(grid["bond_maturity_years"])) == list(ac.SETTINGS_BOND_MATURITIES) and len(grid) == 16
-    sourced = table[table["added_with"] == "MSCI's share for 2002"]
-    assert set(sourced["emerging_share"]) == {ac.SETTINGS_SOURCED_SHARE} and len(sourced) == 4
+    for year, share in ((2002, ac.SETTINGS_SOURCED_SHARE), (1997, ac.SETTINGS_SOURCED_SHARE_1997)):
+        sourced = table[table["added_with"] == f"MSCI's share for {year}"]
+        assert set(sourced["emerging_share"]) == {share} and len(sourced) == 4
     # The row at the test's own settings is the test: the same worst falls as the results table.
     own = table[table["test_settings"] == "yes"]
     assert len(own) == 1 and (own["emerging_share"].iloc[0], own["bond_maturity_years"].iloc[0]) == (0.10, 7.0)
@@ -92,18 +93,48 @@ def test_the_settings_table_holds_the_referees_grid_and_the_share_for_2002():
             assert r["largest_split_within_limit"] == "65/35"
 
 
-def test_the_mandate_and_the_readme_give_the_settings_tables_figures():
+def test_the_turning_share_lies_between_the_two_sourced_shares_and_meets_the_limit():
+    turning = pd.read_csv(ROOT / "mandate" / "allocation_check_settings_turning.csv").set_index("bond_maturity_years")
+    assert list(turning.index) == list(ac.TURNING_MATURITIES)
+    for maturity, row in turning.iterrows():
+        assert ac.SETTINGS_SOURCED_SHARE < row["turning_share"] <= ac.SETTINGS_SOURCED_SHARE_1997
+        assert row["worst_fall_70_30"] == pytest.approx(ac.RISK_LIMIT, abs=1e-5)
+    assert turning.loc[7.0, "turning_share"] < turning.loc[6.7, "turning_share"]
+
+
+def test_the_turning_share_reproduces_exactly_and_brackets_the_limit():
+    cached(*GLOBAL)
+    text = ac.turning_shares().to_csv(index=False, float_format="%.6f", lineterminator="\n")
+    assert text == (ROOT / "mandate" / "allocation_check_settings_turning.csv").read_text(encoding="utf-8")
+    for maturity, share in zip(ac.TURNING_MATURITIES, ac.turning_shares()["turning_share"]):
+        fall = lambda s: ac.worst_fall(ac.band_path(ac.monthly_returns(s, maturity)[0], 0.70))[0]  # noqa: E731
+        assert fall(share) <= ac.RISK_LIMIT < fall(share - 2 * ac.TURNING_INTERVAL)
+
+
+def test_the_mandate_the_readme_and_the_guide_give_the_settings_tables_figures():
     table = pd.read_csv(ROOT / "mandate" / "allocation_check_settings.csv")
-    sourced = table[table["added_with"] == "MSCI's share for 2002"].set_index("bond_maturity_years")
+    turning = pd.read_csv(ROOT / "mandate" / "allocation_check_settings_turning.csv").set_index("bond_maturity_years")
+    late = table[table["added_with"] == "MSCI's share for 2002"].set_index("bond_maturity_years")
+    early = table[table["added_with"] == "MSCI's share for 1997"].set_index("bond_maturity_years")
     within = int((table["worst_fall_70_30"] <= ac.RISK_LIMIT).sum())
     mandate = (ROOT / "mandate" / "MANDATE.md").read_text(encoding="utf-8")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert sourced.loc[7.0, "largest_split_within_limit"] == "65/35" and sourced.loc[6.7, "largest_split_within_limit"] == "65/35"
-    assert f"70/30 falls {sourced.loc[7.0, 'worst_fall_70_30'] * 100:.2f} per cent with the bond at 7 years and " \
-           f"{sourced.loc[6.7, 'worst_fall_70_30'] * 100:.2f} per cent at 6.7 years" in mandate
-    assert f"70/30 stays within 35 per cent in {within}." in mandate and f"in {within} of the 20" in mandate
+    guide = (ROOT / "guide" / "source.md").read_text(encoding="utf-8")
+    assert set(late.loc[[7.0, 6.7], "largest_split_within_limit"]) == {"65/35"}
+    assert set(early.loc[[7.0, 6.7], "largest_split_within_limit"]) == {"70/30"}
+    figures = lambda t: f"({t.loc[7.0, 'worst_fall_70_30'] * 100:.2f} and {t.loc[6.7, 'worst_fall_70_30'] * 100:.2f} per cent)"  # noqa: E731
+    assert figures(late) in mandate and figures(early) in mandate
+    turns = (f"answer turns at a share of {turning.loc[7.0, 'turning_share'] * 100:.1f} per cent at 7 years and "
+             f"{turning.loc[6.7, 'turning_share'] * 100:.1f} at 6.7")
+    for text in (mandate, readme, guide):
+        assert turns in text and "so on MSCI's own figures the test does not decide between 70/30 and 65/35" in text
+        assert "The target is 70/30 and has not been amended. A change would be an amendment under rule 9." in text
+        assert "At the share of emerging markets MSCI reports for 2002" not in text
+    assert f"Over the {len(table)} settings of `mandate/allocation_check_settings.csv`, 70/30 stays within 35 per cent in {within}." in mandate
+    assert f"in {within} of the {len(table)}" in mandate
     assert f"from {table['worst_fall_70_30'].min() * 100:.1f} to {table['worst_fall_70_30'].max() * 100:.1f} per cent" in mandate
-    assert f"70/30 stays within 35 per cent in {within}." in readme
+    assert f"Over the {len(table)} settings of that table 70/30 stays within 35 per cent in {within}." in readme
+    assert f"the test at the {len(table)} settings of `mandate/allocation_check_settings.csv`" in guide
 
 
 def test_the_settings_table_reproduces_exactly():

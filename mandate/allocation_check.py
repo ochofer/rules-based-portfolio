@@ -24,7 +24,9 @@ maturity, on a grid of four shares and four maturities that the report gave. It 
 and of 65/35 and the largest split within the limit at each pair, and it chooses nothing. The referee's own run
 of the same functions had already given the outcome, so the table was written knowing it. Four rows were added
 the same day after MSCI's share of emerging markets in MSCI ACWI for 2002 was read: a share of 4.0 per cent at
-the grid's four maturities.
+the grid's four maturities. Four more were added after the referee's second report of the same day, at 6.8 per
+cent, MSCI's share for 1997, and the run finds with the test's own functions the share at which the worst fall of
+70/30 equals the limit, with the bond at 7 years and at 6.7. The referee's run had already given both outcomes.
 
 Data, downloaded at run time and cached in cache/ (never committed):
   - Kenneth French's developed-market and emerging-market factor files (the
@@ -50,7 +52,8 @@ Output:  mandate/allocation_check_results.md, the same text on screen, and the t
          mandate/allocation_check_history.csv (each calendar year, the two periods and the whole test) and
          mandate/allocation_check_history_windows.csv (rolling windows of ten calendar years). The gap in growth per
          year between the 100/0 and the 40/60 split, with its bootstrap, goes to mandate/allocation_check_split_gap.csv,
-         and the run at other settings to mandate/allocation_check_settings.csv.
+         the run at other settings to mandate/allocation_check_settings.csv, and the share at which 70/30 meets the
+         limit to mandate/allocation_check_settings_turning.csv.
 Requires Python 3.9 or later, pandas and numpy.
 """
 import io
@@ -99,6 +102,12 @@ GAP_SEED = 20261119
 SETTINGS_EMERGING_SHARES = (0.0, 0.05, 0.10, 0.15)
 SETTINGS_BOND_MATURITIES = (5.0, 6.7, 7.0, 9.0)
 SETTINGS_SOURCED_SHARE = 0.04
+# Four more rows, added after the referee's second report of 19 November 2026: MSCI's share for 1997, 6.83 per cent,
+# at 6.8 per cent. The worst fall of 2000 to 2003 lies between MSCI's two years, and the share at which 70/30's
+# worst fall equals the limit is found by bisection at the test's maturity and at the bond fund's duration.
+SETTINGS_SOURCED_SHARE_1997 = 0.068
+TURNING_MATURITIES = (7.0, 6.7)
+TURNING_INTERVAL = 1e-6  # the width of the last interval of the bisection, in share
 
 # Two expectations for the US run, written on 5 November 2026 before it ran and kept as written. The run
 # reports whether each is met, and nothing is tuned to meet them. That they came first rests on the date written
@@ -499,10 +508,11 @@ def split_gap(returns, first=1.0, second=0.4):
 def settings_grid():
     """The test at other settings of the constructed series: at each pair of an emerging markets' share and a bond
     maturity, the worst fall of 70/30 and of 65/35 and the largest split whose worst fall is within the limit,
-    every other choice as the test makes it. The pairs are the referee's grid, then the share of 4.0 per cent at
-    the grid's maturities, and the last column says which. Nothing is chosen from it."""
+    every other choice as the test makes it. The pairs are the referee's grid, then the shares of 4.0 and 6.8 per
+    cent at the grid's maturities, and the last column says which. Nothing is chosen from it."""
     pairs = [(s, m, "the referee's grid") for s in SETTINGS_EMERGING_SHARES for m in SETTINGS_BOND_MATURITIES]
     pairs += [(SETTINGS_SOURCED_SHARE, m, "MSCI's share for 2002") for m in SETTINGS_BOND_MATURITIES]
+    pairs += [(SETTINGS_SOURCED_SHARE_1997, m, "MSCI's share for 1997") for m in SETTINGS_BOND_MATURITIES]
     rows = []
     for share, maturity, added in pairs:
         returns, _ = monthly_returns(share, maturity)
@@ -516,6 +526,28 @@ def settings_grid():
                                                     if largest else "none"),
                      "test_settings": "yes" if (share, maturity) == (EMERGING_SHARE, BOND_MATURITY) else "no",
                      "added_with": added})
+    return pd.DataFrame(rows)
+
+
+def turning_shares():
+    """The emerging markets' share at which the worst fall of 70/30 equals the limit, at each maturity of
+    TURNING_MATURITIES, by bisection with the test's own functions. A lower share gives a deeper fall on these
+    series, so the bisection keeps a share whose fall is above the limit and one whose fall is within it, and
+    halves the interval until it is narrower than TURNING_INTERVAL. The share given is the one whose fall is within
+    the limit."""
+    rows = []
+    for maturity in TURNING_MATURITIES:
+        def fall(share):
+            return worst_fall(band_path(monthly_returns(share, maturity)[0], 0.70))[0]
+        low, high = min(SETTINGS_EMERGING_SHARES), max(SETTINGS_EMERGING_SHARES)
+        if not fall(low) > RISK_LIMIT >= fall(high):
+            raise SystemExit(f"At {maturity} years the worst fall of 70/30 does not cross the limit between the shares "
+                             f"{low} and {high}.")
+        while high - low > TURNING_INTERVAL:
+            middle = (low + high) / 2
+            low, high = (middle, high) if fall(middle) > RISK_LIMIT else (low, middle)
+        rows.append({"bond_maturity_years": maturity, "turning_share": high, "worst_fall_70_30": fall(high),
+                     "last_interval": TURNING_INTERVAL, "added_with": "the referee's second report"})
     return pd.DataFrame(rows)
 
 
@@ -636,6 +668,9 @@ def main():
     # The test at other settings of the constructed series, added after a referee's report of 19 November 2026.
     settings_grid().to_csv(os.path.join(ROOT, "mandate", "allocation_check_settings.csv"), index=False,
                            float_format="%.6f", lineterminator="\n")
+    # The share at which 70/30 meets the limit, added after the referee's second report of 19 November 2026.
+    turning_shares().to_csv(os.path.join(ROOT, "mandate", "allocation_check_settings_turning.csv"), index=False,
+                            float_format="%.6f", lineterminator="\n")
     print("")
     for r in periods.itertuples():
         print(f"{r.series}, {r.first_month} to {r.last_month}: {r.cumulative_return_usd * 100:.1f} per cent in US dollars, "

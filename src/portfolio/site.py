@@ -2197,33 +2197,46 @@ def factor_view(page, loadings, rolling, as_of):
 # Method --------------------------------------------------------------------------------------------
 
 
-def _settings_text(allocation: pd.DataFrame, settings: pd.DataFrame) -> str:
-    """The sentences on how firm the split is, from mandate/allocation_check_settings.csv: first the test at the
-    emerging markets' share MSCI reports for 2002, then the margin at the test's settings and the count over every
-    setting of the table."""
+def _settings_text(allocation: pd.DataFrame, settings: pd.DataFrame, turning: pd.DataFrame = None) -> str:
+    """The sentences on how firm the split is, from mandate/allocation_check_settings.csv and
+    mandate/allocation_check_settings_turning.csv: the margin at the test's own settings, the test at MSCI's shares
+    of emerging markets for 2002 and for 1997, with the bond at 7 and at 6.7 years, the share at which the answer
+    turns, the count over every setting of the table, and the state of the target. The build stops when the tables
+    no longer bear the sentences out."""
     if not len(settings):
         return ""
-    sourced = settings[settings["added_with"] == "MSCI's share for 2002"].set_index("bond_maturity_years")
-    at = lambda m: sourced.loc[m]  # noqa: E731
-    held = allocation[allocation["chosen"] == "yes"].iloc[0]
+    if turning is None:
+        turning = _read("allocation_check_settings_turning.csv", config.ROOT / "mandate")
     limit = 0.35
-    within = int((settings["worst_fall_70_30"] <= limit).sum())
+    held = allocation[allocation["chosen"] == "yes"].iloc[0]
+    by_year = {year: settings[settings["added_with"] == f"MSCI's share for {year}"].set_index("bond_maturity_years")
+               for year in (2002, 1997)}
+    turns = turning.set_index("bond_maturity_years")["turning_share"]
+    late, early = by_year[2002], by_year[1997]
+    split = lambda table, m: table.loc[m, "largest_split_within_limit"]  # noqa: E731
+    fall = lambda table, m: f"{table.loc[m, 'worst_fall_70_30'] * 100:.2f}"  # noqa: E731
+    share = lambda table: f"{table['emerging_share'].iloc[0] * 100:.1f}"  # noqa: E731
     spread = settings["worst_fall_70_30"].max() - settings["worst_fall_70_30"].min()
     if spread <= limit - held["worst_fall"]:
         raise ValueError("The settings move 70/30's worst fall by less than its margin, and the text says more")
-    share = f"{sourced['emerging_share'].iloc[0] * 100:.1f}"
-    same = at(7.0)["largest_split_within_limit"] == at(6.7)["largest_split_within_limit"]
-    gives = (f"the test gives {at(7.0)['largest_split_within_limit']}" if same else
-             f"the test gives {at(7.0)['largest_split_within_limit']} with the bond at 7 years and "
-             f"{at(6.7)['largest_split_within_limit']} at 6.7")
-    return (f" At the share of emerging markets MSCI reports for 2002, {share} per cent, {gives}: 70/30 falls "
-            f"{at(7.0)['worst_fall_70_30'] * 100:.2f} per cent with the bond at 7 years and "
-            f"{at(6.7)['worst_fall_70_30'] * 100:.2f} at 6.7 years, the duration the bond fund's factsheet of 30 "
-            f"September 2026 reports. At the test's own settings 70/30's worst fall is {held['worst_fall'] * 100:.1f} per "
-            f"cent, {(limit - held['worst_fall']) * 100:.1f} points inside the limit, a margin smaller than the effect of "
-            "the two settings the test fixes, the emerging markets' share of the equity series and the bond's maturity: "
-            f"over the {len(settings)} settings of mandate/allocation_check_settings.csv, 70/30 stays within 35 per cent "
-            f"in {within}. 65/35 is the lower edge of the band the rules already allow.")  # fmt: skip
+    if {split(late, 7.0), split(late, 6.7)} != {"65/35"} or {split(early, 7.0), split(early, 6.7)} != {"70/30"}:
+        raise ValueError("The test no longer gives 65/35 at MSCI's share for 2002 and 70/30 at its share for 1997")
+    if not all(late["emerging_share"].iloc[0] < turns[m] <= early["emerging_share"].iloc[0] for m in (7.0, 6.7)):
+        raise ValueError("The share at which the answer turns no longer lies between MSCI's shares for 2002 and 1997")
+    within = int((settings["worst_fall_70_30"] <= limit).sum())
+    return (f" At the test's own settings 70/30's worst fall is {held['worst_fall'] * 100:.1f} per cent, "
+            f"{(limit - held['worst_fall']) * 100:.1f} points inside the limit, a margin smaller than the effect of the "
+            "two settings the test fixes, the emerging markets' share of the equity series and the bond's maturity. At "
+            f"MSCI's share of emerging markets for 2002, {share(late)} per cent, the test gives 65/35 with the bond at 7 "
+            f"or 6.7 years, the test's maturity and the bond fund's reported duration ({fall(late, 7.0)} and "
+            f"{fall(late, 6.7)} per cent). At its share for 1997, {share(early)} per cent, it gives 70/30 "
+            f"({fall(early, 7.0)} and {fall(early, 6.7)} per cent). The worst fall lies between the two years, and the "
+            f"answer turns at a share of {turns[7.0] * 100:.1f} per cent at 7 years and {turns[6.7] * 100:.1f} at 6.7, "
+            "so on MSCI's own figures the test does not decide between 70/30 and 65/35. Over the "
+            f"{len(settings)} settings of mandate/allocation_check_settings.csv, 70/30 stays within 35 per cent in "
+            f"{within}. The target is 70/30 and has not been amended. A change would be an amendment under rule 9. "
+            "65/35 is the lower edge of the band rule 5 allows around a target of 70/30. A weight at that edge is not "
+            "a target, and a target of 65/35 would carry a band of its own.")  # fmt: skip
 
 
 def _allocation_curve(page, allocation: pd.DataFrame, us: pd.DataFrame = None, settings: pd.DataFrame = None):

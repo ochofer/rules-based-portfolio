@@ -8,16 +8,23 @@ from portfolio import config, site
 MANDATE = config.ROOT / "mandate"
 
 
-def test_the_allocation_figure_gives_the_test_at_the_share_for_2002_first():
+def test_the_allocation_figure_gives_both_of_msci_s_shares_and_the_state_of_the_target():
     allocation = pd.read_csv(MANDATE / "allocation_check_results.csv")
     settings = pd.read_csv(MANDATE / "allocation_check_settings.csv")
+    turning = pd.read_csv(MANDATE / "allocation_check_settings_turning.csv").set_index("bond_maturity_years")
     text = site._settings_text(allocation, settings)
-    sourced = settings[settings["added_with"] == "MSCI's share for 2002"].set_index("bond_maturity_years")
-    split = sourced.loc[7.0, "largest_split_within_limit"]
-    assert text.startswith(f" At the share of emerging markets MSCI reports for 2002, 4.0 per cent, the test gives {split}:")
-    assert f"over the 20 settings of mandate/allocation_check_settings.csv, 70/30 stays within 35 per cent in " \
+    assert text.startswith(" At the test's own settings 70/30's worst fall is 34.7 per cent, 0.3 points inside the limit")
+    late = text.index("At MSCI's share of emerging markets for 2002, 4.0 per cent, the test gives 65/35 with the bond at 7 or 6.7 years")
+    early = text.index("At its share for 1997, 6.8 per cent, it gives 70/30")
+    assert late < early
+    assert (f"the answer turns at a share of {turning.loc[7.0, 'turning_share'] * 100:.1f} per cent at 7 years and "
+            f"{turning.loc[6.7, 'turning_share'] * 100:.1f} at 6.7, so on MSCI's own figures the test does not decide "
+            "between 70/30 and 65/35.") in text
+    assert f"Over the 24 settings of mandate/allocation_check_settings.csv, 70/30 stays within 35 per cent in " \
            f"{int((settings['worst_fall_70_30'] <= 0.35).sum())}." in text
-    assert "0.3 points inside the limit" in text and "65/35 is the lower edge of the band" in text
+    assert "The target is 70/30 and has not been amended. A change would be an amendment under rule 9." in text
+    assert ("65/35 is the lower edge of the band rule 5 allows around a target of 70/30. A weight at that edge is not "
+            "a target, and a target of 65/35 would carry a band of its own.") in text
     assert site._settings_text(allocation, pd.DataFrame()) == ""
 
 
