@@ -2,7 +2,7 @@
 
 These are the rules the portfolio runs under. They were fixed on 7 October 2026, before the first order, and the git tag `rules-v1.0` marks this version. A rule changes only through rule 9.
 
-The portfolio is long-only and holds two exchange-traded funds in a euro brokerage account. An ETF (exchange-traded fund) is a fund whose shares are listed on a stock exchange; both ETFs held here are UCITS funds, the European Union standard for funds sold to the public. One ETF holds global equities and the other holds euro government bonds.
+The portfolio is long-only and holds two exchange-traded funds in a euro brokerage account. An ETF (exchange-traded fund) is a fund whose shares are listed on a stock exchange. Both ETFs held here are UCITS funds, the European Union standard for funds sold to the public. One ETF holds global equities and the other holds euro government bonds.
 
 ## Terms used in the rules
 
@@ -107,4 +107,5 @@ No amendment under rule 9 has been made. An erratum corrects wording and a readi
 | 2026-10-09 | 1 | Erratum | The two tables of the ETFs that qualify print negative tracking differences with the minus sign. The figures are unchanged. |
 | 2026-11-19 | 2 | Reading | Written on 19 November 2026, after the first purchases of 8 October 2026: the starting amount is invested once, at the target weights, and the rules name no day for it. |
 | 2026-11-19 | 9 | Reading | A correction that changes an order is an amendment, and it applies from the first cycle day at least 30 days after its commit. |
+| 2026-11-19 | Opening | Erratum | The opening's sentence on what an ETF is, which joined two sentences with a semicolon, is written as two sentences: "listed on a stock exchange. Both ETFs held here are UCITS funds". The words are unchanged. |
 | 2026-11-19 | Ranking | Note | "The order was fixed before the funds were compared" rests on the date written in this file: the ranking and the ranked funds entered the repository in the same commit, on 7 October 2026. |

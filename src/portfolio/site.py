@@ -2430,8 +2430,9 @@ def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: 
                   plot=False, table=table, wide=True, anchor="method-selection", kind="figure",
                   note="Tracking difference is the fund's calendar-year return minus "
                   "the return of its index, so a higher figure means a smaller shortfall. Each mark is one year, with the "
-                  "shape given in the legend, and the bar is the three-year average. The funds are numbered in the rank order fixed before they were "
-                  "compared: equity ETFs by Irish domicile, then the highest average tracking difference, then the lowest "
+                  "shape given in the legend, and the bar is the three-year average. The funds are numbered in the rank order that the rules give as "
+                  "fixed before the funds were compared, which rests on the date written in the rules: equity ETFs by "
+                  "Irish domicile, then the highest average tracking difference, then the lowest "
                   "TER, and bond ETFs by the highest average tracking difference, then the lowest TER. The held funds, "
                   "in the primary ink, are the first in rank order that the account offers. Hollow marks are funds the "
                   "account does not offer. " + TREATY_NOTE + " " + US_SHARE_NOTE)  # fmt: skip
