@@ -197,6 +197,9 @@ def _produced_on_cycle_day(ledger: Ledger, navs_eur: pd.DataFrame, o, plans: dic
     return "yes" if abs(paid - amount[(o.sleeve, o.side)]) <= 1.0 else "no"
 
 
+STARTING_AMOUNT = "starting amount"  # produced_by_rules of a first purchase that invested its target weight
+
+
 def orders(ledger: Ledger, navs_eur: pd.DataFrame = None) -> pd.DataFrame:
     """The portfolio's orders with what the public record shows of them: no amount and no units. Each order's
     price against the net asset value of its day is below, above or at it, and empty until that value is
@@ -211,8 +214,10 @@ def orders(ledger: Ledger, navs_eur: pd.DataFrame = None) -> pd.DataFrame:
             total = sum(float(v) for v in split.values())
             parts = ", ".join(f"rule {k}: {float(v) / total:.4f}" for k, v in split.items())
         if o.rule == "start":
+            # No rule names the day of the first purchases, so they carry a value of their own: the starting amount
+            # invested once at the target weights (the reading of rule 2 of 19 November 2026).
             gross = o.gross + o.fee
-            produced = "yes" if abs(gross - config.TARGET[o.sleeve] * start) <= 1.0 else "no"
+            produced = STARTING_AMOUNT if abs(gross - config.TARGET[o.sleeve] * start) <= 1.0 else "no"
         elif o.rule in ("4", "5", "4+5") and navs_eur is not None:
             produced = _produced_on_cycle_day(ledger, navs_eur, o, plans)
         else:
@@ -495,9 +500,15 @@ def departures(issues: pd.DataFrame, placed: pd.DataFrame) -> pd.DataFrame:
         rule, happened, consequence = _DEPARTURE.get(
             r.issue, ("", "{what}: " + r.issue, "Kept in the record")
         )
-        if r.issue in ("outside the rule 7 window", "on a day Xetra is closed"):
+        if first:
+            # The rules name no day for the first purchases (the reading of rule 2 of 19 November 2026).
+            day = pd.Timestamp(r.date).date()
+            cycle = trading_days.cycle_day(day.year, day.month) == day
+            consequence += (". No rule names the day on which the starting amount is invested, and it was invested "
+                            f"on {day.day} {day:%B %Y}, " + ("a cycle day" if cycle else "which is not a cycle day"))
+        elif r.issue in ("outside the rule 7 window", "on a day Xetra is closed"):
             alone = kinds.get((r.date, r.sleeve, r.side), set()) <= {r.issue}
-            produced = len(on_day) and (on_day["produced_by_rules"] != "no").all()
+            produced = len(on_day) and (on_day["produced_by_rules"] == "yes").all()
             if alone and produced:
                 consequence += ". The order is the one the rules call for, and only its time departed"
         rows.append({"date": r.date, "rule": rule, "what_happened": happened.format(what=what) + ".",

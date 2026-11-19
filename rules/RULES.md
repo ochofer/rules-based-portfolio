@@ -93,7 +93,7 @@ The file holds the starting amount, the top-up and a random line that prevents a
 
 ## Amendments
 
-No rule has been amended. An erratum corrects wording and a reading settles a case the text leaves open. Neither changes a rule, so neither waits the 30 days of rule 9.
+No amendment under rule 9 has been made. An erratum corrects wording and a reading settles a case the text leaves open, and neither has waited the 30 days of rule 9. A note says what a statement of this file rests on and changes no rule and no order. One erratum decided orders. The erratum of rule 4, committed on 8 October 2026 at 11:24, 28 days before the first cycle day, decided the orders of 5 November: 83.6 per cent of the cash went to equity and 16.4 to bonds, where the sentence as tagged gives 95.1 and 4.9. The rule as tagged had two sentences that could not both hold, and the erratum chose between them without waiting the 30 days. Since the reading of rule 9 of 19 November 2026, a correction that changes an order is an amendment.
 
 | Committed | Rule | Type | Text |
 |---|---|---|---|
@@ -105,3 +105,6 @@ No rule has been amended. An erratum corrects wording and a reading settles a ca
 | 2026-10-08 | 7 | Reading | On a cycle day when the US equity market is closed, the orders are placed that day between 15:45 and 17:00 Amsterdam time, as rule 3 requires. |
 | 2026-10-09 | 7 | Erratum | The reading of 8 October on the bid and ask now calls them the quotes Tradegate Exchange showed at the time, the words of the dashboard. The reading is unchanged. |
 | 2026-10-09 | 1 | Erratum | The two tables of the ETFs that qualify print negative tracking differences with the minus sign. The figures are unchanged. |
+| 2026-11-19 | 2 | Reading | Written on 19 November 2026, after the first purchases of 8 October 2026: the starting amount is invested once, at the target weights, and the rules name no day for it. |
+| 2026-11-19 | 9 | Reading | A correction that changes an order is an amendment, and it applies from the first cycle day at least 30 days after its commit. |
+| 2026-11-19 | Ranking | Note | "The order was fixed before the funds were compared" rests on the date written in this file: the ranking and the ranked funds entered the repository in the same commit, on 7 October 2026. |

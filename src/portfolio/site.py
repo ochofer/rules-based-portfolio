@@ -916,7 +916,9 @@ MARKET_NOTE = (
     "The global market portfolio is a comparator the portfolio's design names, and the benchmark remains the index blend. "
     "It holds every asset class at its share of the world's invested market value, as Doeswijk, Lam and Swinkels "
     "measure the global multi-asset market portfolio," + _note("doeswijk_2014") + " at the weights of 31 December "
-    "2023 in their data update, version 6." + _note("doeswijk_2024"),
+    "2023 in their data update, version 6." + _note("doeswijk_2024") + " The data update gives two cautions of its "
+    "own: its private equity is Preqin's figure for private capital, and since the paper countries such as China have "
+    "entered developed bond indices, so part of emerging debt is counted twice.",
     "It takes the same contributions on the same days. It bought the published weights carried to the day before the "
     "first purchase by each class fund's return in euro, holds them as they move with prices, as the market holds them, "
     "and invests each top-up in proportion to what it holds. The carried weights are not the market's weights of that "
@@ -1219,7 +1221,8 @@ def _selection_card(as_of) -> str:
             "full calendar years, fund return minus index return in percentage points from the issuers' factsheets, then "
             "the lowest TER, in per cent a year. A fund without three years of factsheet returns ranks after those with them. The LifeStrategy "
             "funds are the euro accumulating classes, and the Mag7 fund was named when the comparators were fixed on "
-            "10 November 2026, before any of their values was read.")  # fmt: skip
+            "10 November 2026, before any of their values was read. The S&P 500 fund was fixed on 6 November 2026 with "
+            "the S&P 500 alternative, and that it came before its values rests on the dates written in its file.")  # fmt: skip
     return _card("comparisons-selection", "How the one-fund comparators' funds were chosen",
                  "Tracking difference in percentage points, calendar years 2023 to 2025",
                  tuple(f"method/{n}" for _, n in SELECTIONS) + ("method/comparator_funds.csv",), plot=False, kind="table",
@@ -1280,7 +1283,7 @@ COST_WORDS = {"Ongoing costs of the two ETFs at the portfolio's weights": "The t
 
 def _managed_card(summary: pd.DataFrame, fees: pd.DataFrame, as_of) -> str:
     """The bank's managed profile beside the portfolio: one row for each, with its costs a year and what they are made
-    up of, since a bank publishes no return for its managed profiles. The portfolio's implementation cost, which is
+    up of, since the bank publishes returns by calendar year only. The portfolio's implementation cost, which is
     cumulative, is a sentence under the table."""
     fees = fees[fees["comparator"] != "market_portfolio"] if len(fees) else fees
     rows, implementation = [], None
@@ -1310,8 +1313,8 @@ def _managed_card(summary: pd.DataFrame, fees: pd.DataFrame, as_of) -> str:
     columns = ["", "Costs a year, basis points", "Made up of", "Source"]
     table = _table(columns, rows, numeric=("Costs a year, basis points",), wrap_first=True, prose=True) if rows else ""
     status = summary.loc["bank_offensief", "status"] if "bank_offensief" in summary.index else ""
-    note = (f"{_status(status)}, so this table sets the costs a year side by side and nothing else: there is no return, "
-            "volatility or worst fall to set beside the portfolio's, and the profile is not like for like. Rabobank "
+    note = (f"{_status(status)}, so this table sets the costs a year side by side and nothing else: there is no return "
+            "over the record's dates, volatility or worst fall to set beside the portfolio's, and the profile is not like for like. Rabobank "
             "manages index funds for its clients in Rabo Beheerd Beleggen Basis, in four profiles from Defensief to Zeer "
             "Offensief, and its brochure and Risicometer give Offensief 70 per cent equity and 30 per cent bonds, the "
             "portfolio's split. Its costs are read from Rabobank's published cost overview at each build: the basic "
@@ -1852,6 +1855,15 @@ def _risk_tiles(page, summary, boot, weight_equity, monthly):
     line = ("The forecast's calibration is the standard deviation, over the months, of each month's return divided by the "
             "monthly volatility estimated at the end of the month before. 1 means the estimates matched the returns, and "
             "above 1 that they were too low. Every estimate is kept as first written, in outputs/ex_ante_risk.csv.")  # fmt: skip
+    if _has(summary, "bond_groups_duration"):
+        line += (f" The three maturity groups, each a zero-coupon bond at its midpoint, give the bond sleeve a duration "
+                 f"of {float(summary['bond_groups_duration']):.1f} years at their weights, against the "
+                 f"{float(summary['bond_reported_duration']):.1f} years of the fund's factsheet. With each group's returns "
+                 f"scaled to {float(summary['bond_reported_duration']):.1f} years the estimated volatility is "
+                 f"{fmt.pct(summary['estimated_volatility_reported_duration'])} a year instead of "
+                 f"{fmt.pct(summary['estimated_volatility'])}, and from the November 2026 month end "
+                 "outputs/ex_ante_risk.csv keeps that figure in a second column. The estimate above stays as the method "
+                 "sets it.")  # fmt: skip
     size = "four" if len(tiles) == 4 else "three"
     page.add("risk", f'<div class="wide"><div class="tiles {size}">{tile_html}</div><p class="tilenote">{_esc(line)}</p>'
              + _tracking_notes(summary)
@@ -1887,6 +1899,9 @@ def _tail_tiles(page, summary):
                             "Estimated on index returns, at today's weights, and not the record. ") + '</div>')  # fmt: skip
 
 
+MSCI_EUROPE_MIDDLE_EAST_FROM = pd.Period("2010-05", "M")  # the first month-end level of the index in MSCI's tool
+
+
 def _correlation_heatmap(page, components, pairs, summary):
     names = [c for c in components["component"] if c != "Cash"]
     matrix = pairs.pivot(index="component_a", columns="component_b", values="correlation").loc[names, names]
@@ -1909,8 +1924,14 @@ def _correlation_heatmap(page, components, pairs, summary):
     table = _table(["Component", "Weight", "Volatility, a year", "Series"], rows, numeric=("Weight", "Volatility, a year"),
                    rounding=True)
     israel = fmt.pct(summary["israel_share_of_portfolio"])
+    # MSCI's index of Europe and the Middle East (code 144115) has month-end levels from May 2010 in the public tool
+    # the program reads, so the region takes MSCI Europe wherever its history is needed before then.
+    before = ([f"the earlier window in {_month_name(summary['earlier_window_start'])}"]
+              if pd.Period(str(summary["earlier_window_start"]), "M") < MSCI_EUROPE_MIDDLE_EAST_FROM else [])
+    before.append("the episode of 2007 to 2009")
     note = (f"Monthly returns in euro over {_window_text(summary)}. The equity regions are MSCI's regional indices, net total "
-            "return. MSCI publishes no series for Europe and the Middle East together, so that region is priced by MSCI Europe, "
+            "return. MSCI publishes an index of Europe and the Middle East, but its month-end levels in MSCI's public tool "
+            f"begin in May 2010, after the start of {' and of '.join(before)}, so that region is priced by MSCI Europe, "
             f"and Israel, {israel} of the portfolio, goes with it. Each maturity group is a zero-coupon euro area government "
             "bond at the group's midpoint, priced from the ECB's curve as the allocation test prices its seven-year bond: "
             "short 1 to 5 years at 3, medium 5 to 10 years at 7.5, and long over 10 years at 20. Cash has no return and no "
@@ -2176,8 +2197,39 @@ def factor_view(page, loadings, rolling, as_of):
 # Method --------------------------------------------------------------------------------------------
 
 
-def _allocation_curve(page, allocation: pd.DataFrame, us: pd.DataFrame = None):
+def _settings_text(allocation: pd.DataFrame, settings: pd.DataFrame) -> str:
+    """The sentences on how firm the split is, from mandate/allocation_check_settings.csv: first the test at the
+    emerging markets' share MSCI reports for 2002, then the margin at the test's settings and the count over every
+    setting of the table."""
+    if not len(settings):
+        return ""
+    sourced = settings[settings["added_with"] == "MSCI's share for 2002"].set_index("bond_maturity_years")
+    at = lambda m: sourced.loc[m]  # noqa: E731
+    held = allocation[allocation["chosen"] == "yes"].iloc[0]
+    limit = 0.35
+    within = int((settings["worst_fall_70_30"] <= limit).sum())
+    spread = settings["worst_fall_70_30"].max() - settings["worst_fall_70_30"].min()
+    if spread <= limit - held["worst_fall"]:
+        raise ValueError("The settings move 70/30's worst fall by less than its margin, and the text says more")
+    share = f"{sourced['emerging_share'].iloc[0] * 100:.1f}"
+    same = at(7.0)["largest_split_within_limit"] == at(6.7)["largest_split_within_limit"]
+    gives = (f"the test gives {at(7.0)['largest_split_within_limit']}" if same else
+             f"the test gives {at(7.0)['largest_split_within_limit']} with the bond at 7 years and "
+             f"{at(6.7)['largest_split_within_limit']} at 6.7")
+    return (f" At the share of emerging markets MSCI reports for 2002, {share} per cent, {gives}: 70/30 falls "
+            f"{at(7.0)['worst_fall_70_30'] * 100:.2f} per cent with the bond at 7 years and "
+            f"{at(6.7)['worst_fall_70_30'] * 100:.2f} at 6.7 years, the duration the bond fund's factsheet of 30 "
+            f"September 2026 reports. At the test's own settings 70/30's worst fall is {held['worst_fall'] * 100:.1f} per "
+            f"cent, {(limit - held['worst_fall']) * 100:.1f} points inside the limit, a margin smaller than the effect of "
+            "the two settings the test fixes, the emerging markets' share of the equity series and the bond's maturity: "
+            f"over the {len(settings)} settings of mandate/allocation_check_settings.csv, 70/30 stays within 35 per cent "
+            f"in {within}. 65/35 is the lower edge of the band the rules already allow.")  # fmt: skip
+
+
+def _allocation_curve(page, allocation: pd.DataFrame, us: pd.DataFrame = None, settings: pd.DataFrame = None):
     """The allocation test as the curve of the splits: growth per year against the worst fall, one point per split."""
+    if settings is None:
+        settings = _read("allocation_check_settings.csv", config.ROOT / "mandate")
     splits = list(allocation["split"])
     x = [fmt.rounded(v * 100, 2) for v in allocation["worst_fall"]]
     y = [fmt.rounded(v * 100, 2) for v in allocation["growth_per_year"]]
@@ -2226,7 +2278,7 @@ def _allocation_curve(page, allocation: pd.DataFrame, us: pd.DataFrame = None):
     title = "The allocation test: growth per year against the worst fall of each split"
     source = "mandate/allocation_check_results.csv"
     note = ("The split held is the largest equity target weight whose worst fall stayed within 35 per cent. With "
-            "two assets every split lies on this curve, and the limit picks the point.")  # fmt: skip
+            "two assets every split lies on this curve, and the limit picks the point." + _settings_text(allocation, settings))  # fmt: skip
     if us is not None:
         by_split = us.set_index("split")
         rows = [r + [fmt.pct(by_split.loc[r[0], "worst_fall"]), fmt.pct(by_split.loc[r[0], "growth_per_year"])] for r in rows]
@@ -2289,6 +2341,32 @@ def _controls(page, controls: pd.DataFrame):
     page.add("method", _card("controls", "Controls", "Each control with its frequency and its evidence", "method/controls.csv",
              plot=False, wide=True, anchor="method-controls", table=None, kind="table",
              note=None).replace('<p class="source">', _table(["Control", "Frequency", "Evidence"], rows, prose=True) + '<p class="source">', 1))  # fmt: skip
+
+
+# The source of the two treaty rates behind the equity ranking's first criterion, read on 19 November 2026.
+TREATY_NOTE = (
+    "The 15 per cent is the treaty between the United States and Ireland of 1997: Article 10(2)(b) limits the tax on "
+    "dividends to \u201c15 percent of the gross amount of the dividends\u201d, and Article 4(1)(d) counts an Irish "
+    "collective investment undertaking as a resident of Ireland. The treaty between the United States and Luxembourg "
+    "of 1996 sets the same 15 per cent, but its Article 24 denies its benefits to Luxembourg companies with tax "
+    "privileges like those of the holding companies of 1929, and its notes name the investment companies of the "
+    "Luxembourg law of 30 March 1988 among them (US Senate, Executive Report 105-8, 1997). A Luxembourg fund that is "
+    "such an investment company therefore pays the 30 per cent the United States charges on dividends without a "
+    "treaty, so the Luxembourg rate turns on the fund's legal form. The law of 1988 has since been replaced, and no "
+    "official source was found that applies the treaty's notes to the laws that replaced it.")
+# A dated note on the rules' figure for the United States, which the tagged text keeps.
+US_SHARE_NOTE = (
+    "On 19 November 2026: the rules put the United States at about 60 per cent of a global index. The look-through of "
+    "13 November 2026 gives 64.4 per cent of the equity sleeve, and at that figure the same arithmetic gives 0.13 "
+    "percentage points a year.")
+
+
+def _rules_notes() -> str:
+    """The notes of the rules' table of amendments, one sentence each under the rules card, as rules/RULES.md holds
+    them."""
+    text = (config.ROOT / "rules" / "RULES.md").read_text()
+    notes = re.findall(r"^\| (\d{4}-\d{2}-\d{2}) \| [^|]+ \| Note \| (.+?) \|$", text, flags=re.M)
+    return "".join(f'<p class="note">Note of {_esc(fmt.day_words(day))}: {_esc(body)}</p>' for day, body in notes)
 
 
 def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: str, sources: pd.DataFrame,
@@ -2356,7 +2434,7 @@ def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: 
                   "compared: equity ETFs by Irish domicile, then the highest average tracking difference, then the lowest "
                   "TER, and bond ETFs by the highest average tracking difference, then the lowest TER. The held funds, "
                   "in the primary ink, are the first in rank order that the account offers. Hollow marks are funds the "
-                  "account does not offer.")  # fmt: skip
+                  "account does not offer. " + TREATY_NOTE + " " + US_SHARE_NOTE)  # fmt: skip
     block = block.replace('<p class="note">', "".join(blocks) + '<p class="note">', 1)
     page.add("method", block)
 
@@ -2369,7 +2447,7 @@ def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: 
     if len(controls):
         _controls(page, controls)
     page.add("method", f'<article class="card wide rules" id="method-rules"><h3>The rules</h3><p class="asof">Rendered from '
-             f'rules/RULES.md at build time, with the amendments table</p>{rules_html}</article>')
+             f'rules/RULES.md at build time, with the amendments table</p>{rules_html}{_rules_notes()}</article>')
     page.add("method", _other_projects())
 
 
@@ -2560,7 +2638,7 @@ def _per_cent(x: float) -> str:
 
 
 def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.DataFrame, fund: str, period: tuple,
-              added, periods: pd.DataFrame = None, split_gap: pd.DataFrame = None) -> None:  # fmt: skip
+              added, periods: pd.DataFrame = None, split_gap: pd.DataFrame = None, us_share: str = "") -> None:  # fmt: skip
     """What the portfolio does not do, and why: a card of text across the Method view, with the US run of the
     allocation test and the S&P 500 alternative inside it. Every value in the text is read from a committed file."""
     first, last, months = period
@@ -2569,15 +2647,15 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
     cumulative = periods.set_index(["series", "first_month"])["cumulative_return_usd"]
     test = allocation.set_index("split")
     error = test.loc["100/0", "volatility"] / (months / 12) ** 0.5 * 100
-    # The gap between the 100/0 and the 40/60 split and its own standard error, from the two splits' monthly
-    # differences on the same months (mandate/allocation_check_split_gap.csv).
+    # The gap between the 100/0 and the 40/60 split, with its standard error and 95 per cent interval from the
+    # block bootstrap of the two splits' paired months (mandate/allocation_check_split_gap.csv).
     if split_gap is None:
         split_gap = _read("allocation_check_split_gap.csv", config.ROOT / "mandate")
     gap_row = split_gap.iloc[0]
     if (gap_row["first_split"], gap_row["second_split"]) != ("100/0", "40/60"):
         raise ValueError("mandate/allocation_check_split_gap.csv does not hold the 100/0 and the 40/60 split")
-    if gap_row["upper_bound"] - gap_row["lower_bound"] <= gap_row["gap_per_year"]:
-        raise ValueError("The gap's two standard errors either side no longer span more than the gap itself")
+    if not gap_row["gap_lower_95"] < 0 < gap_row["gap_upper_95"]:
+        raise ValueError("The gap's 95 per cent interval no longer includes zero, and the text says it does")
     bound = lambda x: f"{x * 100:+.1f}".replace("-", fmt.MINUS)  # noqa: E731
     within = us_test[us_test["within_limit"] == "yes"]
     u70 = us_test.set_index("split").loc["70/30"]
@@ -2585,8 +2663,9 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
     fields = {
         "test": _ref("c21"), "frontier": _ref("c32"), "growth": _ref("c3"), "us_test": _ref("c33"),
         "alternative": _ref("c34"), "costs": costs, "years": f"{months / 12:.0f}", "error": f"{error:.1f}",
-        "gap": f"{gap_row['gap_per_year'] * 100:.1f}", "gap_error": f"{gap_row['standard_error'] * 100:.1f}",
-        "gap_low": bound(gap_row["lower_bound"]), "gap_high": bound(gap_row["upper_bound"]), "us_split": _esc(within.loc[within["equity_weight"].idxmax(), "split"]),
+        "gap": f"{gap_row['gap_per_year'] * 100:.1f}", "gap_error": f"{gap_row['gap_standard_error'] * 100:.1f}",
+        "gap_low": bound(gap_row["gap_lower_95"]), "gap_high": bound(gap_row["gap_upper_95"]),
+        "draws": f"{int(gap_row['draws']):,}", "block": f"{int(gap_row['block_months'])}", "us_share": us_share, "us_split": _esc(within.loc[within["equity_weight"].idxmax(), "split"]),
         "us_fall": f"{u70['worst_fall'] * 100:.1f}", "us_peak": _month_name(u70["peak"]),
         "us_low": _month_name(u70["low"]), "fund": _esc(fund), **{f"n{i}": _note(key) for i, key in enumerate(ESSAY_NOTES, start=1)},
         "us_after": _per_cent(cumulative[("US stock market", "2010-01")]),
@@ -2601,14 +2680,14 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
          "sleeve, and that is the input the data cannot supply. Over the test's {years} years the standard error of the "
          "equity series' mean yearly return is {error} percentage points, its yearly volatility over the square root of "
          "its years: the uncertainty of that input. The gap in growth per year between the 100/0 and the 40/60 split "
-         "on the same history is {gap} points (the table under {test}). Its own standard error, from the two splits' "
-         "monthly differences, their standard deviation times the square root of 12 over the square root of the years, "
-         "is {gap_error} points. Two standard errors either side put the gap between {gap_low} and {gap_high} points a "
-         "year, so {years} years leave it uncertain by more than its own size. On 18 November 2026 this comparison was "
-         "corrected: it had set the gap against the standard error of the equity mean, which is not the yardstick for "
-         "two splits on the same months. The rules and the split are unchanged. DeMiguel, Garlappi and Uppal "
+         "on the same history is {gap} points (the table under {test}). A circular block bootstrap of the two splits' paired "
+         "months, which redraws the {years} years {draws} times in blocks of {block} months, gives the gap a standard "
+         "error of {gap_error} points and a 95 per cent interval from {gap_low} to {gap_high} points a year, an interval "
+         "that includes zero, so {years} years do not fix the sign of the gap. On 19 November 2026 this comparison was "
+         "corrected: it had set the gap against the standard error of the equity series' mean, which is not the "
+         "yardstick for two splits on the same months. The rules and the split are unchanged. DeMiguel, Garlappi and Uppal "
          "measured how much history a sample-based optimiser needs before it beats an equal split out of sample: about "
-         "3,000 months for 25 assets and about 6,000 for 50.{n1} A replication of their study by the same author finds "
+         "3,000 months for 25 assets and about 6,000 for 50.{n1} A replication of their study by the author of this page finds "
          "that none of the seven optimising rules it tests earns a higher Sharpe ratio than the equal split at the 5 "
          "per cent level, on any of four sets of assets, over the 261 months since the paper.{n2} The frontier of the two sleeves is in the Risk view ({frontier}). With two assets it is a "
          "line, and the limit picks the point on it."),
@@ -2623,7 +2702,7 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
          "value, and reference B, the same contributions returned to 70/30 on every cycle day ({growth}). No single "
          "market index is the benchmark. The question readers ask most is why the portfolio does not simply hold the "
          "S&P 500. The global equity fund already holds the "
-         "index's companies at about two thirds of its weight, so holding the index alone sells the other third of the "
+         "index's companies at about {us_share} per cent of its weight, so holding the index alone sells the rest of the "
          "world's listed companies and puts the whole portfolio into one country and one currency. A weight on one "
          "country above its share of the world is a view, and the rules take none. The advice to hold the index alone "
          "grew popular in the years after 2009, when the US stock market returned {us_after} in dollars, dividends "
@@ -3590,6 +3669,16 @@ def _bases(out: dict, simulated: dict, correlation: tuple) -> dict:
     return {k: v for k, v in bases.items() if v}
 
 
+def _us_share(out: dict) -> str:
+    """The United States' share of the equity sleeve in the look-through, in whole per cent, for the sentences of the
+    dashboard and the guide that give it."""
+    country = out.get("lookthrough_equity_country.csv", pd.DataFrame())
+    row = country[country["country"] == "United States"] if len(country) else country
+    if not len(row):
+        raise ValueError("outputs/lookthrough_equity_country.csv has no row for the United States")
+    return f"{float(row['share_of_sleeve'].iloc[0]) * 100:.0f}"
+
+
 def build(out_dir: Path = None) -> Path:
     out = {p.name: pd.read_csv(p) for p in sorted(config.OUTPUTS_DIR.glob("*.csv"))}
     palette = json.loads((config.SITE_DIR / "palette.json").read_text())
@@ -3622,7 +3711,8 @@ def build(out_dir: Path = None) -> Path:
         "added": _first_commit_day(ADDED_WITH, _built(now_row)),
         "periods": _read("allocation_check_us_periods.csv", config.ROOT / "mandate"),
         "history": _read("allocation_check_history.csv", config.ROOT / "mandate"),
-        "history_windows": _read("allocation_check_history_windows.csv", config.ROOT / "mandate")}  # fmt: skip
+        "history_windows": _read("allocation_check_history_windows.csv", config.ROOT / "mandate"),
+        "us_share": _us_share(out)}  # fmt: skip
     method(page, allocation, selection, _rules_html(), out["sources.csv"], simulated["bootstrap"], correlation,
            _read("controls.csv", config.METHOD_DIR), not_done)  # fmt: skip
     simulations(page, simulated["history"], simulated["paths"], monthly)
@@ -3637,7 +3727,7 @@ def build(out_dir: Path = None) -> Path:
     numbers = _number(page.sections)
     _number_notes(page.sections)
     # The guide to the dashboard is built with it, and the build stops when a part of the page has no entry in it.
-    guide_module.write(page.sections, numbers, VIEWS, terms(), _built(now_row), out_dir)
+    guide_module.write(page.sections, numbers, VIEWS, terms(), _built(now_row), out_dir, {"us_share": _us_share(out)})
 
     first = orders["date"].min() if len(orders) else None
     tabs = "".join(f'<button type="button" data-view="{v}" aria-selected="false">{_esc(t)}</button>' for v, t in VIEWS)

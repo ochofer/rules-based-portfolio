@@ -18,6 +18,14 @@ US stock market and of the developed markets outside the United States over
 January 2000 to December 2009 and over January 2010 to December 2024, the
 figures behind one sentence of the dashboard's Method view.
 
+On 19 November 2026, after a referee's report, a third run was added: the same test with the constructed series
+built at other settings of their two choices, the emerging markets' share of the equity series and the bond's
+maturity, on a grid of four shares and four maturities that the report gave. It writes the worst fall of 70/30
+and of 65/35 and the largest split within the limit at each pair, and it chooses nothing. The referee's own run
+of the same functions had already given the outcome, so the table was written knowing it. Four rows were added
+the same day after MSCI's share of emerging markets in MSCI ACWI for 2002 was read: a share of 4.0 per cent at
+the grid's four maturities.
+
 Data, downloaded at run time and cached in cache/ (never committed):
   - Kenneth French's developed-market and emerging-market factor files (the
     market return is Mkt-RF plus RF, in US dollars).
@@ -40,7 +48,9 @@ Output:  mandate/allocation_check_results.md, the same text on screen, and the t
          mandate/allocation_check_us_periods.csv, and its figures to the screen. The history of the comparisons
          writes the split and the dollar effects of 70/30 against 100/0, 60/40 and the US stock market at 70/30 to
          mandate/allocation_check_history.csv (each calendar year, the two periods and the whole test) and
-         mandate/allocation_check_history_windows.csv (rolling windows of ten calendar years).
+         mandate/allocation_check_history_windows.csv (rolling windows of ten calendar years). The gap in growth per
+         year between the 100/0 and the 40/60 split, with its bootstrap, goes to mandate/allocation_check_split_gap.csv,
+         and the run at other settings to mandate/allocation_check_settings.csv.
 Requires Python 3.9 or later, pandas and numpy.
 """
 import io
@@ -69,7 +79,8 @@ US_PERIODS = (("2000-01", "2009-12"), ("2010-01", "2024-12"))  # the decade from
 RISK_LIMIT = 0.35        # worst fall allowed in the test: one third, rounded up to the next 5 points
 BAND_HALF_WIDTH = 0.05   # rule 5: the equity weight may move 5 points either side of its target
 EQUITY_GRID = [w / 100 for w in range(40, 101, 5)]
-EMERGING_SHARE = 0.10    # emerging markets' approximate share of a global index of developed and emerging markets
+EMERGING_SHARE = 0.10    # emerging markets' share of the equity series in every month. MSCI puts them at 6.8 per
+                         # cent of MSCI ACWI in 1997, 4.0 in 2002 and 11.3 in 2007 (see SETTINGS_SOURCED_SHARE)
 BOND_MATURITY = 7.0      # in years, close to the average duration of a euro government bond index
 FIRST_MONTH, LAST_MONTH = "1999-01", "2025-12"
 # The history of the comparisons: 70/30 against three comparators on the test's own series, by calendar year, over
@@ -77,9 +88,21 @@ FIRST_MONTH, LAST_MONTH = "1999-01", "2025-12"
 HISTORY_TARGET = 0.70
 HISTORY_COMPARATORS = (("100/0", "global", 1.00), ("60/40", "global", 0.60), ("the US stock market at 70/30", "united_states", 0.70))
 WINDOW_YEARS = 10
+# The gap between the 100/0 and the 40/60 split: its standard error and 95 per cent interval from a circular block
+# bootstrap of the two splits' paired months, with a fixed seed so that a run reproduces them.
+GAP_BLOCK_MONTHS = 12
+GAP_DRAWS = 9999
+GAP_SEED = 20261119
+# The run at other settings, added on 19 November 2026 after a referee's report: the grid the report used, and
+# four rows added after MSCI's share of emerging markets in MSCI ACWI for 2002, 3.98 per cent (MSCI, Emerging
+# Markets: A 20-year Perspective, 2008, p. 22), was read, at a share of 4.0 per cent and the grid's maturities.
+SETTINGS_EMERGING_SHARES = (0.0, 0.05, 0.10, 0.15)
+SETTINGS_BOND_MATURITIES = (5.0, 6.7, 7.0, 9.0)
+SETTINGS_SOURCED_SHARE = 0.04
 
 # Two expectations for the US run, written on 5 November 2026 before it ran and kept as written. The run
-# reports whether each is met, and nothing is tuned to meet them.
+# reports whether each is met, and nothing is tuned to meet them. That they came first rests on the date written
+# here: they entered the repository in the same commit as the US results.
 # E8: the worst fall of the US series at 70/30 exceeds 35 per cent, since the dollar fell against the euro from
 #     2001 to 2003 while the US market fell further than the global series.
 # E9: the largest US split whose worst fall is within 35 per cent is 65/35 or lower.
@@ -180,21 +203,22 @@ def usd_per_eur_month_end():
     return month_end(daily_rate)
 
 
-def monthly_returns():
-    """Monthly euro returns of the equity and bond sleeves, February 1999 to December 2025."""
+def monthly_returns(emerging_share=EMERGING_SHARE, bond_maturity=BOND_MATURITY):
+    """Monthly euro returns of the equity and bond sleeves, February 1999 to December 2025, with the emerging
+    markets' share of the equity series and the bond's maturity in years as the test sets them unless given."""
     developed, header_dev = french_market("developed")
     emerging, header_em = french_market("emerging")
     usd_per_eur = usd_per_eur_month_end()
     # An investor in euro gains when the dollar rises against the euro, so the
     # dollar return is multiplied by last month's rate over this month's rate.
     currency = usd_per_eur.shift(1) / usd_per_eur
-    equity = (1 + (1 - EMERGING_SHARE) * developed + EMERGING_SHARE * emerging) * currency - 1
+    equity = (1 + (1 - emerging_share) * developed + emerging_share * emerging) * currency - 1
 
     # Bonds from October 2004: a seven-year zero-coupon bond priced from the
     # month-end spot rate (continuous compounding), held for one month, so that
     # its maturity shortens by one month while it is held.
     spot = ecb_seven_year()
-    ecb_bond = np.exp(-spot * (BOND_MATURITY - 1 / 12)) / np.exp(-spot.shift(1) * BOND_MATURITY) - 1
+    ecb_bond = np.exp(-spot * (bond_maturity - 1 / 12)) / np.exp(-spot.shift(1) * bond_maturity) - 1
     # Before October 2004: the ten-year yield, a monthly average, priced as a
     # bond with a duration of seven years: one month of yield, minus duration
     # times the change in yield, plus the second-order term of the price change.
@@ -202,7 +226,7 @@ def monthly_returns():
     ten_year.index = pd.PeriodIndex(ten_year.index, freq="M")
     ten_year = ten_year / 100
     change = ten_year.diff()
-    early_bond = ten_year.shift(1) / 12 - BOND_MATURITY * change + 0.5 * (BOND_MATURITY ** 2 + BOND_MATURITY) * change ** 2
+    early_bond = ten_year.shift(1) / 12 - bond_maturity * change + 0.5 * (bond_maturity ** 2 + bond_maturity) * change ** 2
     bonds = ecb_bond.combine_first(early_bond)
 
     returns = pd.DataFrame({"equity": equity, "bonds": bonds}).loc[FIRST_MONTH:LAST_MONTH].dropna()
@@ -439,24 +463,61 @@ def history_tables(frames):
 
 
 def split_gap(returns, first=1.0, second=0.4):
-    """The gap in growth per year between two splits on the same months, 100/0 and 40/60, and its standard error:
-    the standard deviation of their monthly differences times the square root of 12, over the square root of the
-    years, as the history's bands are built, with the arithmetic mean of the monthly differences a year and the
-    bounds at two standard errors either side of the gap."""
-    years = len(returns) / 12
+    """The gap in growth per year between two splits on the same months, 100/0 and 40/60, and its uncertainty.
+
+    The standard error and the 95 per cent interval of the gap come from a circular block bootstrap of the two
+    splits' paired months: blocks of GAP_BLOCK_MONTHS consecutive months, wrapping from the last month to the
+    first, are drawn with replacement until the draw holds as many months as the test, GAP_DRAWS times, and in
+    each draw the gap is the difference of the two growth rates per year. The table also gives the arithmetic
+    mean of the monthly differences a year and its standard error with the months taken as independent: the
+    standard deviation of the monthly differences times the square root of 12, over the square root of the
+    years."""
+    months = len(returns)
+    years = months / 12
     a, b = band_path(returns, first), band_path(returns, second)
-    differences = (a / a.shift(1, fill_value=1.0) - 1) - (b / b.shift(1, fill_value=1.0) - 1)
+    returns_first, returns_second = a / a.shift(1, fill_value=1.0) - 1, b / b.shift(1, fill_value=1.0) - 1
+    differences = returns_first - returns_second
     growth_first, growth_second = a.iloc[-1] ** (1 / years) - 1, b.iloc[-1] ** (1 / years) - 1
-    gap = growth_first - growth_second
     deviation = differences.std() * math.sqrt(12)
-    error = deviation / math.sqrt(years)
+    rng = np.random.default_rng(GAP_SEED)
+    starts = rng.integers(0, months, (GAP_DRAWS, -(-months // GAP_BLOCK_MONTHS)))
+    draws = ((starts[:, :, None] + np.arange(GAP_BLOCK_MONTHS)) % months).reshape(GAP_DRAWS, -1)[:, :months]
+    log_first, log_second = np.log1p(returns_first.to_numpy()), np.log1p(returns_second.to_numpy())
+    gaps = np.exp(12 * log_first[draws].mean(axis=1)) - np.exp(12 * log_second[draws].mean(axis=1))
+    lower, upper = np.quantile(gaps, [0.025, 0.975])
     name = lambda w: f"{round(w * 100)}/{round((1 - w) * 100)}"  # noqa: E731
     return pd.DataFrame([{"first_split": name(first), "second_split": name(second), "first_month": str(returns.index[0]),
-                          "last_month": str(returns.index[-1]), "months": len(returns),
+                          "last_month": str(returns.index[-1]), "months": months,
                           "first_split_growth_per_year": growth_first, "second_split_growth_per_year": growth_second,
-                          "gap_per_year": gap, "mean_difference_per_year": differences.mean() * 12,
-                          "difference_standard_deviation_per_year": deviation, "standard_error": error,
-                          "lower_bound": gap - 2 * error, "upper_bound": gap + 2 * error}])
+                          "gap_per_year": growth_first - growth_second, "mean_difference_per_year": differences.mean() * 12,
+                          "difference_standard_deviation_per_year": deviation,
+                          "mean_difference_standard_error_independent_months": deviation / math.sqrt(years),
+                          "block_months": GAP_BLOCK_MONTHS, "draws": GAP_DRAWS, "seed": GAP_SEED,
+                          "gap_standard_error": gaps.std(ddof=1), "gap_lower_95": lower, "gap_upper_95": upper}])
+
+
+def settings_grid():
+    """The test at other settings of the constructed series: at each pair of an emerging markets' share and a bond
+    maturity, the worst fall of 70/30 and of 65/35 and the largest split whose worst fall is within the limit,
+    every other choice as the test makes it. The pairs are the referee's grid, then the share of 4.0 per cent at
+    the grid's maturities, and the last column says which. Nothing is chosen from it."""
+    pairs = [(s, m, "the referee's grid") for s in SETTINGS_EMERGING_SHARES for m in SETTINGS_BOND_MATURITIES]
+    pairs += [(SETTINGS_SOURCED_SHARE, m, "MSCI's share for 2002") for m in SETTINGS_BOND_MATURITIES]
+    rows = []
+    for share, maturity, added in pairs:
+        returns, _ = monthly_returns(share, maturity)
+        grid = split_rows(returns)
+        fall = {round(r[0] * 100): r[3] for r in grid}
+        largest = largest_within(grid)
+        rows.append({"emerging_share": share, "bond_maturity_years": maturity, "first_month": str(returns.index[0]),
+                     "last_month": str(returns.index[-1]), "months": len(returns), "worst_fall_70_30": fall[70],
+                     "worst_fall_65_35": fall[65],
+                     "largest_split_within_limit": (f"{round(largest[0] * 100)}/{round((1 - largest[0]) * 100)}"
+                                                    if largest else "none"),
+                     "test_settings": "yes" if (share, maturity) == (EMERGING_SHARE, BOND_MATURITY) else "no",
+                     "added_with": added})
+    return pd.DataFrame(rows)
+
 
 def csv_text(table):
     """The results table as the text of its file."""
@@ -572,6 +633,9 @@ def main():
     # The gap between the 100/0 and the 40/60 split that the Method view sets beside its own standard error.
     split_gap(returns).to_csv(os.path.join(ROOT, "mandate", "allocation_check_split_gap.csv"), index=False,
                               float_format="%.6f", lineterminator="\n")
+    # The test at other settings of the constructed series, added after a referee's report of 19 November 2026.
+    settings_grid().to_csv(os.path.join(ROOT, "mandate", "allocation_check_settings.csv"), index=False,
+                           float_format="%.6f", lineterminator="\n")
     print("")
     for r in periods.itertuples():
         print(f"{r.series}, {r.first_month} to {r.last_month}: {r.cumulative_return_usd * 100:.1f} per cent in US dollars, "

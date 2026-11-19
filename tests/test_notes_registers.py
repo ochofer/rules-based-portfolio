@@ -65,8 +65,8 @@ def test_the_departures_register_names_the_rule_and_the_consequence():
          {"date": pd.Timestamp("2026-12-07"), "sleeve": B, "side": "buy", "issue": "called for by the rules and not placed"}]
     )  # fmt: skip
     placed = pd.DataFrame(
-        [{"date": day, "sleeve": E, "side": "buy", "rule": "start", "produced_by_rules": "yes"},
-         {"date": day, "sleeve": B, "side": "buy", "rule": "start", "produced_by_rules": "yes"}]
+        [{"date": day, "sleeve": E, "side": "buy", "rule": "start", "produced_by_rules": metrics.STARTING_AMOUNT},
+         {"date": day, "sleeve": B, "side": "buy", "rule": "start", "produced_by_rules": metrics.STARTING_AMOUNT}]
     )  # fmt: skip
     register = metrics.departures(issues, placed)
     assert list(register.columns) == ["date", "rule", "what_happened", "consequence"]
@@ -74,7 +74,13 @@ def test_the_departures_register_names_the_rule_and_the_consequence():
     assert register["what_happened"].iloc[0] == (
         "The first purchase of the equity ETF was placed outside 15:45 to 17:00 Amsterdam time."
     )
-    assert register["consequence"].iloc[0].endswith("only its time departed.")
+    # The rules name no day for the first purchases, so the register says so and does not call their time the only
+    # departure (the reading of rule 2 of 19 November 2026).
+    assert register["consequence"].iloc[0] == (
+        "Kept in the record as placed. No rule names the day on which the starting amount is invested, and it was "
+        "invested on 8 October 2026, which is not a cycle day."
+    )
+    assert "only its time departed" not in " ".join(register["consequence"])
     assert (
         register["consequence"].iloc[2]
         == "The next cycle day applies the rules to the weights as they stand."

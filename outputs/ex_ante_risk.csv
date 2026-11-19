@@ -1,2 +1,2 @@
-as_of,month_end,estimated_volatility,estimated_tracking_error,value_at_risk,window_start,window_end,realised_tracking_error,realised_tracking_error_months
-2026-11-13,2026-10,0.1001162781,,0.0497529654,2016-11,2026-10,,
+as_of,month_end,estimated_volatility,estimated_volatility_reported_duration,estimated_tracking_error,value_at_risk,window_start,window_end,realised_tracking_error,realised_tracking_error_months
+2026-11-13,2026-10,0.1001162781,,,0.0497529654,2016-11,2026-10,,

@@ -220,6 +220,11 @@ def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, re
     weights = risk.component_weights(regions, maturities, weights_now["cash"])
     contributions = risk.risk_contributions(weights, cov)
     estimate = risk.volatility(weights, cov)
+    # The maturity groups imply a longer duration than the bond fund reports: the estimate again with the groups
+    # scaled to the reported duration, kept beside the first.
+    implied = risk.groups_duration(weights)
+    reported = float(look["bonds_duration"]["duration_years"].iloc[0])
+    estimate_reported = risk.volatility(weights, risk.scaled_to_duration(cov, implied, reported))
     full_mean = mean.reindex(weights.index).fillna(0.0)
     minimum = risk.minimum_variance(cov)
     israel = float(equity.loc[equity["country"] == "Israel", "weight"].sum()) * weights_now[E]
@@ -253,18 +258,19 @@ def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, re
     realised = float(bench["tracking_error"]) if bench is not None and pd.notna(bench["tracking_error"]) else float("nan")
     realised_months = float(bench["periods"]) if pd.notna(realised) else float("nan")
     history = risk.record_estimate(history, end, estimate, current.index[0], first_purchase,
-                                   tails["value_at_risk_historical"], tracking, realised, realised_months)
+                                   tails["value_at_risk_historical"], tracking, realised, realised_months,
+                                   estimate_reported)  # fmt: skip
     calibration, calibration_months = risk.calibration(history, monthly)
     beyond, beyond_months = risk.exceedances(history, monthly)
     complete = monthly[monthly["complete"] == "yes"] if len(monthly) else monthly
-    realised = float(complete["volatility_12m"].iloc[-1]) if len(complete) else float("nan")
+    realised_volatility = float(complete["volatility_12m"].iloc[-1]) if len(complete) else float("nan")
     summary = pd.DataFrame([{**window_text, "earlier_window_start": str(earlier.index[0]),
                              "earlier_window_end": str(earlier.index[-1]), "weights_as_of": nav_date,
                              "estimated_volatility": estimate, "estimated_return": float(full_mean @ weights),
                              "minimum_variance_volatility": float(np.sqrt(minimum @ cov @ minimum)),
                              "minimum_variance_return": float(mean @ minimum), "israel_share_of_portfolio": israel,
                              "cash_weight": weights[risk.CASH], "calibration": calibration,
-                             "calibration_months": calibration_months, "realised_volatility_12m": realised,
+                             "calibration_months": calibration_months, "realised_volatility_12m": realised_volatility,
                              **tails, "months_beyond_value_at_risk": beyond, "months_with_value_at_risk": beyond_months,
                              "estimated_tracking_error": tracking, **active_tails,
                              "tracking_error_band_edge": risk.band_edge_tracking_error(shares, cov),
@@ -274,7 +280,9 @@ def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, re
                              "tracking_error_highest_cash": highest["weight_cash"] if highest is not None else float("nan"),
                              "tracking_error_highest_top_up_waiting": (_top_up_waiting(records, highest["date"])
                                                                        if highest is not None else ""),
-                             "realised_tracking_error": realised, "realised_tracking_error_months": realised_months}])  # fmt: skip
+                             "realised_tracking_error": realised, "realised_tracking_error_months": realised_months,
+                             "bond_groups_duration": implied, "bond_reported_duration": reported,
+                             "estimated_volatility_reported_duration": estimate_reported}])  # fmt: skip
     test = risk.allocation_test_returns()
     episodes = risk.stress(components, test, weights)
     kids = risk.fetch_kids(refresh)
@@ -324,7 +332,8 @@ def _top_up_waiting(records, day) -> str:
 
 
 UNREADABLE = (SystemExit, ValueError, OSError, KeyError)
-BANK_STATUS = "Rabobank publishes no return for its managed profiles"
+BANK_STATUS = ("Rabobank publishes returns by calendar year only, after the funds' costs and before its own, and none "
+               "over the record's dates")
 
 
 def _comparison_inputs(refresh, today, navs, table, alt_usd, alt_eur, look, equity_as_of, sheet, out_dir) -> tuple:

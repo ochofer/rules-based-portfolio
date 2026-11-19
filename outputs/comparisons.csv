@@ -16,4 +16,4 @@ as_of,comparator,name,pane,basis,first_day,last_day,periods,return_time_weighted
 2026-11-13,mag7,The Mag7 fund,one_fund,daily,2026-11-04,2026-11-13,7,-0.0042956065,,0.044063653,2026-11-04,2026-11-05,,,,,,,-0.0042956065,1
 2026-11-13,market_portfolio,The global market portfolio,market_portfolio,daily,2026-10-08,2026-11-13,27,0.0066614542,0.0889642449,0.02135106,2026-10-29,2026-11-06,0.9697492267,0.0106015152,0.0272708687,0.0178529743,yes,,0.0070984868,
 2026-11-13,savings,Savings at the euro short-term rate,bank,daily,2026-10-08,2026-11-13,27,0.0024435646,0.0008955244,0,,,,0.0063836256,0.1025760336,0.0671517769,yes,,0.0024435888,
-2026-11-13,bank_offensief,Rabobank's managed profile Offensief,managed,daily,,,0,,,,,,,,,,,Rabobank publishes no return for its managed profiles,,
+2026-11-13,bank_offensief,Rabobank's managed profile Offensief,managed,daily,,,0,,,,,,,,,,,"Rabobank publishes returns by calendar year only, after the funds' costs and before its own, and none over the record's dates",,

@@ -80,6 +80,13 @@ def test_a_reference_becomes_the_exhibit_number_with_links_to_the_entry_and_the_
         guide.body(SOURCE + "\nSee ⟦c99⟧.\n", _found())
 
 
+def test_a_value_mark_takes_the_figure_the_build_gives_and_stops_without_one():
+    text, _ = guide.body(SOURCE + "\nAbout ⟦value:us_share⟧ per cent.\n", _found(), {"us_share": "64"})
+    assert "About 64 per cent." in text
+    with pytest.raises(guide.GuideError, match="us_share"):
+        guide.body(SOURCE + "\nAbout ⟦value:us_share⟧ per cent.\n", _found())
+
+
 def test_a_heading_may_cover_a_part_and_its_one_exhibit():
     found = _found()
     found["anchors"]["log-table"] = "costs"

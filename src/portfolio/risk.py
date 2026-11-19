@@ -5,10 +5,15 @@ volatility and its record, and the portfolio's estimated return over five histor
 The components are the four equity regions of the look-through (method/msci_regions.csv) and the bond
 sleeve's maturity ladder in three maturity groups. A region's monthly return in euro is MSCI's published
 month-end level of its regional index, net total return, from the public tool that gives the index blend.
-MSCI publishes no series for Europe and the Middle East together, so that region is priced by MSCI Europe,
-and Israel goes with it. A maturity group's monthly return is a zero-coupon euro area government bond at
+MSCI publishes an index of Europe and the Middle East, but its month-end levels in MSCI's public tool begin in
+May 2010, after the start of the earlier window and of the episode of 2007 to 2009, so that region is priced by
+MSCI Europe, and Israel goes with it. A maturity group's monthly return is a zero-coupon euro area government bond at
 the group's midpoint, priced from the ECB's curve for all euro area government bonds, as the allocation
 test prices its seven-year bond. The series start in January 2001 (MSCI) and October 2004 (ECB).
+
+The three groups, each a zero-coupon bond at its midpoint, give the bond sleeve a longer duration than the fund
+reports, so the estimate is also taken with each group's returns scaled to the fund's reported duration, and kept
+beside the first. The first stays as the method sets it.
 
 The window is the last 120 complete months, rolled at each month end, and the 120 months before it serve
 the earlier frontier only. The weights are the latest look-through weights. Cash, the uninvested part of the
@@ -268,6 +273,22 @@ def risk_contributions(weights: pd.Series, cov: pd.DataFrame) -> pd.Series:
     return pd.Series(w * marginal / (w @ marginal), index=full.index)
 
 
+def groups_duration(weights: pd.Series) -> float:
+    """The bond sleeve's duration that the maturity groups imply: each group is a zero-coupon bond, whose duration
+    is its maturity, so the midpoints weighted by the groups' weights over their total weight."""
+    names = [g[0] for g in MATURITY_GROUPS]
+    held = weights.reindex(names).fillna(0.0)
+    return float((held * [g[3] for g in MATURITY_GROUPS]).sum() / held.sum())
+
+
+def scaled_to_duration(cov: pd.DataFrame, implied: float, reported: float) -> pd.DataFrame:
+    """The covariance with each maturity group's returns scaled by the reported duration over the implied one, so
+    that the bond sleeve carries the fund's reported sensitivity to yields. The equity regions are unchanged."""
+    scale = pd.Series(1.0, index=cov.index)
+    scale[[g[0] for g in MATURITY_GROUPS if g[0] in cov.index]] = reported / implied
+    return cov.mul(scale, axis=0).mul(scale, axis=1)
+
+
 def _kkt(cov: np.ndarray, constraints: np.ndarray, targets: np.ndarray, support: tuple):
     n, m = len(support), constraints.shape[0]
     s = list(support)
@@ -483,23 +504,26 @@ def tracking_error_by_day(daily: pd.DataFrame, shares: pd.Series, cov: pd.DataFr
 
 def record_estimate(history: pd.DataFrame, month_end: pd.Period, value: float, start: pd.Period, first_purchase,
                     value_at_risk: float = float("nan"), tracking: float = float("nan"),
-                    realised: float = float("nan"), realised_months: float = float("nan")) -> pd.DataFrame:  # fmt: skip
-    """The record of the estimated volatility, the estimated tracking error against the benchmark and the
-    historical value at risk at
+                    realised: float = float("nan"), realised_months: float = float("nan"),
+                    reported_duration: float = float("nan")) -> pd.DataFrame:  # fmt: skip
+    """The record of the estimated volatility, the same estimate with the maturity groups scaled to the bond fund's
+    reported duration, the estimated tracking error against the benchmark and the historical value at risk at
     each month end, with the realised tracking error against the benchmark and the number of monthly differences
     it rests on, all kept as they were first written: a month end is added once, at the first build after it, and
     never rewritten. A month end written before a column existed keeps that column empty."""
-    columns = ["month_end", "estimated_volatility", "estimated_tracking_error", "value_at_risk", "window_start",
-               "window_end", "realised_tracking_error", "realised_tracking_error_months"]  # fmt: skip
+    columns = ["month_end", "estimated_volatility", "estimated_volatility_reported_duration", "estimated_tracking_error",
+               "value_at_risk", "window_start", "window_end", "realised_tracking_error",
+               "realised_tracking_error_months"]  # fmt: skip
     history = history.reindex(columns=columns) if len(history) else pd.DataFrame(columns=columns)
     if month_end >= pd.Period(pd.Timestamp(first_purchase), "M") and str(month_end) not in set(history["month_end"].astype(str)):
-        row = {"month_end": str(month_end), "estimated_volatility": value, "estimated_tracking_error": tracking,
+        row = {"month_end": str(month_end), "estimated_volatility": value,
+               "estimated_volatility_reported_duration": reported_duration, "estimated_tracking_error": tracking,
                "value_at_risk": value_at_risk, "window_start": str(start), "window_end": str(month_end),
                "realised_tracking_error": realised, "realised_tracking_error_months": realised_months}  # fmt: skip
         history = pd.concat([history, pd.DataFrame([row])], ignore_index=True) if len(history) else pd.DataFrame([row])
     history = history.reset_index(drop=True)
-    for column in ("estimated_volatility", "estimated_tracking_error", "value_at_risk", "realised_tracking_error",
-                   "realised_tracking_error_months"):  # fmt: skip
+    for column in ("estimated_volatility", "estimated_volatility_reported_duration", "estimated_tracking_error",
+                   "value_at_risk", "realised_tracking_error", "realised_tracking_error_months"):  # fmt: skip
         history[column] = history[column].astype(float)
     for column in ("month_end", "window_start", "window_end"):
         history[column] = history[column].astype(str)

@@ -6,6 +6,8 @@ The portfolio is run for the highest long-run growth over five to ten years, wit
 
 The risk limit is a worst fall of about one third, measured on returns with contributions removed. A worst fall above 40 per cent is outside the mandate. The test reads "about one third" as at most 35 per cent, one third rounded up to the next 5 points, which leaves 5 points between the test and the outer bound of 40 per cent.
 
+Added on 19 November 2026, after a referee's report: read as one third, 33.3 per cent, the limit gives 65/35, with a worst fall of 30.9 per cent. The reading of 35 per cent, the limit in `mandate/allocation_check.py` and the grid of splits entered the repository in the same commit, so the history cannot show that the reading was fixed before the grid was seen.
+
 The limit sets the target weights and never triggers a sale. In a fall, rule 8 applies and the cycle runs as written.
 
 ## Constraints
@@ -20,7 +22,7 @@ The limit sets the target weights and never triggers a sale. In a fall, rule 8 a
 
 Each sleeve is the part of the portfolio held in one ETF. The test builds monthly euro returns for both sleeves from February 1999, the second month of the euro, to December 2025:
 
-- Equity: Kenneth French's market returns for developed and emerging markets, weighted 90 and 10, close to their shares of a global index, and converted from US dollars to euro at the month-end reference rate of the European Central Bank (ECB).
+- Equity: Kenneth French's market returns for developed and emerging markets, weighted 90 and 10 in every month, and converted from US dollars to euro at the month-end reference rate of the European Central Bank (ECB). MSCI puts emerging markets at 6.8 per cent of MSCI ACWI in 1997, 4.0 in 2002, inside the worst fall, and 11.3 in 2007 (MSCI, Emerging Markets: A 20-year Perspective, 2008, p. 22). Until 19 November 2026 this line called the weights of 90 and 10 close to the two markets' shares of a global index.
 - Bonds: a euro area government bond with a duration of seven years, close to that of a euro government bond index. From October 2004 it is a seven-year zero-coupon bond priced from the ECB's yield curve. Before that date, the change in the ECB's ten-year government bond yield, a monthly average, is applied to a bond of that duration.
 
 For each split from 40/60 to 100/0, in steps of 5 points, the test starts at the target weights and checks the equity weight at each month end. When the equity weight is outside the band, the interval of 5 points either side of the equity target weight that rule 5 uses, the test goes back to the target weights. It then measures the worst fall. Costs and taxes are left out. The portfolio holds the split with the largest equity target weight whose worst fall is within 35 per cent.
@@ -32,7 +34,7 @@ For each split from 40/60 to 100/0, in steps of 5 points, the test starts at the
 | 75/25 | 37.8% | 2000-08 | 2003-03 | 36.5% | 6.9% |
 | 80/20 | 40.5% | 2000-08 | 2003-03 | 38.6% | 7.2% |
 
-The result is 70/30. Its worst fall, 34.7 per cent from August 2000 to March 2003, is 0.3 points inside the limit, and its fall from October 2007 to February 2009 is 33.4 per cent. Growth per year is the compound annual return over the 27 years. The full grid is in `mandate/allocation_check_results.md`.
+The result is 70/30. Its worst fall, 34.7 per cent from August 2000 to March 2003, is 0.3 points inside the limit, and its fall from October 2007 to February 2009 is 33.4 per cent. At the share of emerging markets MSCI reports for 2002, 4.0 per cent, the test gives 65/35: 70/30 falls 35.04 per cent with the bond at 7 years and 35.13 per cent at 6.7 years, the duration the bond fund's factsheet of 30 September 2026 reports. The margin of 0.3 points is smaller than the effect of the two settings of the constructed series that the test fixes: over the 20 settings of `mandate/allocation_check_settings.csv`, 70/30 stays within 35 per cent in 11. 65/35 is the lower edge of the band the rules already allow. Growth per year is the compound annual return over the 27 years. The full grid is in `mandate/allocation_check_results.md`.
 
 The constructed returns are close to those of funds on the same markets. From 2021 to 2025 the equity series differed by less than 2 percentage points in every calendar year from an MSCI ACWI fund that reports its returns in euro, and the bond series by less than 1 point from the bond ETF the portfolio holds.
 
@@ -40,6 +42,7 @@ The constructed returns are close to those of funds on the same markets. From 20
 
 - The 27 years contain two deep falls in equity markets, and deeper falls are possible.
 - Month-end values miss falls that reverse within a month.
+- The constructed series rest on two settings that the test fixes: the emerging markets' share of the equity series, 10 per cent in every month, and the bond's maturity, 7 years. MSCI puts emerging markets at 4.0 per cent of MSCI ACWI in 2002, and the bond fund's factsheet of 30 September 2026 reports a duration of 6.7 years. `mandate/allocation_check_settings.csv` runs the test at 20 settings: the grid of a referee's report of 19 November 2026, shares of 0, 5, 10 and 15 per cent with maturities of 5, 6.7, 7 and 9 years, whose outcome that report had already given, and a share of 4.0 per cent at the same maturities, added after MSCI's figure for 2002 was read. 70/30 stays within 35 per cent in 11 of the 20, and its worst fall runs from 33.5 to 35.9 per cent.
 - Before October 2004 the bond returns rest on monthly average yields, a rougher construction, and the worst fall of 2000 to 2003 lies in that period. The fall of 2007 to 2009 rests on the ECB curve and on its own selects the same split: 70/30 fell 33.4 per cent and 75/25 fell 36.5 per cent.
 - The result depends on bonds rising while equities fell. Bonds rose by 24.6 per cent from the peak of August 2000 to the low of March 2003, and by 9.8 per cent from October 2007 to February 2009. In 2022 bonds fell with equities, and every split fell between 13.3 and 15.9 per cent from its previous peak.
 - The test has no contributions, so it leaves out rule 4, under which each monthly top-up buys the sleeve furthest below its target weight.

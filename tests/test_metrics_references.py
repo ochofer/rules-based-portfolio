@@ -182,4 +182,4 @@ def test_a_cycle_day_order_is_produced_by_the_rules_when_it_matches_the_proposal
     t, c = write_ledger(rows, [contribution("2026-10-08", "before 15:59:00", 1000, "start"),
                                contribution("2026-11-02", "10:00:00", 50, "top-up")])  # fmt: skip
     placed = metrics.orders(ledger.read(t, c), frame)
-    assert list(placed["produced_by_rules"]) == ["yes", "yes", "no", "yes", "no"]
+    assert list(placed["produced_by_rules"]) == [metrics.STARTING_AMOUNT, metrics.STARTING_AMOUNT, "no", "yes", "no"]

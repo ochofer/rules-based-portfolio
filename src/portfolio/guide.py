@@ -4,7 +4,8 @@ printed from that page.
 The source holds one entry for every view, part, tile and exhibit of the dashboard. A heading names what its entry
 covers with a mark between brackets: ⟦view:overview⟧ for a view, ⟦c3⟧ for the exhibit whose id is c3, and
 ⟦#log-notes⟧ for a part of a view with that anchor. A tile is covered by a paragraph that opens with its name in
-bold, and so is a key figure. A mark in the text, such as ⟦c3⟧, becomes the exhibit's number with a link to its entry. The build stops when
+bold, and so is a key figure. A mark in the text, such as ⟦c3⟧, becomes the exhibit's number with a link to its entry,
+and a mark such as ⟦value:us_share⟧ becomes the figure the dashboard's build reads for it from its tables. The build stops when
 the dashboard holds a view, an exhibit, an anchored part or a tile that the guide has no entry for, or when the guide
 has an entry for something the dashboard no longer holds, so the guide changes whenever the dashboard does.
 
@@ -120,8 +121,9 @@ def _heading(level: str, named: str, title: str, found: dict, contents: list) ->
     return f'\n<{tag} id="{anchor}">{targets}{html.escape(label)}</{tag}>\n{where}\n'
 
 
-def body(source: str, found: dict) -> tuple:
-    """The guide's text as HTML, and its contents as (level, anchor, label)."""
+def body(source: str, found: dict, values: dict = None) -> tuple:
+    """The guide's text as HTML, and its contents as (level, anchor, label). A value mark takes its figure from
+    values, and the build stops when it has none."""
     import markdown
 
     contents = []
@@ -130,6 +132,11 @@ def body(source: str, found: dict) -> tuple:
 
     def inline(m):
         mark = m.group(1)
+        if mark.startswith("value:"):
+            key = mark.split(":", 1)[1]
+            if key not in (values or {}):
+                raise GuideError(f"{FOLDER}/{SOURCE} asks for the value {key}, which the build does not give")
+            return html.escape(str(values[key]))
         if mark not in found["exhibits"]:
             raise GuideError(f"{FOLDER}/{SOURCE} refers to {mark}, which the dashboard does not hold")
         anchor, number, _ = _number_text(mark, found)
@@ -158,9 +165,9 @@ def _contents(contents: list) -> str:
     return f'<div class="gd-contents" role="navigation" aria-label="Contents"><h2 id="contents">Contents</h2><ul>{items}</ul></div>'
 
 
-def page(source: str, found: dict, terms: list) -> str:
+def page(source: str, found: dict, terms: list, values: dict = None) -> str:
     """The guide's page, with its edition's date left as a mark."""
-    text, contents = body(source, found)
+    text, contents = body(source, found, values)
     css = (config.SITE_DIR / "report.css").read_text(encoding="utf-8").replace("Quarterly report, ISSUE", TITLE)
     css += (config.SITE_DIR / "guide.css").read_text(encoding="utf-8")
     glossary = "".join(f"<dt>{html.escape(a)}</dt><dd>{html.escape(b)}</dd>" for a, b in terms)
@@ -216,7 +223,7 @@ def edition(new_page: str, previous: Path, built) -> str:
     return f"{day.day} {day.strftime('%B %Y')}"
 
 
-def write(sections: dict, numbers: dict, views, terms: list, built, out_dir: Path = None) -> Path:
+def write(sections: dict, numbers: dict, views, terms: list, built, out_dir: Path = None, values: dict = None) -> Path:
     """Build the guide's page from its source and the numbered dashboard, and stop when the two do not cover each
     other. The edition is read from the repository's own page, so a build elsewhere reproduces it."""
     source = (config.ROOT / FOLDER / SOURCE).read_text(encoding="utf-8")
@@ -224,7 +231,7 @@ def write(sections: dict, numbers: dict, views, terms: list, built, out_dir: Pat
     faults = coverage(source, found)
     if faults:
         raise GuideError("the guide does not match the dashboard: " + "; ".join(faults))
-    new = page(source, found, terms)
+    new = page(source, found, terms, values)
     dated = edition(new, config.ROOT / FOLDER / PAGE, built)
     target = (out_dir or config.ROOT) / FOLDER / PAGE
     target.parent.mkdir(parents=True, exist_ok=True)

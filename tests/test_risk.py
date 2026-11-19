@@ -348,4 +348,44 @@ def test_the_record_keeps_both_tracking_errors_against_the_benchmark_as_first_wr
                                  0.06, 0.0009, 0.002, 5)  # fmt: skip
     row = again.iloc[0]
     assert row["estimated_tracking_error"] == pytest.approx(0.0004) and pd.isna(row["realised_tracking_error"])
-    assert list(again.columns[:3]) == ["month_end", "estimated_volatility", "estimated_tracking_error"]
+    assert list(again.columns[:4]) == ["month_end", "estimated_volatility", "estimated_volatility_reported_duration",
+                                       "estimated_tracking_error"]
+
+
+def test_the_groups_are_scaled_to_the_reported_duration_and_the_record_keeps_both_estimates():
+    # Weights of 12.6, 9.5 and 7.6 per cent on the groups at 3, 7.5 and 20 years imply a duration of 8.8 years.
+    weights = pd.Series([0.47, 0.10, 0.05, 0.08, 0.126, 0.095, 0.076, 0.003], index=NAMES + [risk.CASH])
+    implied = risk.groups_duration(weights)
+    assert implied == pytest.approx((0.126 * 3 + 0.095 * 7.5 + 0.076 * 20) / 0.297)
+    cov = sample().cov() * 12
+    scaled = risk.scaled_to_duration(cov, implied, 6.7)
+    groups = [g[0] for g in risk.MATURITY_GROUPS]
+    regions = [r[0] for r in risk.REGIONS]
+    k = 6.7 / implied
+    assert np.allclose(scaled.loc[groups, groups], cov.loc[groups, groups] * k * k)
+    assert np.allclose(scaled.loc[regions, groups], cov.loc[regions, groups] * k)
+    assert np.allclose(scaled.loc[regions, regions], cov.loc[regions, regions])
+    assert risk.volatility(weights, scaled) < risk.volatility(weights, cov)
+    # A month end written before the column existed keeps it empty, and a new one carries it.
+    old = risk.record_estimate(pd.DataFrame(), pd.Period("2026-10", "M"), 0.10, pd.Period("2016-11", "M"), "2026-10-08")
+    old = old.drop(columns=["estimated_volatility_reported_duration"])
+    record = risk.record_estimate(old, pd.Period("2026-11", "M"), 0.10, pd.Period("2016-12", "M"), "2026-10-08",
+                                  0.05, 0.0004, float("nan"), float("nan"), 0.098)  # fmt: skip
+    assert pd.isna(record.loc[0, "estimated_volatility_reported_duration"])
+    assert record.loc[1, "estimated_volatility_reported_duration"] == pytest.approx(0.098)
+
+
+def test_the_scaled_estimate_rebuilt_from_the_committed_tables_gives_the_committed_figure():
+    components = pd.read_csv(config.OUTPUTS_DIR / "risk_components.csv")
+    pairs = pd.read_csv(config.OUTPUTS_DIR / "risk_correlation.csv")
+    summary = pd.read_csv(config.OUTPUTS_DIR / "risk_summary.csv").iloc[0]
+    if "estimated_volatility_reported_duration" not in summary:
+        pytest.skip("the committed summary has no estimate at the reported duration yet")
+    cov = risk.covariance_from_tables(components, pairs)
+    weights = components.set_index("component")["weight"]
+    implied = risk.groups_duration(weights)
+    assert implied == pytest.approx(summary["bond_groups_duration"], abs=1e-8)
+    duration = pd.read_csv(config.OUTPUTS_DIR / "lookthrough_bonds_duration.csv").iloc[0]["duration_years"]
+    assert summary["bond_reported_duration"] == duration
+    scaled = risk.scaled_to_duration(cov, implied, duration)
+    assert risk.volatility(weights, scaled) == pytest.approx(summary["estimated_volatility_reported_duration"], abs=1e-8)

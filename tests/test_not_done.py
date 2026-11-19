@@ -20,7 +20,9 @@ def _section(added="2026-11-06"):
     us = pd.read_csv(MANDATE / "allocation_check_us_results.csv")
     daily = pd.read_csv(config.OUTPUTS_DIR / "portfolio_daily.csv")
     page = site.Page()
-    site._not_done(page, allocation, us, daily, "An S&P 500 fund", site._test_period(), pd.Timestamp(added))
+    country = pd.read_csv(config.OUTPUTS_DIR / "lookthrough_equity_country.csv")
+    site._not_done(page, allocation, us, daily, "An S&P 500 fund", site._test_period(), pd.Timestamp(added),
+                   us_share=site._us_share({"lookthrough_equity_country.csv": country}))
     return page, " ".join(page.sections["method"])
 
 
@@ -30,13 +32,20 @@ def test_the_values_in_the_text_are_computed_from_the_committed_files():
     assert (first, last, months) == ("1999-02", "2025-12", 323)
     error = allocation.loc["100/0", "volatility"] / (months / 12) ** 0.5 * 100
     split_gap = pd.read_csv(MANDATE / "allocation_check_split_gap.csv").iloc[0]
-    gap, gap_error = split_gap["gap_per_year"] * 100, split_gap["standard_error"] * 100
+    gap, gap_error = split_gap["gap_per_year"] * 100, split_gap["gap_standard_error"] * 100
+    low, high = split_gap["gap_lower_95"] * 100, split_gap["gap_upper_95"] * 100
     _, html = _section()
     assert f"mean yearly return is {error:.1f} percentage points" in html
     assert f"the 100/0 and the 40/60 split on the same history is {gap:.1f} points" in html
-    assert (f"over the square root of the years, is {gap_error:.1f} points. Two standard errors either side put the gap "
-            "between \u22120.9 and +6.0 points a year, so 27 years leave it uncertain by more than its own size.") in html
-    assert "On 18 November 2026 this comparison was corrected" in html and "The rules and the split are unchanged." in html
+    assert (f"which redraws the 27 years 9,999 times in blocks of 12 months, gives the gap a standard error of "
+            f"{gap_error:.1f} points and a 95 per cent interval from {low:+.1f} to {high:+.1f} points a year, an interval "
+            "that includes zero, so 27 years do not fix the sign of the gap.").replace("-", "\u2212") in html
+    assert low < 0 < high
+    assert "On 19 November 2026 this comparison was corrected" in html and "The rules and the split are unchanged." in html
+    assert "by the author of this page" in html and "by the same author" not in html
+    country = pd.read_csv(config.OUTPUTS_DIR / "lookthrough_equity_country.csv").set_index("country")
+    share = country.loc["United States", "share_of_sleeve"] * 100
+    assert f"index&#x27;s companies at about {share:.0f} per cent of its weight" in html
     assert "Over the test&#x27;s 27 years" in html
     assert ("the largest split within 35 per cent is 65/35, and the worst fall at 70/30 is 36.0 per cent, from August "
             "2000 to February 2003") in html  # fmt: skip
