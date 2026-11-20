@@ -56,7 +56,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from . import config, metrics, references
+from . import config, metrics, references, rule_11
 from .ledger import Ledger
 
 E, B = config.EQUITY, config.BONDS
@@ -788,7 +788,7 @@ def _benchmark_effects(row, blend, r, funds, state, ref_b, navs, days) -> list:
         line["drift"] = (r.loc[window, "reference_b"] - r.loc[window, "reference_a"]).sum()
         growth = fund_level.loc[end] / fund_level.loc[previous] - 1
         w = b_state.loc[previous]
-        tilt = config.TARGET[E] - w["equity"]
+        tilt = rule_11.target_on(previous)[E] - w["equity"]
         line["split"] = tilt * (growth["r_d"] - growth["r_b"])
         line["dollar"] = tilt * (growth["r_e"] - growth["r_d"])
         line["cash"] = w["cash"] * (w["equity"] * growth["r_e"] + (1 - w["equity"]) * growth["r_b"])

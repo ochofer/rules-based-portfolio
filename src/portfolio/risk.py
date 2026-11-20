@@ -36,7 +36,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import config, prices
+from . import config, prices, rule_11
 
 WINDOW_MONTHS = 120
 FRONTIER_POINTS = 25
@@ -462,7 +462,8 @@ def active_weights(equity: float, bonds: float, shares: pd.Series) -> pd.Series:
     """The components' active weights at the given sleeve weights, in shares of the portfolio. The rest of the
     portfolio is its own cash, whose active weight is the cash itself and which has no return."""
     sleeve_weight = {config.EQUITY: equity, config.BONDS: bonds}
-    return pd.Series({c: (sleeve_weight[SLEEVE_OF[c]] - config.TARGET[SLEEVE_OF[c]]) * shares[c] for c in COMPONENTS})
+    target = rule_11.current_target()
+    return pd.Series({c: (sleeve_weight[SLEEVE_OF[c]] - target[SLEEVE_OF[c]]) * shares[c] for c in COMPONENTS})
 
 
 def tracking_error(active: pd.Series, cov: pd.DataFrame) -> float:
@@ -487,7 +488,7 @@ def band_edge_tracking_error(shares: pd.Series, cov: pd.DataFrame) -> float:
     """The estimated tracking error against the benchmark at the band's edge, fully invested: the equity weight at the band's upper
     bound and the bonds at the rest. The lower bound gives the same figure, since its active weights are the same
     with the opposite sign."""
-    upper = config.BAND[1]
+    upper = rule_11.current_band()[1]
     return tracking_error(active_weights(upper, 1 - upper, shares), cov)
 
 

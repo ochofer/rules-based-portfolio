@@ -8,6 +8,16 @@ returns from February 1999 to December 2025, the worst fall of every split from
 selects the largest equity target weight whose worst fall stays within the
 limit.
 
+The equity series is Kenneth French's market returns for five regions, North America, Europe, Japan, Asia Pacific ex
+Japan and emerging markets, at the equity ETF's weights by region in the holdings file of 13 November 2026, in
+mandate/allocation_check_regions.csv, the same weights in every month of the history, converted to euro at the ECB's
+month-end rate. It answers what French's regional markets, at the weights by region the fund had on that date, would
+have lost over the test's months, and not what the index lost with the weights it had then. The weights are refreshed to a month end's at the review of October 2027
+and on a day on which rule 11 changes the target weights. Until 19 November 2026 the equity series was French's developed and
+emerging markets at 90 and 10 in every month, and the construction was changed on that day after its outcome was
+known. From the cycle day of 5 January 2027 rule 11 reads the test again at each month end, on the weights by region
+of that month end, through run_at below.
+
 In November 2026, after the first cycle day, a second run was added to answer
 a question readers ask: the same test with the US stock market in place of the
 global equity series, with the same bonds, the same band rule, the same splits
@@ -18,19 +28,32 @@ US stock market and of the developed markets outside the United States over
 January 2000 to December 2009 and over January 2010 to December 2024, the
 figures behind one sentence of the dashboard's Method view.
 
-On 19 November 2026 a third run was added: the same test with the constructed series built at other settings
-of their two choices, the emerging markets' share of the equity series and the bond's maturity, on a grid of four
+On 19 November 2026 a third run was added, on the equity series as it stood until that day: the same test with
+the constructed series built at other settings of their two choices, the emerging markets' share of the equity series and the bond's maturity, on a grid of four
 shares and four maturities. It writes the worst fall of 70/30 and of 65/35 and the largest split within the
 limit at each pair, and it chooses nothing. A run of the same functions had already given the outcome, so the
 table was written knowing it. Four rows were added the same day after MSCI's share of emerging markets in MSCI
 ACWI for 2002 was read: a share of 4.0 per cent at the grid's four maturities. Four more were added the same day,
 at 6.8 per cent, MSCI's share for 1997, and the run finds with the test's own functions the share at which the
 worst fall of 70/30 equals the limit, with the bond at 7 years and at 6.7. Both were added after their outcomes
-were known.
+were known, and the two tables are the record of the test as it stood until 19 November 2026.
+
+A fourth run, added on 19 November 2026 after its outcome was known, sets the deciding series beside two series
+built on MSCI's indices in euro, with the same bonds, band rule and months: MSCI's regional returns at the same
+weights, net and gross of the tax on dividends, and MSCI ACWI, the index the equity ETF tracks, with the weights it
+had in each month. It chooses nothing. A fifth gives the deciding series with the bond at 5, 6.7, 7 and 9 years.
+
+A sixth, added with rule 11 after its outcome was known, gives the deciding series at other weights by region: the
+fund's weights rolled back by French's regional returns to each month end from December 2009, the smallest shift
+between two regions that changes the split, and North America's weight from 55 to 80 per cent with the other four in
+proportion. It chooses nothing.
 
 Data, downloaded at run time and cached in cache/ (never committed):
-  - Kenneth French's developed-market and emerging-market factor files (the
-    market return is Mkt-RF plus RF, in US dollars).
+  - Kenneth French's factor files for North America, Europe, Japan, Asia Pacific ex Japan and emerging markets
+    (the market return is Mkt-RF plus RF, in US dollars), for the deciding series, and his developed-market file
+    for the test as it stood until 19 November 2026.
+  - MSCI's month-end levels in euro of MSCI North America, MSCI Europe, MSCI Pacific, MSCI Emerging Markets and
+    MSCI ACWI, price, net and gross, from MSCI's public tool, for the comparison only.
   - Kenneth French's US research factors, monthly (the US market return is
     Mkt-RF plus RF, in US dollars), for the US run only.
   - Kenneth French's developed-ex-US factor file, monthly (the market return of
@@ -53,10 +76,14 @@ Output:  mandate/allocation_check_results.md, the same text on screen, and the t
          mandate/allocation_check_history_windows.csv (rolling windows of ten calendar years). The gap in growth per
          year between the 100/0 and the 40/60 split, with its bootstrap, goes to mandate/allocation_check_split_gap.csv,
          the run at other settings to mandate/allocation_check_settings.csv, and the share at which 70/30 meets the
-         limit to mandate/allocation_check_settings_turning.csv.
+         limit to mandate/allocation_check_settings_turning.csv. The comparison goes to
+         mandate/allocation_check_comparison.csv, the bond's maturities to mandate/allocation_check_maturities.csv, and
+         the test at other weights by region to mandate/allocation_check_weights.csv.
 Requires Python 3.9 or later, pandas and numpy.
 """
+import hashlib
 import io
+import json
 import math
 import os
 import re
@@ -86,6 +113,42 @@ EMERGING_SHARE = 0.10    # emerging markets' share of the equity series in every
                          # cent of MSCI ACWI in 1997, 4.0 in 2002 and 11.3 in 2007 (see SETTINGS_SOURCED_SHARE)
 BOND_MATURITY = 7.0      # in years, close to the average duration of a euro government bond index
 FIRST_MONTH, LAST_MONTH = "1999-01", "2025-12"
+# The equity series: Kenneth French's market returns for five regions, at the equity ETF's weights by region at one
+# month end, the same weights in every month of the history. REGION_WEIGHTS holds those weights country by country, as
+# the program writes them from the iShares holdings file (python3 -m portfolio regions), with each country's region in
+# French's lists and in MSCI's.
+REGION_WEIGHTS = os.path.join(ROOT, "mandate", "allocation_check_regions.csv")
+REGIONS = (("North America", "north_america"), ("Europe", "europe"), ("Japan", "japan"),
+           ("Asia Pacific ex Japan", "asia_pacific_ex_japan"), ("Emerging markets", "emerging"))
+MATURITIES = (5.0, 6.7, 7.0, 9.0)  # the bond's maturity as a setting of the deciding series, in years
+FALL_SPLITS = (0.65, 0.70, 0.75)   # the splits whose worst fall the comparison gives
+# The comparison, added on 19 November 2026 after its outcome was known: the same test on MSCI's indices in euro. The
+# look-through's four MSCI regions and the index that prices each, Europe and Middle East by MSCI Europe, and MSCI ACWI,
+# the index the equity ETF tracks, with the weights it had in each month.
+MSCI_REGIONS = (("North America", "990200", "MSCI North America"), ("Europe and Middle East", "990500", "MSCI Europe"),
+                ("Pacific", "990800", "MSCI Pacific"), ("Emerging markets", "891800", "MSCI Emerging Markets"))
+MSCI_ACWI = ("892400", "MSCI ACWI")
+# MSCI's net and gross returns in euro start at the end of December 2000. Before that the price return is used, alone
+# or with an estimated dividend: the mean monthly difference between the total return and the price return over
+# DIVIDEND_MONTHS.
+DIVIDEND_MONTHS = ("2001-01", "2005-12")
+# The five regional files of the deciding series, with the header line that names French's database and their
+# SHA-256 hashes, and the values the test reads from the ECB's three series, with their number, their first and last
+# month and a SHA-256 digest of them, all as committed in FRENCH_FILES. A record row says whether the files and the
+# values it ran on are those committed.
+FRENCH_FILES = os.path.join(ROOT, "mandate", "allocation_check_files.csv")
+ECB_SERIES = (("ecb_usd_per_eur", "Euro reference rate against the US dollar, month end"),
+              ("ecb_7y", "Seven-year spot rate of the euro area government curve, month end"),
+              ("ecb_10y", "Ten-year government bond yield, monthly average"))  # fmt: skip
+ECB_DECIMALS = 8  # the digest's precision: each value as published, in Python's format "{:.8f}"
+OUT_WEIGHTS = os.path.join(ROOT, "mandate", "allocation_check_weights.csv")
+ROLLBACK_FROM = "2009-12"   # the earliest month end to which the fund's weights by region are rolled back
+SHIFT_STEP = 0.001          # a shift between two regions grows in steps of a tenth of a point
+SHIFT_LIMIT = 0.15          # up to 15 points, or the whole weight of the region it comes from
+NORTH_AMERICA_SCAN = (0.55, 0.80, 0.0005)  # North America's weight from 55 to 80 per cent, in steps of 0.05 points
+MSCI_URL = ("https://app2.msci.com/products/service/index/indexmaster/getLevelDataForGraph?currency_symbol=EUR"
+            "&index_variant={variant}&start_date=19981231&end_date=20251231&data_frequency=END_OF_MONTH"
+            "&index_codes={code}")
 # The history of the comparisons: 70/30 against three comparators on the test's own series, by calendar year, over
 # the two periods of US_PERIODS and over rolling windows of ten calendar years.
 HISTORY_TARGET = 0.70
@@ -121,12 +184,21 @@ E9_US_LARGEST_SPLIT_AT_MOST = 0.65
 SOURCES = {
     "developed": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Developed_3_Factors_CSV.zip",
     "emerging": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Emerging_5_Factors_CSV.zip",
+    # The emerging-markets file of French's 202608 database, kept in cache/ under its own name for the test as it
+    # stood until 19 November 2026. A new download serves the latest database.
+    "emerging_202608": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Emerging_5_Factors_CSV.zip",
     "us_market": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip",
     "developed_ex_us": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Developed_ex_US_3_Factors_CSV.zip",
+    "north_america": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/North_America_3_Factors_CSV.zip",
+    "europe": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Europe_3_Factors_CSV.zip",
+    "japan": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Japan_3_Factors_CSV.zip",
+    "asia_pacific_ex_japan": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Asia_Pacific_ex_Japan_3_Factors_CSV.zip",
     "ecb_usd_per_eur": "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A?format=csvdata",
     "ecb_10y": "https://data-api.ecb.europa.eu/service/data/IRS/M.U2.L.L40.CI.0000.EUR.N.Z?format=csvdata",
     "ecb_7y": "https://data-api.ecb.europa.eu/service/data/YC/B.U2.EUR.4F.G_N_C.SV_C_YM.SR_7Y?format=csvdata",
 }
+SOURCES.update({f"msci_{code}_{variant.lower()}": MSCI_URL.format(variant=variant, code=code)
+                for code in [code for _, code, _ in MSCI_REGIONS] + [MSCI_ACWI[0]] for variant in ("STRD", "NETR", "GRTR")})
 
 # Calendar-year returns in euro, in per cent, of two funds that track the same
 # markets, as their issuers publish them. The comparison shows how closely the
@@ -150,7 +222,8 @@ def fetch(name, attempts=3):
     partial file in the cache.
     """
     os.makedirs(CACHE, exist_ok=True)
-    path = os.path.join(CACHE, name + (".zip" if SOURCES[name].endswith(".zip") else ".csv"))
+    url = SOURCES[name]
+    path = os.path.join(CACHE, name + (".zip" if url.endswith(".zip") else ".json" if "msci.com" in url else ".csv"))
     if not os.path.exists(path):
         request = urllib.request.Request(SOURCES[name], headers={"User-Agent": "allocation-check/1.0", "Accept": "*/*"})
         for attempt in range(1, attempts + 1):
@@ -212,41 +285,192 @@ def usd_per_eur_month_end():
     return month_end(daily_rate)
 
 
-def monthly_returns(emerging_share=EMERGING_SHARE, bond_maturity=BOND_MATURITY):
-    """Monthly euro returns of the equity and bond sleeves, February 1999 to December 2025, with the emerging
-    markets' share of the equity series and the bond's maturity in years as the test sets them unless given."""
-    developed, header_dev = french_market("developed")
-    emerging, header_em = french_market("emerging")
+def currency_factor():
+    """The factor that converts each month's return in US dollars to euro, last month's rate over this month's, and
+    the month-end rates. An investor in euro gains when the dollar rises against the euro."""
     usd_per_eur = usd_per_eur_month_end()
-    # An investor in euro gains when the dollar rises against the euro, so the
-    # dollar return is multiplied by last month's rate over this month's rate.
-    currency = usd_per_eur.shift(1) / usd_per_eur
-    equity = (1 + (1 - emerging_share) * developed + emerging_share * emerging) * currency - 1
+    return usd_per_eur.shift(1) / usd_per_eur, usd_per_eur
 
-    # Bonds from October 2004: a seven-year zero-coupon bond priced from the
-    # month-end spot rate (continuous compounding), held for one month, so that
-    # its maturity shortens by one month while it is held.
+
+def bond_returns(bond_maturity=BOND_MATURITY):
+    """Monthly returns of the bond sleeve at the maturity given in years, with the two ECB series they rest on."""
+    # From October 2004: a zero-coupon bond priced from the month-end spot rate (continuous compounding), held for
+    # one month, so that its maturity shortens by one month while it is held.
     spot = ecb_seven_year()
     ecb_bond = np.exp(-spot * (bond_maturity - 1 / 12)) / np.exp(-spot.shift(1) * bond_maturity) - 1
-    # Before October 2004: the ten-year yield, a monthly average, priced as a
-    # bond with a duration of seven years: one month of yield, minus duration
-    # times the change in yield, plus the second-order term of the price change.
+    # Before October 2004: the ten-year yield, a monthly average, priced as a bond with a duration of the maturity
+    # given: one month of yield, minus duration times the change in yield, plus the second-order term of the price
+    # change.
     ten_year = ecb_series("ecb_10y")
     ten_year.index = pd.PeriodIndex(ten_year.index, freq="M")
     ten_year = ten_year / 100
     change = ten_year.diff()
     early_bond = ten_year.shift(1) / 12 - bond_maturity * change + 0.5 * (bond_maturity ** 2 + bond_maturity) * change ** 2
-    bonds = ecb_bond.combine_first(early_bond)
+    return ecb_bond.combine_first(early_bond), spot, ten_year
 
-    returns = pd.DataFrame({"equity": equity, "bonds": bonds}).loc[FIRST_MONTH:LAST_MONTH].dropna()
-    vintages = {
-        "Kenneth French, developed markets": f'file header "{header_dev}"',
-        "Kenneth French, emerging markets": f'file header "{header_em}"',
+
+def _ecb_vintages(usd_per_eur, spot, ten_year):
+    return {
         "ECB euro reference rate against the US dollar": "last observation " + str(usd_per_eur.index[-1]),
         "ECB seven-year spot rate": "last observation " + str(spot.index[-1]),
         "ECB ten-year government bond yield": "last observation " + str(ten_year.index[-1]),
     }
+
+
+def region_weights(table):
+    """The weights of French's five regions and of MSCI's four in a table of the form of REGION_WEIGHTS, each scaled to
+    sum to one over the countries its regions cover."""
+    french = table[table["french_region"] != "none"].groupby("french_region")["share_of_fund"].sum()
+    french = (french / french.sum()).reindex([name for name, _ in REGIONS]).fillna(0.0)
+    covered = table[table["msci_region"].isin([region for region, _, _ in MSCI_REGIONS])]
+    msci = covered.groupby("msci_region")["share_of_fund"].sum()
+    msci = (msci / msci.sum()).reindex([region for region, _, _ in MSCI_REGIONS]).fillna(0.0)
+    return french, msci
+
+
+def read_region_weights(path=REGION_WEIGHTS):
+    """The equity ETF's weights by region from REGION_WEIGHTS: the date of its holdings file, the weights of French's
+    five regions and of MSCI's four, and the table itself."""
+    table = pd.read_csv(path, keep_default_na=False)
+    french, msci = region_weights(table)
+    return str(table["holdings_as_of"].iloc[0]), french, msci, table
+
+
+FILE_COLUMNS = ["source", "series", "file", "header", "hashed", "values_read", "first_period", "last_period", "sha256"]
+FRENCH_SOURCE, ECB_SOURCE = "Kenneth French's library", "European Central Bank"
+
+
+def ecb_values_read():
+    """The values of the ECB's three series that the test reads, as published, by month: the reference rate at each
+    month end from the month before the first month of the test's returns to its last; the seven-year spot rate at each month end
+    that the bond's returns from October 2004 read; and the ten-year yield in each month that the bond's returns
+    before then read. A value the test does not read can change without changing these."""
+    usd = usd_per_eur_month_end()
+    span = pd.period_range(FIRST_MONTH, LAST_MONTH, freq="M")
+    months = [m for m in span if m in usd.index and (m - 1) in usd.index]  # the months of the test's returns
+    daily = ecb_series("ecb_7y")
+    daily.index = pd.to_datetime(daily.index)
+    spot = month_end(daily)
+    ten = ecb_series("ecb_10y")
+    ten.index = pd.PeriodIndex(ten.index, freq="M")
+    late = [m for m in months if m in spot.index and (m - 1) in spot.index]
+    early = [m for m in months if m not in set(late)]
+    return {"ecb_usd_per_eur": usd.reindex(sorted(set(months) | {m - 1 for m in months})),
+            "ecb_7y": spot.reindex(sorted(set(late) | {m - 1 for m in late})),
+            "ecb_10y": ten.reindex(sorted(set(early) | {m - 1 for m in early}))}
+
+
+def ecb_digest(values):
+    """The SHA-256 digest of a series' values: one line per month, in order, the month as YYYY-MM, a comma and the
+    value in the format "{:.8f}", each line ending in a line feed, the text in UTF-8."""
+    text = "".join(f"{period},{value:.{ECB_DECIMALS}f}\n" for period, value in values.items())
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def french_files():
+    """The test's sources as committed in FRENCH_FILES: the five regional files of the deciding series in cache/, each
+    with the header line that names French's database and its SHA-256 hash, and the values the test reads from the
+    ECB's three series, each with their number, their first and last month and their digest."""
+    rows = []
+    for name, key in REGIONS:
+        data = fetch(key)
+        archive = zipfile.ZipFile(io.BytesIO(data))
+        header = archive.read(archive.namelist()[0]).decode("latin1").splitlines()[0].strip()
+        rows.append({"source": FRENCH_SOURCE, "series": name, "file": os.path.basename(SOURCES[key]), "header": header,
+                     "hashed": "the file", "sha256": hashlib.sha256(data).hexdigest()})
+    read = ecb_values_read()
+    for key, name in ECB_SERIES:
+        values = read[key]
+        rows.append({"source": ECB_SOURCE, "series": name, "file": SOURCES[key].split("/data/")[1].split("?")[0],
+                     "hashed": f"the values the test reads, to {ECB_DECIMALS} decimals", "values_read": str(len(values)),
+                     "first_period": str(values.index[0]), "last_period": str(values.index[-1]),
+                     "sha256": ecb_digest(values)})
+    return pd.DataFrame(rows, columns=FILE_COLUMNS).fillna("")
+
+
+def _committed_files():
+    if not os.path.exists(FRENCH_FILES):
+        return pd.DataFrame(columns=FILE_COLUMNS)
+    return pd.read_csv(FRENCH_FILES, dtype=str, keep_default_na=False)
+
+
+def files_as_committed():
+    """Whether the five regional files in cache/ carry the hashes committed in FRENCH_FILES, and their headers."""
+    now = french_files()
+    committed = _committed_files()
+    now_files, kept = now[now["source"] == FRENCH_SOURCE], committed[committed["source"] == FRENCH_SOURCE]
+    same = len(kept) == len(now_files) and list(kept["sha256"]) == list(now_files["sha256"])
+    return same, "; ".join(sorted(set(now_files["header"])))
+
+
+def ecb_as_committed():
+    """Whether the values the test reads from the ECB's three series are those whose number, months and digests are
+    committed in FRENCH_FILES."""
+    columns = ["series", "values_read", "first_period", "last_period", "sha256"]
+    now = french_files()
+    now = now[now["source"] == ECB_SOURCE][columns].astype(str).reset_index(drop=True)
+    committed = _committed_files()
+    committed = committed[committed["source"] == ECB_SOURCE][columns].astype(str).reset_index(drop=True)
+    return len(committed) == len(ECB_SERIES) and now.equals(committed)
+
+
+def regional_dollar_returns(weights):
+    """French's market returns in US dollars for the five regions at the weights given, the same in every month,
+    and each file's header line."""
+    total, headers = None, {}
+    for name, key in REGIONS:
+        series, headers[name] = french_market(key)
+        total = weights[name] * series if total is None else total + weights[name] * series
+    return total, headers
+
+
+def monthly_returns(bond_maturity=BOND_MATURITY, weights=None):
+    """Monthly euro returns of the equity and bond sleeves, February 1999 to December 2025. The equity series is
+    French's five regions at the weights given, by default those of REGION_WEIGHTS, and the bond's maturity in years is the
+    test's unless given."""
+    if weights is None:
+        weights = read_region_weights()[1]
+    dollar, headers = regional_dollar_returns(weights)
+    currency, usd_per_eur = currency_factor()
+    equity = (1 + dollar) * currency - 1
+    bonds, spot, ten_year = bond_returns(bond_maturity)
+    returns = pd.DataFrame({"equity": equity, "bonds": bonds}).loc[FIRST_MONTH:LAST_MONTH].dropna()
+    vintages = {f"Kenneth French, {name}": f'file header "{headers[name]}"' for name, _ in REGIONS}
+    vintages.update(_ecb_vintages(usd_per_eur, spot, ten_year))
     return returns, vintages
+
+
+def fixed_share_returns(emerging_share=EMERGING_SHARE, bond_maturity=BOND_MATURITY):
+    """The test's returns as they stood until 19 November 2026: French's developed and emerging markets at
+    1 - emerging_share and emerging_share in every month, beside the bonds at the maturity given in years."""
+    developed, header_dev = french_market("developed")
+    emerging, header_em = french_market("emerging_202608")
+    currency, usd_per_eur = currency_factor()
+    equity = (1 + (1 - emerging_share) * developed + emerging_share * emerging) * currency - 1
+    bonds, spot, ten_year = bond_returns(bond_maturity)
+    returns = pd.DataFrame({"equity": equity, "bonds": bonds}).loc[FIRST_MONTH:LAST_MONTH].dropna()
+    vintages = {"Kenneth French, developed markets": f'file header "{header_dev}"',
+                "Kenneth French, emerging markets": f'file header "{header_em}"'}
+    vintages.update(_ecb_vintages(usd_per_eur, spot, ten_year))
+    return returns, vintages
+
+
+def msci_levels(code, variant):
+    """Month-end levels in euro of an MSCI index, as MSCI's public tool gives them, indexed by month."""
+    levels = json.loads(fetch(f"msci_{code}_{variant.lower()}"))["indexes"]["INDEX_LEVELS"]
+    return pd.Series({pd.Period(str(x["calc_date"])[:6], "M"): float(x["level_eod"]) for x in levels}).sort_index()
+
+
+def msci_returns(code, variant, dividend):
+    """Monthly euro returns of an MSCI index: its total return, net or gross by variant, where MSCI gives it, and
+    before that the price return, with the estimated dividend added when dividend is true. The estimate is the mean
+    monthly difference between the total return and the price return over DIVIDEND_MONTHS. Returns the series and
+    the estimate."""
+    total, price = msci_levels(code, variant).pct_change(), msci_levels(code, "STRD").pct_change()
+    estimate = float((total - price).loc[DIVIDEND_MONTHS[0]:DIVIDEND_MONTHS[1]].mean())
+    first = total.first_valid_index()
+    early = price.loc[:first - 1] + (estimate if dividend else 0.0)
+    return pd.concat([early, total.loc[first:]]).dropna(), estimate
 
 
 def us_returns(returns):
@@ -369,11 +593,9 @@ def band_weights(returns, equity_target):
 
 
 def global_dollar_returns(index):
-    """The global equity series in US dollars, before its conversion to euro: French's developed and emerging
-    markets at the test's shares."""
-    developed, _ = french_market("developed")
-    emerging, _ = french_market("emerging")
-    return ((1 - EMERGING_SHARE) * developed + EMERGING_SHARE * emerging).reindex(index)
+    """The global equity series in US dollars, before its conversion to euro: French's five regions at the weights
+    of REGION_WEIGHTS."""
+    return regional_dollar_returns(read_region_weights()[1])[0].reindex(index)
 
 
 def history_months(returns, us, dollar, us_dollar):
@@ -506,7 +728,8 @@ def split_gap(returns, first=1.0, second=0.4):
 
 
 def settings_grid():
-    """The test at other settings of the constructed series: at each pair of an emerging markets' share and a bond
+    """The test as it stood until 19 November 2026, on French's developed and emerging markets at a fixed share, at
+    other settings of that series: at each pair of an emerging markets' share and a bond
     maturity, the worst fall of 70/30 and of 65/35 and the largest split whose worst fall is within the limit,
     every other choice as the test makes it. The pairs are a grid added after its outcome was known, then the shares
     of 4.0 and 6.8 per cent at the grid's maturities, and the last column says which. Nothing is chosen from it."""
@@ -516,7 +739,7 @@ def settings_grid():
     pairs += [(SETTINGS_SOURCED_SHARE_1997, m, "MSCI's share for 1997") for m in SETTINGS_BOND_MATURITIES]
     rows = []
     for share, maturity, added in pairs:
-        returns, _ = monthly_returns(share, maturity)
+        returns, _ = fixed_share_returns(share, maturity)
         grid = split_rows(returns)
         fall = {round(r[0] * 100): r[3] for r in grid}
         largest = largest_within(grid)
@@ -539,7 +762,7 @@ def turning_shares():
     rows = []
     for maturity in TURNING_MATURITIES:
         def fall(share):
-            return worst_fall(band_path(monthly_returns(share, maturity)[0], 0.70))[0]
+            return worst_fall(band_path(fixed_share_returns(share, maturity)[0], 0.70))[0]
         low, high = min(SETTINGS_EMERGING_SHARES), max(SETTINGS_EMERGING_SHARES)
         if not fall(low) > RISK_LIMIT >= fall(high):
             raise SystemExit(f"At {maturity} years the worst fall of 70/30 does not cross the limit between the shares "
@@ -549,6 +772,206 @@ def turning_shares():
             low, high = (middle, high) if fall(middle) > RISK_LIMIT else (low, middle)
         rows.append({"bond_maturity_years": maturity, "turning_share": high, "worst_fall_70_30": fall(high),
                      "last_interval": TURNING_INTERVAL, "added_with": "added after its outcome was known"})
+    return pd.DataFrame(rows)
+
+
+def run_at(table):
+    """The test at the equity ETF's weights by region in a table of the form of REGION_WEIGHTS, as rule 11 reads it at
+    a month end: the five weights, and on the deciding series and on the two MSCI series, by their net returns, the
+    worst fall of 65/35, 70/30 and 75/25 and the largest split within the limit. An MSCI figure is given at both ends
+    of its range, with the estimated dividend before December 2000 and without. The row names French's database
+    and says whether the five regional files carry the hashes committed in FRENCH_FILES, and whether the values read
+    from the ECB's three series are those whose digests are committed there: where a cached file was lost, the file
+    then served is used, and where the ECB revised a value the test reads, the row says no."""
+    french, msci = region_weights(table)
+    returns, _ = monthly_returns(weights=french)
+    compared = comparison(returns, msci)
+    same, headers = files_as_committed()
+    row = {f"weight_{key}": float(french[name]) for name, key in REGIONS}
+    row.update({"french_database": headers, "french_files_as_committed": "yes" if same else "no",
+                "ecb_values_as_committed": "yes" if ecb_as_committed() else "no"})
+    names = {"deciding": compared[compared["role"] == "deciding"],
+             "msci_regions": compared[(compared["role"] == "comparison") & compared["series"].str.startswith("MSCI's")],
+             "msci_acwi": compared[compared["series"].str.startswith("MSCI ACWI")]}
+    for prefix, rows in names.items():
+        for w in FALL_SPLITS:
+            column = f"worst_fall_{round(w * 100)}_{round((1 - w) * 100)}"
+            if prefix == "deciding":
+                row[column] = float(rows[column].iloc[0])
+            else:
+                row[f"{prefix}_{column}_low"] = float(rows[column].min())
+                row[f"{prefix}_{column}_high"] = float(rows[column].max())
+        splits = sorted(set(rows["largest_split_within_limit"]))
+        row[("" if prefix == "deciding" else prefix + "_") + "largest_split"] = " or ".join(splits)
+    return row
+
+
+def split_name(weight):
+    return f"{round(weight * 100)}/{round((1 - weight) * 100)}"
+
+
+def falls_row(returns):
+    """The worst fall of each split of FALL_SPLITS, the peak and the low of 70/30's, and the largest split within
+    the limit, on one pair of series."""
+    grid = split_rows(returns)
+    fall = {round(r[0] * 100): r for r in grid}
+    largest = largest_within(grid)
+    row = {f"worst_fall_{round(w * 100)}_{round((1 - w) * 100)}": fall[round(w * 100)][3] for w in FALL_SPLITS}
+    row.update({"peak_70_30": str(fall[70][4]), "low_70_30": str(fall[70][5]),
+                "largest_split_within_limit": split_name(largest[0]) if largest else "none",
+                "first_month": str(returns.index[0]), "last_month": str(returns.index[-1]), "months": len(returns)})
+    return row
+
+
+def comparison(returns, msci_weights):
+    """The test on three equity series beside the same bonds and months: French's five regions at the fund's
+    weights by region, the deciding series; MSCI's four regional indices at the same weights; and MSCI ACWI with the weights it had in each month.
+    Each MSCI series is run with its net returns, with and without the estimated dividend before December 2000, and
+    the regional one also with its gross returns, before the tax on dividends, so that the tax's share of the gap is
+    measured. Nothing is chosen from it."""
+    rows = [{"series": "French's regional returns at the fund's weights by region", "role": "deciding", "returns": "total, before tax",
+             "before_december_2000": "the same series", "dividend_estimate_per_year": float("nan"),
+             **falls_row(returns)}]
+    for variant, label in (("NETR", "net, after tax"), ("GRTR", "gross, before tax")):
+        for dividend in (True, False):
+            parts = [msci_returns(code, variant, dividend) for _, code, _ in MSCI_REGIONS]
+            equity = sum(w * series for w, (series, _) in zip(msci_weights, parts))
+            estimate = sum(w * e for w, (_, e) in zip(msci_weights, parts)) * 12
+            frame = pd.DataFrame({"equity": equity.reindex(returns.index), "bonds": returns["bonds"]}).dropna()
+            rows.append({"series": "MSCI's regional returns in euro at the same weights",
+                         "role": "comparison" if variant == "NETR" else "measure of the tax on dividends",
+                         "returns": label,
+                         "before_december_2000": "price with the estimated dividend" if dividend else "price only",
+                         "dividend_estimate_per_year": estimate, **falls_row(frame)})
+    for dividend in (True, False):
+        equity, estimate = msci_returns(MSCI_ACWI[0], "NETR", dividend)
+        frame = pd.DataFrame({"equity": equity.reindex(returns.index), "bonds": returns["bonds"]}).dropna()
+        rows.append({"series": "MSCI ACWI, the fund's own index, with the weights it had in each month",
+                     "role": "comparison", "returns": "net, after tax",
+                     "before_december_2000": "price with the estimated dividend" if dividend else "price only",
+                     "dividend_estimate_per_year": estimate * 12, **falls_row(frame)})
+    for row in rows:
+        if len(row) and row["months"] != len(returns):
+            raise SystemExit(f"{row['series']}: a month is missing inside the test's months.")
+    return pd.DataFrame(rows)
+
+
+def maturity_table(weights):
+    """The deciding series with the bond at each maturity of MATURITIES, in years."""
+    rows = []
+    for maturity in MATURITIES:
+        returns, _ = monthly_returns(maturity, weights)
+        rows.append({"bond_maturity_years": maturity, "test_maturity": "yes" if maturity == BOND_MATURITY else "no",
+                     **falls_row(returns)})
+    return pd.DataFrame(rows)
+
+
+def _falls_at(frame, currency, bonds, weights):
+    """The worst fall of each split of FALL_SPLITS and the largest split within the limit, on the deciding series
+    built at the weights given, the same in every month, from the five regions' returns in US dollars in frame."""
+    dollar = None
+    for name, _ in REGIONS:
+        dollar = weights[name] * frame[name] if dollar is None else dollar + weights[name] * frame[name]
+    equity = (1 + dollar) * currency - 1
+    returns = pd.DataFrame({"equity": equity, "bonds": bonds}).loc[FIRST_MONTH:LAST_MONTH].dropna()
+    grid = split_rows(returns)
+    fall = {round(r[0] * 100): r[3] for r in grid}
+    largest = largest_within(grid)
+    row = {f"worst_fall_{round(w * 100)}_{round((1 - w) * 100)}": fall[round(w * 100)] for w in FALL_SPLITS}
+    row["largest_split_within_limit"] = split_name(largest[0]) if largest else "none"
+    months = returned_to_target(returns, HISTORY_TARGET)
+    row.update({"months_back_to_target_70_30": len(months), "months_back_to_target_70_30_list": " ".join(months)})
+    return row
+
+
+def returned_to_target(returns, equity_target):
+    """The month ends at which the band of rule 5 takes a split back to its target weights in the test, as in
+    band_path."""
+    equity, bonds, months = equity_target, 1 - equity_target, []
+    for month, r_equity, r_bonds in zip(returns.index, returns["equity"].values, returns["bonds"].values):
+        equity *= 1 + r_equity
+        bonds *= 1 + r_bonds
+        total = equity + bonds
+        if abs(equity / total - equity_target) > BAND_HALF_WIDTH:
+            equity, bonds = equity_target * total, (1 - equity_target) * total
+            months.append(str(month))
+    return months
+
+
+def _ranges(shifts):
+    """Shifts in steps of SHIFT_STEP, as runs of points: "9.0 to 10.0", or "" for none."""
+    runs = []
+    for s in shifts:
+        if runs and abs(s - runs[-1][1] - SHIFT_STEP) < 1e-9:
+            runs[-1][1] = s
+        else:
+            runs.append([s, s])
+    return ", ".join(f"{a * 100:.1f}" if a == b else f"{a * 100:.1f} to {b * 100:.1f}" for a, b in runs)
+
+
+def _region_text(name):
+    """A region's name inside a sentence."""
+    return name.lower() if name == "Emerging markets" else name
+
+
+def weights_table(weights):
+    """The deciding series' test at other weights by region, the same in every month of the history, to show how far
+    the weights must move before the split changes. Nothing is chosen from it. Three cases:
+      - rolled back: the weights given, taken as those of the last month end of French's regional files, rolled
+        back by the five regions' returns in US dollars to each month end from ROLLBACK_FROM. The weights move with
+        returns only, with no issuance and no change of the index's members;
+      - shift: for each pair of regions, the smallest shift of weight from the first to the second, in steps of
+        SHIFT_STEP up to SHIFT_LIMIT or the whole weight of the first, at which the largest split within the limit
+        changes, or the largest shift tried where none does, and whether every larger shift tried changes it too;
+      - North America: its weight over NORTH_AMERICA_SCAN, with the other four in their proportions.
+    Each row also gives the month ends at which the test takes 70/30 back to its target weights, whose number moves
+    the worst fall in jumps."""
+    frame = pd.DataFrame({name: french_market(key)[0] for name, key in REGIONS})
+    currency, _ = currency_factor()
+    bonds, _, _ = bond_returns(BOND_MATURITY)
+    base = weights.reindex([name for name, _ in REGIONS])
+    keys = {name: f"weight_{key}" for name, key in REGIONS}
+    split = split_name(largest_within(split_rows(monthly_returns(weights=base)[0]))[0])
+    rows = []
+
+    def add(case, w, month_end="", shift_from="", shift_to="", shift_points=float("nan"), every_larger="",
+            unchanged_at="", falls=None):
+        rows.append({"case": case, "month_end": month_end, "shift_from": shift_from, "shift_to": shift_to,
+                     "shift_points": shift_points, "every_larger_shift_changes_the_split": every_larger,
+                     "larger_shifts_that_do_not_change_it": unchanged_at,
+                     **{keys[n]: float(w[n]) for n in keys}, **(falls or _falls_at(frame, currency, bonds, w))})
+
+    w, month = base.copy(), frame.index[-1]
+    while True:
+        add("rolled back", w, month_end=str(month))
+        if str(month) == ROLLBACK_FROM:
+            break
+        w = w / (1 + frame.loc[month, list(keys)])
+        w, month = w / w.sum(), month - 1
+    for a in keys:
+        for b in keys:
+            if a == b:
+                continue
+            tried = []
+            for n in range(1, int(math.floor(min(SHIFT_LIMIT, float(base[a])) / SHIFT_STEP + 1e-9)) + 1):
+                w = base.copy()
+                shift = round(n * SHIFT_STEP, 6)
+                w[a], w[b] = w[a] - shift, w[b] + shift
+                tried.append((shift, w, _falls_at(frame, currency, bonds, w)))
+            changes = [i for i, (_, _, f) in enumerate(tried) if f["largest_split_within_limit"] != split]
+            first = changes[0] if changes else len(tried) - 1
+            every = ("yes" if changes == list(range(first, len(tried))) else "no") if changes else ""
+            unchanged = [tried[i][0] for i in range(first, len(tried)) if i not in changes] if changes else []
+            shift, w, falls = tried[first]
+            add("shift", w, shift_from=a, shift_to=b, shift_points=shift * 100, every_larger=every,
+                unchanged_at=_ranges(unchanged), falls=falls)
+    low, high, step = NORTH_AMERICA_SCAN
+    others = [n for n in keys if n != "North America"]
+    for i in range(int(round((high - low) / step)) + 1):
+        w = base.copy()
+        w["North America"] = round(low + i * step, 6)
+        w[others] = base[others] / base[others].sum() * (1 - w["North America"])
+        add("North America", w)
     return pd.DataFrame(rows)
 
 
@@ -576,9 +999,13 @@ def us_summary(rows, header):
 
 
 def main():
+    as_of, french_weights, msci_weights, by_country = read_region_weights()
     returns, vintages = monthly_returns()
     rows = split_rows(returns)
     chosen = largest_within(rows)
+    compared = comparison(returns, msci_weights)
+    maturities = maturity_table(french_weights)
+    weights = weights_table(french_weights)
 
     out = []
     out.append("# Allocation check: results")
@@ -586,6 +1013,17 @@ def main():
     out.append(f"Generated by `mandate/allocation_check.py` on {date.today().isoformat()}. "
                f"The returns are monthly, in euro, from {returns.index[0]} to {returns.index[-1]}, {len(returns)} months, "
                f"measured at month ends with no costs and no taxes.")
+    out.append("")
+    uncovered = by_country[by_country["french_region"] == "none"]
+    out.append("The equity series is Kenneth French's market return for five regions, at the equity ETF's weights by region "
+               f"in its holdings file of {as_of}, the same weights in every month, converted to euro at the ECB's "
+               "month-end rate: " + ", ".join(f"{name} {french_weights[name] * 100:.1f} per cent" for name, _ in REGIONS)
+               + ". Each country goes to the region of French's lists that holds it (method/french_regions.csv), and "
+               + ", ".join(f"{r.country}, {r.share_of_fund * 100:.2f} per cent of the fund" for r in uncovered.itertuples())
+               + ", are in none of them, so the five weights are scaled to sum to one. The series answers what French's "
+               "regional markets, at the weights by region the fund had on that date, would have lost over the test's "
+               "months, and not what the index lost with the weights it had then. The bonds are a zero-coupon bond of "
+               f"{BOND_MATURITY:g} years priced from the ECB's euro area curve.")
     out.append("")
     out.append("A split is the pair of target weights, written equity/bonds. Each split starts at its target weights and is "
                "rebalanced by its band, the interval of 5 points either side of the equity target weight: when the equity weight "
@@ -598,15 +1036,80 @@ def main():
     out.append("|---|---|---|---|---|---|---|---|---|---|")
     for w, growth, vol, fall, peak, low, f00, f08, f22 in rows:
         split = f"{round(w * 100)}/{round((1 - w) * 100)}"
-        out.append(f"| {split} | {growth * 100:.1f}% | {vol * 100:.1f}% | {fall * 100:.1f}% | {peak} | {low} | "
-                   f"{f00 * 100:.1f}% | {f08 * 100:.1f}% | {f22 * 100:.1f}% | {'yes' if fall <= RISK_LIMIT else 'no'} |")
+        out.append(f"| {split} | {growth * 100:.1f}% | {vol * 100:.1f}% | {fall * 100:.2f}% | {peak} | {low} | "
+                   f"{f00 * 100:.2f}% | {f08 * 100:.2f}% | {f22 * 100:.2f}% | {'yes' if fall <= RISK_LIMIT else 'no'} |")
     out.append("")
     if chosen:
         out.append(f"The largest equity target weight whose worst fall is within {RISK_LIMIT * 100:.0f} per cent is "
                    f"{round(chosen[0] * 100)} per cent, a split of {round(chosen[0] * 100)}/{round((1 - chosen[0]) * 100)}, "
-                   f"with a worst fall of {chosen[3] * 100:.1f} per cent from {chosen[4]} to {chosen[5]}.")
+                   f"with a worst fall of {chosen[3] * 100:.2f} per cent from {chosen[4]} to {chosen[5]}.")
     else:
         out.append(f"No split on the grid has a worst fall within {RISK_LIMIT * 100:.0f} per cent.")
+    out.append("")
+    out.append("## Three sources")
+    out.append("")
+    out.append("The same test, with the same bonds, band rule and months, on French's regional returns at the fund's weights by "
+               "region, the deciding series, on MSCI's regional indices in euro at the same weights, Europe and Middle East priced by "
+               "MSCI Europe, and on MSCI ACWI, the index the equity ETF tracks, with the weights it had in each month. "
+               "MSCI's net and gross returns in euro start in December 2000, so the months before use its price return, "
+               "alone or with an estimated dividend, the mean monthly difference between the total and the price return "
+               f"from {DIVIDEND_MONTHS[0]} to {DIVIDEND_MONTHS[1]}. The gross rows measure the tax on dividends and choose "
+               "nothing. Worst falls in per cent.")
+    out.append("")
+    out.append("| Series | Returns | Before December 2000 | Dividend estimate a year | 65/35 | 70/30 | 75/25 | Largest split within 35% |")
+    out.append("|---|---|---|---|---|---|---|---|")
+    for r in compared.itertuples():
+        estimate = "" if pd.isna(r.dividend_estimate_per_year) else f"{r.dividend_estimate_per_year * 100:.2f}%"
+        out.append(f"| {r.series} | {r.returns} | {r.before_december_2000} | {estimate} | {r.worst_fall_65_35 * 100:.2f} | "
+                   f"{r.worst_fall_70_30 * 100:.2f} | {r.worst_fall_75_25 * 100:.2f} | {r.largest_split_within_limit} |")
+    out.append("")
+    out.append("## The bond's maturity")
+    out.append("")
+    out.append("The deciding series with the bond at other maturities. Worst falls in per cent.")
+    out.append("")
+    out.append("| Maturity | 65/35 | 70/30 | 75/25 | Largest split within 35% |")
+    out.append("|---|---|---|---|---|")
+    for r in maturities.itertuples():
+        out.append(f"| {r.bond_maturity_years:g} years{' (the test)' if r.test_maturity == 'yes' else ''} | "
+                   f"{r.worst_fall_65_35 * 100:.2f} | {r.worst_fall_70_30 * 100:.2f} | {r.worst_fall_75_25 * 100:.2f} | "
+                   f"{r.largest_split_within_limit} |")
+    out.append("")
+    out.append("## The test at other weights by region")
+    out.append("")
+    back = weights[weights["case"] == "rolled back"]
+    shifts = weights[weights["case"] == "shift"]
+    scan = weights[weights["case"] == "North America"].reset_index(drop=True)
+    held = split_name(chosen[0]) if chosen else "none"
+    changed = shifts[shifts["largest_split_within_limit"] != held]
+    jump = scan["worst_fall_70_30"].diff().abs().idxmax()
+    before, after = scan.iloc[jump - 1], scan.iloc[jump]
+    added = sorted(set(after["months_back_to_target_70_30_list"].split()) - set(before["months_back_to_target_70_30_list"].split()))
+    dropped = sorted(set(before["months_back_to_target_70_30_list"].split()) - set(after["months_back_to_target_70_30_list"].split()))
+    partly = changed[changed["every_larger_shift_changes_the_split"] == "no"]
+    out.append(f"The deciding series at other weights by region, the same in every month, in mandate/allocation_check_weights.csv. "
+               f"Rolled back by the five regions' returns in US dollars from {back['month_end'].iloc[0]}, taken as the month end "
+               f"of the weights of {as_of}, to each month end from {ROLLBACK_FROM}, with no issuance and no change of the "
+               f"index's members, the fund's weights give "
+               + " or ".join(sorted(set(back["largest_split_within_limit"]))) + f" at all {len(back)} month ends, with "
+               f"70/30's worst fall from {back['worst_fall_70_30'].min() * 100:.2f} to {back['worst_fall_70_30'].max() * 100:.2f} "
+               f"per cent. In steps of {SHIFT_STEP * 100:g} points, the smallest shifts between two regions that change "
+               f"the split are " + " and ".join(f"{r.shift_points:.1f} points from {_region_text(r.shift_from)} to "
+                                              f"{_region_text(r.shift_to)} ({r.largest_split_within_limit})"
+                                              for r in changed.sort_values("shift_points").itertuples())
+               + f". No shift between another pair of regions, of up to {SHIFT_LIMIT * 100:.0f} points or the whole "
+               "weight of the region it comes from, changes it."
+               + "".join(f" From {_region_text(r.shift_from)} to {_region_text(r.shift_to)} the split is "
+                         f"{r.largest_split_within_limit} from {r.shift_points:.1f} points and {held} again at "
+                         f"{r.larger_shifts_that_do_not_change_it} points." for r in partly.itertuples())
+               + f" With North America's weight from {NORTH_AMERICA_SCAN[0] * 100:.0f} to "
+               f"{NORTH_AMERICA_SCAN[1] * 100:.0f} per cent and the other four in proportion, the split is "
+               + " or ".join(sorted(set(scan["largest_split_within_limit"]))) + ", and 70/30's worst fall moves in jumps: "
+               f"{before['worst_fall_70_30'] * 100:.2f} per cent at {before['weight_north_america'] * 100:.2f} and "
+               f"{after['worst_fall_70_30'] * 100:.2f} at {after['weight_north_america'] * 100:.2f}, where the test takes "
+               f"70/30 back to its target weights {int(after['months_back_to_target_70_30'])} times in place of "
+               f"{int(before['months_back_to_target_70_30'])}"
+               + (f", adding {' and '.join(added)}" if added else "") + (f" and dropping {' and '.join(dropped)}" if dropped else "")
+               + ".")
     if chosen:
         split = f"{round(chosen[0] * 100)}/{round((1 - chosen[0]) * 100)}"
         values = band_path(returns, chosen[0])
@@ -620,7 +1123,7 @@ def main():
         out.append("|---|---|---|---|---|---|")
         for label, start, end in (("1999-2004", "1999-01", "2004-12"), ("2007-2010", "2007-01", "2010-12")):
             fall, peak, low = worst_fall(values, start, end)
-            out.append(f"| {label} | {peak} | {low} | {fall * 100:.1f} | {sleeve_return(returns, 'equity', peak, low) * 100:+.1f} | "
+            out.append(f"| {label} | {peak} | {low} | {fall * 100:.2f} | {sleeve_return(returns, 'equity', peak, low) * 100:+.1f} | "
                        f"{sleeve_return(returns, 'bonds', peak, low) * 100:+.1f} |")
     out.append("")
     out.append("## How closely the constructed returns follow two funds")
@@ -640,10 +1143,36 @@ def main():
     out.append("")
     out.append("## Data used")
     out.append("")
+    out.append("The deciding series, the comparison and the bond's maturities:")
+    out.append("")
     for source, note in vintages.items():
         out.append(f"- {source}: {note}")
+    out.append(f"- The equity ETF's weights by region: mandate/allocation_check_regions.csv, holdings file of {as_of}")
+    out.append("- MSCI, month-end levels in euro, price, net and gross, from MSCI's public tool: "
+               + ", ".join(name for _, _, name in MSCI_REGIONS) + f" and {MSCI_ACWI[1]}, last month "
+               + str(msci_levels(MSCI_ACWI[0], "NETR").index[-1]))
+    out.append("- The five regional files' hashes, and the digests of the values the test reads from the ECB's three "
+               "series: mandate/allocation_check_files.csv")
+    out.append("")
+    out.append("The test as it stood until 19 November 2026, in mandate/allocation_check_settings.csv and "
+               "mandate/allocation_check_settings_turning.csv:")
+    out.append("")
+    for source, note in fixed_share_returns()[1].items():
+        if source.startswith("Kenneth French"):
+            out.append(f"- {source}: {note}")
+    out.append("")
+    out.append("The US run and its two periods:")
+    out.append("")
+    out.append(f'- Kenneth French, US stock market: file header "{us_returns(returns)[1]}"')
+    out.append(f'- Kenneth French, developed markets outside the United States: file header "{french_market("developed_ex_us")[1]}"')
     table = results_table(rows, chosen)
     table.to_csv(OUT_CSV, index=False, float_format="%.6f", lineterminator="\n")
+    compared.to_csv(os.path.join(ROOT, "mandate", "allocation_check_comparison.csv"), index=False, float_format="%.6f",
+                    lineterminator="\n")
+    maturities.to_csv(os.path.join(ROOT, "mandate", "allocation_check_maturities.csv"), index=False, float_format="%.6f",
+                      lineterminator="\n")
+    weights.to_csv(OUT_WEIGHTS, index=False, float_format="%.6f", lineterminator="\n")
+    french_files().to_csv(FRENCH_FILES, index=False, lineterminator="\n")
     text = "\n".join(out) + "\n"
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(text)
@@ -666,7 +1195,7 @@ def main():
     # The gap between the 100/0 and the 40/60 split that the Method view sets beside its own standard error.
     split_gap(returns).to_csv(os.path.join(ROOT, "mandate", "allocation_check_split_gap.csv"), index=False,
                               float_format="%.6f", lineterminator="\n")
-    # The test at other settings of the constructed series, added on 19 November 2026.
+    # The test as it stood until 19 November 2026, at other settings of its series, added on 19 November 2026.
     settings_grid().to_csv(os.path.join(ROOT, "mandate", "allocation_check_settings.csv"), index=False,
                            float_format="%.6f", lineterminator="\n")
     # The share at which 70/30 meets the limit, added on 19 November 2026 after its outcome was known.

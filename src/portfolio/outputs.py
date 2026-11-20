@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from . import comparisons, config, factors, ledger as ledger_module, lookthrough, metrics, positions, prices, risk
-from . import references, valuations
+from . import references, rule_11, valuations
 
 E, B = config.EQUITY, config.BONDS
 COST_COLUMNS = ("month", "commissions_bps", "half_spread_bps", "orders_without_bid_and_ask", "currency_conversion_bps",
@@ -41,6 +41,46 @@ def _write(frame: pd.DataFrame, name: str, as_of, out_dir: Path) -> Path:
     return path
 
 
+def _write_kept(frame: pd.DataFrame, path: Path) -> Path:
+    """A table whose rows are kept as first written: no as_of column, so that a row's text never changes."""
+    frame = frame.copy()
+    for column in frame.columns:
+        if pd.api.types.is_float_dtype(frame[column]):
+            frame[column] = frame[column].round(10) + 0.0
+    frame.to_csv(path, index=False, float_format="%.10g", lineterminator="\n")
+    return path
+
+
+def _allocation_sources(record: pd.DataFrame) -> list:
+    """The rows of the sources table for the allocation test's files that rule 11 reads: French's five regional
+    files, MSCI's series of the comparison, and the issuer's holdings files at the month ends of the record. These
+    files are read by mandate/allocation_check.py, so the date read is the file's date in cache/."""
+    module = rule_11.allocation_check()
+
+    def read_on(name: str) -> str:
+        path = config.CACHE_DIR / name
+        return pd.Timestamp(path.stat().st_mtime, unit="s").strftime("%Y-%m-%d") if path.exists() else ""
+
+    files = pd.read_csv(module.FRENCH_FILES) if Path(module.FRENCH_FILES).exists() else pd.DataFrame()
+    database = "".join(ch for ch in str(files["header"].iloc[0]) if ch.isdigit()) if len(files) else ""
+    french_end = module.french_market("north_america")[0].index[-1].to_timestamp(how="end").normalize()
+    rows = [(f"Kenneth French, market returns of North America, Europe, Japan, Asia Pacific ex Japan and emerging "
+             f"markets, monthly, Bloomberg database {database}, for the allocation test", "north_america.zip",
+             french_end, read_on("north_america.zip"), module.SOURCES["north_america"]),
+            ("MSCI North America, Europe, Pacific, Emerging Markets and ACWI, month-end levels in euro, price, net "
+             "and gross, for the allocation test's comparison", "msci_892400_netr.json",
+             module.msci_levels(module.MSCI_ACWI[0], "NETR").index[-1].to_timestamp(how="end").normalize(),
+             read_on("msci_892400_netr.json"), module.SOURCES["msci_892400_netr"])]  # fmt: skip
+    held = record[record["holdings_as_of"].astype(str) != ""] if len(record) else record
+    if len(held):
+        last = held.iloc[-1]
+        rows.append(("iShares, IE00B6R52259, holdings at each month end, for rule 11",
+                     f"ishares/IE00B6R52259_holdings_{last['holdings_as_of']}.csv", pd.Timestamp(last["holdings_as_of"]),
+                     read_on(f"ishares/IE00B6R52259_holdings_{last['holdings_as_of']}.csv"),
+                     rule_11.HOLDINGS_AT.format(day=pd.Timestamp(last["holdings_as_of"]))))  # fmt: skip
+    return rows
+
+
 def _lookthrough_frame(table: pd.DataFrame, label: str) -> pd.DataFrame:
     frame = table.reset_index()
     frame = frame.rename(columns={frame.columns[0]: label})
@@ -60,6 +100,15 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     alt_usd = prices.load_alternative(alt_isin, refresh)
     navs = navs.loc[: min(navs.index.max(), alt_usd.index.max())]
     alt_eur = alt_usd.reindex(alt_usd.index.union(navs.index)).ffill().reindex(navs.index) / navs["usd_per_eur"]
+    # Rule 11: the allocation test at each month end, each row written once, and the target weights and the band in
+    # force on each cycle day from 5 January 2027, each row kept as first written, which every figure below reads.
+    kept = rule_11.load(out_dir / "allocation_targets.csv")
+    record = rule_11.update_record(rule_11.load_record(out_dir / "allocation_record.csv"), today,
+                                   holdings=lambda month, day: rule_11.holdings_at(month, day, refresh),
+                                   applied=lambda day: rule_11.applied_on(day, kept))  # fmt: skip
+    written_rule_11 = [_write_kept(record, out_dir / "allocation_record.csv"),
+                       _write_kept(rule_11.targets(record, today, rule_11.weight_after_top_up_from(records, navs), kept),
+                                   out_dir / "allocation_targets.csv")]  # fmt: skip
     held = positions.build(records, today)
     values = valuations.build(held, navs)
     base = metrics.base_day(records, navs)
@@ -175,10 +224,10 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     alt_source = (f"{alt_name}, {alt_isin}, net asset values in US dollars", f"hsbc/{alt_isin}_nav.json", alt_usd.index.max())
     rate_source = ("ECB, euro short-term rate, volume-weighted", "ecb/estr.csv", rate.index.max())
     sources = _sources(series, msci, equity_as_of, bonds_as_of, latest_sheet.name, daily_factors, vintage,
-                       [alt_source, rate_source, *risk_sources, *comparison_sources])  # fmt: skip
+                       [alt_source, rate_source, *risk_sources, *comparison_sources, *_allocation_sources(record)])  # fmt: skip
     written.append(_write(sources, "sources.csv", as_of, out_dir))
     privacy(records, out_dir)
-    return {"as_of": as_of, "files": written}
+    return {"as_of": as_of, "files": written + written_rule_11}
 
 
 def _checks(records, navs, look, weights_now, loadings) -> pd.DataFrame:

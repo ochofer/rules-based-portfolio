@@ -147,6 +147,54 @@ def equity_lines(frame: pd.DataFrame) -> pd.DataFrame:
     return lines
 
 
+FRENCH_REGIONS = ("North America", "Europe", "Japan", "Asia Pacific ex Japan", "Emerging markets")
+
+
+def unplaced_countries(frame: pd.DataFrame) -> list:
+    """The countries of a holdings file's equity lines that method/french_regions.csv does not place, through
+    method/msci_regions.csv, which gives each country the name the French list uses. Rule 11 takes no reading from
+    such a file."""
+    regions = _method("msci_regions.csv").set_index("country")
+    french = _method("french_regions.csv").set_index("country")
+    funds = _method("funds_held.csv").set_index("ticker")
+    out = set()
+    for row in frame.to_dict("records"):
+        if row["Asset Class"] != "Equity":
+            continue
+        country = funds.loc[row["Ticker"], "country"] if row["Ticker"] in funds.index else row["Location"]
+        if country not in regions.index or regions.loc[country, "display"] not in french.index:
+            out.add(str(country))
+    return sorted(out)
+FRENCH_FROM_MSCI = {"Emerging markets": "Emerging markets", "Europe and Middle East": "Europe"}
+
+
+def allocation_regions(lines: pd.DataFrame, as_of) -> pd.DataFrame:
+    """The equity ETF's weights by country for the allocation test, with each country's region in Kenneth French's lists
+    (method/french_regions.csv) and in MSCI's (method/msci_regions.csv): one row per country, then one for the lines
+    that are not equities. A country in neither of French's lists has the region none, and a country that French
+    lists among both developed and emerging markets goes where MSCI classifies it."""
+    french = _method("french_regions.csv").set_index("country")["french_region"]
+    shares = lines.groupby(["country", "region"], sort=False)["weight"].sum().reset_index()
+    rows = []
+    for row in shares.itertuples():
+        if row.country == CASH_LINE:
+            continue
+        region = french[row.country]
+        if region == "as MSCI classifies it":
+            region = FRENCH_FROM_MSCI[row.region]
+        rows.append({"country": row.country, "share_of_fund": row.weight, "french_region": region,
+                     "msci_region": row.region})
+    table = pd.DataFrame(rows).sort_values("share_of_fund", ascending=False, kind="stable")
+    cash = float(lines.loc[lines["country"] == CASH_LINE, "weight"].sum())
+    table = pd.concat([table, pd.DataFrame([{"country": CASH_LINE, "share_of_fund": cash, "french_region": "none",
+                                             "msci_region": "none"}])], ignore_index=True)  # fmt: skip
+    unknown = sorted(set(table["french_region"]) - set(FRENCH_REGIONS) - {"none"})
+    if unknown:
+        raise ValueError(f"method/french_regions.csv gives regions French does not publish: {unknown}")
+    table.insert(0, "holdings_as_of", pd.Timestamp(as_of).date().isoformat())
+    return table.reset_index(drop=True)
+
+
 # Bonds ---------------------------------------------------------------------------------------------
 
 

@@ -16,7 +16,7 @@ from pathlib import Path
 import pandas as pd
 
 from . import comparisons as comparisons_module
-from . import config, references, trading_days
+from . import config, references, rule_11, trading_days
 from . import risk as risk_module
 from . import formatting as fmt
 from . import guide as guide_module
@@ -425,8 +425,8 @@ def _span(first, last) -> str:
 def _key_figures(w_now, last, month_orders: int) -> str:
     """The strip of key figures: where the portfolio stands against its rules, each figure over the line that names
     its reference."""
-    low, high = config.BAND
-    target = config.TARGET[config.EQUITY]
+    low, high = rule_11.current_band()
+    target = rule_11.current_target()[config.EQUITY]
     figures = [
         ("Equity weight", fmt.pct(w_now["weight_equity"]), f"Target {_whole(target)}%, band {_whole(low)} to {_whole(high)}"),
         ("Drift from target", fmt.points((w_now["weight_equity"] - target) * 100),
@@ -471,12 +471,12 @@ TOP_UP_SHARE = 5  # the monthly top-up, per cent of the starting amount (rule 3)
 def _key_facts(first_day, costs: pd.DataFrame) -> str:
     """Key facts: the sleeves with the funds' full names, the band, the contributions, the rebalancing, the risk limit,
     the costs, the valuation, the first purchase and the benchmark, the index blend."""
-    low, high = config.BAND
+    low, high = rule_11.current_band()
     held = pd.read_csv(config.METHOD_DIR / "selection_tracking_difference.csv")
     held = held[held["held"] == "yes"].drop_duplicates("sleeve").set_index("sleeve")["fund"]
     rows = [
-        ("Equity sleeve", f"{held['equity']}, target {_whole(config.TARGET[config.EQUITY])}%"),
-        ("Bond sleeve", f"{held['bonds']}, target {_whole(config.TARGET[config.BONDS])}%"),
+        ("Equity sleeve", f"{held['equity']}, target {_whole(rule_11.current_target()[config.EQUITY])}%"),
+        ("Bond sleeve", f"{held['bonds']}, target {_whole(rule_11.current_target()[config.BONDS])}%"),
         ("Band", f"Equity between {_whole(low)}% and {_whole(high)}%"),
         ("Contributions", f"A starting amount, then a fixed monthly top-up of {TOP_UP_SHARE}% of it"),
         ("Rebalancing", "Through the top-ups, and back to target when equity leaves the band on a cycle day"),
@@ -499,10 +499,10 @@ def _key_facts(first_day, costs: pd.DataFrame) -> str:
 def _allocation(w_now, pending: str) -> tuple:
     """Chart 2: the allocation against the target and the band, a bullet chart: the weight as a bar, the target as a
     tick, the band shaded."""
-    low, high = config.BAND
+    low, high = rule_11.current_band()
     band_text = f"Band {_whole(low)} to {_whole(high)}"
-    rows = [("Equity", w_now["weight_equity"], config.TARGET[config.EQUITY], "@equity", band_text),
-            ("Bonds", w_now["weight_bonds"], config.TARGET[config.BONDS], "@bonds", "No band of its own")]  # fmt: skip
+    rows = [("Equity", w_now["weight_equity"], rule_11.current_target()[config.EQUITY], "@equity", band_text),
+            ("Bonds", w_now["weight_bonds"], rule_11.current_target()[config.BONDS], "@bonds", "No band of its own")]  # fmt: skip
     traces, annotations = [], []
     for name, w, target, role, band in rows:
         hover = f"{name} {fmt.pct(w)}<br>Target {fmt.pct(target)}<br>{band}"
@@ -526,8 +526,8 @@ def _allocation(w_now, pending: str) -> tuple:
     }  # fmt: skip
     cash = w_now["weight_cash"]
     table = _table(["Sleeve", "Weight", "Target weight", "Band"],
-                   [["Equity", fmt.pct(w_now["weight_equity"]), fmt.pct(config.TARGET[config.EQUITY]), band_text],
-                    ["Bonds", fmt.pct(w_now["weight_bonds"]), fmt.pct(config.TARGET[config.BONDS]), ""],
+                   [["Equity", fmt.pct(w_now["weight_equity"]), fmt.pct(rule_11.current_target()[config.EQUITY]), band_text],
+                    ["Bonds", fmt.pct(w_now["weight_bonds"]), fmt.pct(rule_11.current_target()[config.BONDS]), ""],
                     ["Cash", fmt.pct(cash), "", ""]], numeric=("Weight", "Target weight"), rounding=True)  # fmt: skip
     dates = _two_dates(w_now)
     unit = "Per cent of the portfolio, " + (dates[len("As of "):] if dates.startswith("As of ") else dates[0].lower() + dates[1:])
@@ -663,7 +663,7 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
 def rebalancing(page, daily, orders, band, compliance, monthly, now=None):
     history = daily.iloc[1:]
     empty = None if len(history) else "The equity weight starts on the first valuation day."
-    low, high = config.BAND
+    low, high = rule_11.current_band()
     traces = []
     if len(history):
         traces.append({"type": "scatter", "mode": "lines", "name": "Equity weight", "x": list(history["date"]),
@@ -1409,7 +1409,7 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
         like = market[market["sleeve"].isin(comparisons_module.EQUITY_LIKE)]
         share = {k: f"{float(like[k].sum()) * 100:.1f}" for k in ("published", "start", "current")}
         market_share = MARKET_SHARE.format(**share, day=fmt.day_words(market["current_as_of"].iloc[0]),
-                                           target=f"{config.TARGET[config.EQUITY] * 100:.0f}")  # fmt: skip
+                                           target=f"{rule_11.current_target()[config.EQUITY] * 100:.0f}")  # fmt: skip
     pane_notes = {
         "same_rules": ("Reference portfolio A follows the rules at net asset value without costs, so its difference to the "
                        "portfolio is the implementation cost with the opposite sign. Reference portfolio B goes back to "
@@ -1803,7 +1803,7 @@ def _tracking_notes(summary) -> str:
                      + (" with the top-up waiting for the cycle day" if waiting else "")
                      + f", it is {_basis_points(summary['tracking_error_highest'])} basis points, the highest of any day "
                      "since the first purchase.")  # fmt: skip
-    low, high = config.BAND
+    low, high = rule_11.current_band()
     parts.append(f"The estimated tracking error against the benchmark at the band's edge, fully invested, is "
                  f"{_basis_points(summary['tracking_error_band_edge'])} basis points a year, at {round(high * 100)}/"
                  f"{round((1 - high) * 100)} or {round(low * 100)}/{round((1 - low) * 100)}.")  # fmt: skip
@@ -2197,46 +2197,100 @@ def factor_view(page, loadings, rolling, as_of):
 # Method --------------------------------------------------------------------------------------------
 
 
-def _settings_text(allocation: pd.DataFrame, settings: pd.DataFrame, turning: pd.DataFrame = None) -> str:
-    """The sentences on how firm the split is, from mandate/allocation_check_settings.csv and
-    mandate/allocation_check_settings_turning.csv: the margin at the test's own settings, the test at MSCI's shares
-    of emerging markets for 2002 and for 1997, with the bond at 7 and at 6.7 years, the share at which the answer
-    turns, the count over every setting of the table, and the state of the target. The build stops when the tables
-    no longer bear the sentences out."""
-    if not len(settings):
+def _fall2(x) -> str:
+    """A worst fall set against the limit of 35 per cent, with two decimals: 0.34551 -> "34.55%"."""
+    return f"{float(x) * 100:.2f}%"
+
+
+def _sources_text(allocation: pd.DataFrame, comparison: pd.DataFrame = None, maturities: pd.DataFrame = None,
+                  regions: pd.DataFrame = None, record: pd.DataFrame = None) -> str:
+    """The sentences on how firm the split is, from mandate/allocation_check_comparison.csv,
+    mandate/allocation_check_maturities.csv, the date of mandate/allocation_check_regions.csv and the latest row of
+    outputs/allocation_record.csv: the deciding series' margin, the test on MSCI ACWI and on MSCI's regional returns,
+    why French's series decides, what each source covers and what of their gap is measured, the bond's maturity,
+    and rule 11. A worst fall set against the limit has two decimals. The build stops when the tables no longer bear
+    the sentences out."""
+    folder = config.ROOT / "mandate"
+    comparison = _read("allocation_check_comparison.csv", folder) if comparison is None else comparison
+    maturities = _read("allocation_check_maturities.csv", folder) if maturities is None else maturities
+    regions = _read("allocation_check_regions.csv", folder) if regions is None else regions
+    record = _read("allocation_record.csv") if record is None else record
+    if not len(comparison) or not len(maturities) or not len(regions):
         return ""
-    if turning is None:
-        turning = _read("allocation_check_settings_turning.csv", config.ROOT / "mandate")
     limit = 0.35
     held = allocation[allocation["chosen"] == "yes"].iloc[0]
-    by_year = {year: settings[settings["added_with"] == f"MSCI's share for {year}"].set_index("bond_maturity_years")
-               for year in (2002, 1997)}
-    turns = turning.set_index("bond_maturity_years")["turning_share"]
-    late, early = by_year[2002], by_year[1997]
-    split = lambda table, m: table.loc[m, "largest_split_within_limit"]  # noqa: E731
-    fall = lambda table, m: f"{table.loc[m, 'worst_fall_70_30'] * 100:.2f}"  # noqa: E731
-    share = lambda table: f"{table['emerging_share'].iloc[0] * 100:.1f}"  # noqa: E731
-    spread = settings["worst_fall_70_30"].max() - settings["worst_fall_70_30"].min()
-    if spread <= limit - held["worst_fall"]:
-        raise ValueError("The settings move 70/30's worst fall by less than its margin, and the text says more")
-    if {split(late, 7.0), split(late, 6.7)} != {"65/35"} or {split(early, 7.0), split(early, 6.7)} != {"70/30"}:
-        raise ValueError("The test no longer gives 65/35 at MSCI's share for 2002 and 70/30 at its share for 1997")
-    if not all(late["emerging_share"].iloc[0] < turns[m] <= early["emerging_share"].iloc[0] for m in (7.0, 6.7)):
-        raise ValueError("The share at which the answer turns no longer lies between MSCI's shares for 2002 and 1997")
-    within = int((settings["worst_fall_70_30"] <= limit).sum())
-    return (f" At the test's own settings 70/30's worst fall is {held['worst_fall'] * 100:.1f} per cent, "
-            f"{(limit - held['worst_fall']) * 100:.1f} points inside the limit, a margin smaller than the effect of the "
-            "two settings the test fixes, the emerging markets' share of the equity series and the bond's maturity. At "
-            f"MSCI's share of emerging markets for 2002, {share(late)} per cent, the test gives 65/35 with the bond at 7 "
-            f"or 6.7 years, the test's maturity and the bond fund's reported duration ({fall(late, 7.0)} and "
-            f"{fall(late, 6.7)} per cent). At its share for 1997, {share(early)} per cent, it gives 70/30 "
-            f"({fall(early, 7.0)} and {fall(early, 6.7)} per cent). The worst fall lies between the two years, and the "
-            f"answer turns at a share of {turns[7.0] * 100:.1f} per cent at 7 years and {turns[6.7] * 100:.1f} at 6.7, "
-            "so on MSCI's own figures the test does not decide between 70/30 and 65/35. Over the "
-            f"{len(settings)} settings of mandate/allocation_check_settings.csv, 70/30 stays within 35 per cent in "
-            f"{within}. The target is 70/30 and has not been amended. A change would be an amendment under rule 9. "
-            "65/35 is the lower edge of the band rule 5 allows around a target of 70/30. A weight at that edge is not "
-            "a target, and a target of 65/35 would carry a band of its own.")  # fmt: skip
+    deciding = comparison[comparison["role"] == "deciding"].iloc[0]
+    net = comparison[(comparison["role"] == "comparison") & (comparison["series"].str.startswith("MSCI's regional"))]
+    acwi = comparison[comparison["series"].str.startswith("MSCI ACWI")]
+    gross = comparison[comparison["role"] == "measure of the tax on dividends"]
+    if abs(deciding["worst_fall_70_30"] - held["worst_fall"]) > 1e-9 or deciding["largest_split_within_limit"] != "70/30":
+        raise ValueError("The comparison's deciding row is not the allocation test's result")
+    if set(net["largest_split_within_limit"]) | set(acwi["largest_split_within_limit"]) | set(gross["largest_split_within_limit"]) != {"65/35"}:
+        raise ValueError("The MSCI series no longer give 65/35, and the text says they do")
+    for rows in (net, acwi, gross):
+        with_dividend = rows[rows["before_december_2000"] == "price with the estimated dividend"]["worst_fall_70_30"].iloc[0]
+        without = rows[rows["before_december_2000"] == "price only"]["worst_fall_70_30"].iloc[0]
+        if not with_dividend < without:
+            raise ValueError("An MSCI range no longer runs from the series with the estimated dividend to the one without")
+    p1 = lambda v: f"{v * 100:.1f}"  # noqa: E731
+    p2 = lambda v: f"{v * 100:.2f}"  # noqa: E731
+    span = lambda rows: f"{p2(rows['worst_fall_70_30'].min())} to {p2(rows['worst_fall_70_30'].max())}"  # noqa: E731
+    msci = pd.concat([net, acwi])
+    dividend = pd.Series([rows["worst_fall_70_30"].max() - rows["worst_fall_70_30"].min() for rows in (net, acwi)])
+    tax = (net.set_index("before_december_2000")["worst_fall_70_30"]
+           - gross.set_index("before_december_2000")["worst_fall_70_30"])  # fmt: skip
+    if tax.max() - tax.min() > 0.001:
+        raise ValueError("The tax's share differs between the two ends of the range by more than the text rounds")
+    rest = gross["worst_fall_70_30"] - deciding["worst_fall_70_30"]
+    total = net["worst_fall_70_30"] - deciding["worst_fall_70_30"]
+    shorter = maturities.set_index("bond_maturity_years").loc[5.0]
+    day = pd.Timestamp(regions["holdings_as_of"].iloc[0])
+    text = (f" At the equity ETF's weights by region in the holdings file of {day.day} {day:%B %Y}, 70/30's worst fall "
+            f"is {p2(held['worst_fall'])} per cent, {p2(limit - held['worst_fall'])} points inside the limit. The fund "
+            f"tracks MSCI ACWI. On that index's own history 70/30 fell {span(acwi)} per cent, above the test's line of "
+            "35 and inside the mandate's outer bound of 40, and the largest split within 35 per cent is 65/35. The two "
+            f"sources disagree about the split. On French's returns 70/30 passes by {p2(limit - held['worst_fall'])} "
+            f"points, and on MSCI's it misses by {p2(msci['worst_fall_70_30'].min() - limit)} to "
+            f"{p2(msci['worst_fall_70_30'].max() - limit)}, {span(net)} per cent on its regional net returns at the "
+            "same weights. So the test does not decide between 70/30 and 65/35 across the two sources. French's "
+            "series decides because Kenneth French's library was the test's source fixed on 7 October 2026, before "
+            "the first order. MSCI's net returns in euro start in December 2000, four months after the peak of the "
+            "worst fall, and with an estimated dividend in the months before or without one, 70/30's worst fall on "
+            f"MSCI's indices moves by {p2(dividend.min())} to {p2(dividend.max())} points. Both sources can be "
+            "downloaded and the test run again: MSCI's series from its public tool, and French's files from his "
+            "library, which serves only its latest files. The files his library served on 19 November 2026 carry the "
+            "hashes committed in mandate/allocation_check_files.csv. The European Central Bank serves each of its "
+            "three series whole, and the same file holds a digest of the values the test reads from each. Rule 11 "
+            "takes a reading on those values alone. Where a download gives another value, it takes no reading until "
+            "an amendment names the new values. French's market returns include dividends and every stock for which his data "
+            "hold a market value, and his description names no tax on the dividends (Kenneth French, Data Library, "
+            "the description of his returns for developed and for emerging markets, read on 19 November 2026). MSCI's indices cover large and mid-sized companies, about 85 per cent of the investable market "
+            "(MSCI ACWI Index factsheet of 30 October 2026), and their net returns reinvest dividends after withholding "
+            "tax at the maximum rate, that of a foreign institutional investor with no tax treaty (MSCI, Index "
+            "Calculation Methodology for the MSCI "
+            "Equity Indexes, May 2015, section 2.2). On MSCI's gross returns, before the tax, 70/30 fell "
+            f"{span(gross)} per cent and the test still gives 65/35, so the tax is not what separates the two sources' "
+            f"splits. Of the {p1(total.min())} to {p1(total.max())} points between French's returns and MSCI's net "
+            f"returns at the same weights, the tax accounts for {p1(tax.mean())}, and the other {p1(rest.min())} to "
+            f"{p1(rest.max())} are not measured. Among those differences, MSCI's Pacific enters as one index, with "
+            "Japan's share of it as it was in each month, where French's series holds Japan and Asia Pacific ex Japan "
+            f"at their weights of {day.day} {day:%B %Y}, and MSCI Europe prices Israel, which French's series leaves "
+            "out. Each MSCI range runs from a series with an estimated dividend before "
+            "December 2000 to one without. With the bond at 5 years in place of 7 the test gives "
+            f"{shorter['largest_split_within_limit']} ({p2(shorter['worst_fall_70_30'])} per cent).")  # fmt: skip
+    if len(record):
+        last = record.iloc[-1]
+        end = pd.Period(str(last["month_end"]), "M").to_timestamp(how="end")
+        if str(last.get("reading", "yes")) == "no":
+            text += f" Rule 11's record at the month end of {end.day} {end:%B %Y}: no reading. {last['reason']}."
+        else:
+            held_on = pd.Timestamp(str(last["holdings_as_of"]))
+            text += (f" Rule 11's record at the month end of {end.day} {end:%B %Y}, on the holdings file of "
+                     f"{held_on.day} {held_on:%B %Y}: 70/30 falls {p2(last['worst_fall_70_30'])} per cent on the "
+                     f"deciding series, and the largest split within 35 per cent is {last['largest_split']}.")
+    return text + (" The target is 70/30, and from the cycle day of 5 January 2027 rule 11 moves it when the test, "
+                   "run again at each month end, gives the same split, other than the target, at two month ends in a "
+                   "row.")
 
 
 def _allocation_curve(page, allocation: pd.DataFrame, us: pd.DataFrame = None, settings: pd.DataFrame = None):
@@ -2247,7 +2301,7 @@ def _allocation_curve(page, allocation: pd.DataFrame, us: pd.DataFrame = None, s
     x = [fmt.rounded(v * 100, 2) for v in allocation["worst_fall"]]
     y = [fmt.rounded(v * 100, 2) for v in allocation["growth_per_year"]]
     held = [c == "yes" for c in allocation["chosen"]]
-    hover = [f"{s}: worst fall {fmt.pct(f)}, growth per year {fmt.pct(g)}"
+    hover = [f"{s}: worst fall {_fall2(f)}, growth per year {fmt.pct(g)}"
              for s, f, g in zip(splits, allocation["worst_fall"], allocation["growth_per_year"])]  # fmt: skip
     traces = [{"type": "scatter", "mode": "lines+markers", "name": "Splits", "x": x, "y": y, "showlegend": False,
                "line": {"color": "@other", "width": 2}, "marker": {"size": 8, "color": "@ink2"}, **_hover(hover)},
@@ -2259,7 +2313,7 @@ def _allocation_curve(page, allocation: pd.DataFrame, us: pd.DataFrame = None, s
         # The same test on the US stock market in euro: the second curve of the ladder, 70/30 marked on it as well.
         ux = [fmt.rounded(v * 100, 2) for v in us["worst_fall"]]
         uy = [fmt.rounded(v * 100, 2) for v in us["growth_per_year"]]
-        uhover = [f"US series, {s}: worst fall {fmt.pct(f)}, growth per year {fmt.pct(g)}"
+        uhover = [f"US series, {s}: worst fall {_fall2(f)}, growth per year {fmt.pct(g)}"
                   for s, f, g in zip(us["split"], us["worst_fall"], us["growth_per_year"])]  # fmt: skip
         at = list(us["split"]).index("70/30") if "70/30" in list(us["split"]) else None
         traces.append({"type": "scatter", "mode": "lines+markers", "name": "US series", "x": ux, "y": uy,
@@ -2284,17 +2338,17 @@ def _allocation_curve(page, allocation: pd.DataFrame, us: pd.DataFrame = None, s
               "yaxis": {"title": {"text": "Growth per year, per cent"}},
               "shapes": [_vline(35, "@status_breach"), _vline(40, "@status_breach")], "annotations": annotations,
               "margin": {"t": 24}}  # fmt: skip
-    rows = [[r["split"], fmt.pct(r["worst_fall"]), fmt.pct(r["growth_per_year"]), r["within_limit"], r["chosen"]]
+    rows = [[r["split"], _fall2(r["worst_fall"]), fmt.pct(r["growth_per_year"]), r["within_limit"], r["chosen"]]
             for _, r in allocation.iterrows()]  # fmt: skip
     headers = ["Split", "Worst fall", "Growth per year", "Within 35%", "Held"]
     numeric = ("Worst fall", "Growth per year")
     title = "The allocation test: growth per year against the worst fall of each split"
     source = "mandate/allocation_check_results.csv"
     note = ("The split held is the largest equity target weight whose worst fall stayed within 35 per cent. With "
-            "two assets every split lies on this curve, and the limit picks the point." + _settings_text(allocation, settings))  # fmt: skip
+            "two assets every split lies on this curve, and the limit picks the point." + _sources_text(allocation))  # fmt: skip
     if us is not None:
         by_split = us.set_index("split")
-        rows = [r + [fmt.pct(by_split.loc[r[0], "worst_fall"]), fmt.pct(by_split.loc[r[0], "growth_per_year"])] for r in rows]
+        rows = [r + [_fall2(by_split.loc[r[0], "worst_fall"]), fmt.pct(by_split.loc[r[0], "growth_per_year"])] for r in rows]
         headers += ["Worst fall, US series", "Growth per year, US series"]
         numeric += ("Worst fall, US series", "Growth per year, US series")
         title += ", on the global and the US equity series"
@@ -2578,7 +2632,7 @@ def _us_test(allocation: pd.DataFrame, us: pd.DataFrame, period: tuple, added) -
             (us, "US stock market", "@us_series", "US stock market")):  # fmt: skip
         traces.append({"type": "bar", "orientation": "h", "name": name, "y": splits,
                        "x": [fmt.rounded(v * 100, 2) for v in frame["worst_fall"]], "marker": {"color": colour},
-                       **_hover([f"{s}, {label}: worst fall {fmt.pct(v)}" for s, v in zip(splits, frame["worst_fall"])])})  # fmt: skip
+                       **_hover([f"{s}, {label}: worst fall {_fall2(v)}" for s, v in zip(splits, frame["worst_fall"])])})  # fmt: skip
     annotations = [_label(35, 1, "35%", yref="paper", anchor="right", role="@status_breach", xshift=-4, yshift=8),
                    _label(40, 1, "40%", yref="paper", anchor="left", role="@status_breach", xshift=4, yshift=8)]  # fmt: skip
     layout = {"barmode": "group", "bargap": 0.28, "bargroupgap": 0.06, "showlegend": True,
@@ -2588,7 +2642,7 @@ def _us_test(allocation: pd.DataFrame, us: pd.DataFrame, period: tuple, added) -
               "xaxis": {"title": {"text": "Worst fall, per cent"}, "rangemode": "tozero"},
               "shapes": [_vline(35, "@status_breach"), _vline(40, "@status_breach")], "annotations": annotations,
               "margin": {"t": 24}}  # fmt: skip
-    rows = [[s, fmt.pct(g["worst_fall"]), fmt.pct(u["worst_fall"]), fmt.pct(g["growth_per_year"]),
+    rows = [[s, _fall2(g["worst_fall"]), _fall2(u["worst_fall"]), fmt.pct(g["growth_per_year"]),
              fmt.pct(u["growth_per_year"]), g["within_limit"], u["within_limit"]]
             for s, (_, g), (_, u) in zip(splits, allocation.iterrows(), us.iterrows())]  # fmt: skip
     columns = ["Split", "Worst fall, global", "Worst fall, US", "Growth per year, global", "Growth per year, US",
@@ -2697,9 +2751,7 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
          "on the same history is {gap} points (the table under {test}). A circular block bootstrap of the two splits' paired "
          "months, which redraws the {years} years {draws} times in blocks of {block} months, gives the gap a standard "
          "error of {gap_error} points and a 95 per cent interval from {gap_low} to {gap_high} points a year, an interval "
-         "that includes zero, so {years} years do not fix the sign of the gap. On 19 November 2026 this comparison was "
-         "corrected: it had set the gap against the standard error of the equity series' mean, which is not the "
-         "yardstick for two splits on the same months. The rules and the split are unchanged. DeMiguel, Garlappi and Uppal "
+         "that includes zero, so {years} years do not fix the sign of the gap. DeMiguel, Garlappi and Uppal "
          "measured how much history a sample-based optimiser needs before it beats an equal split out of sample: about "
          "3,000 months for 25 assets and about 6,000 for 50.{n1} A replication of their study by the author of this page finds "
          "that none of the seven optimising rules it tests earns a higher Sharpe ratio than the equal split at the 5 "

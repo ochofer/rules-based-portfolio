@@ -41,7 +41,7 @@ def test_the_values_in_the_text_are_computed_from_the_committed_files():
             f"{gap_error:.1f} points and a 95 per cent interval from {low:+.1f} to {high:+.1f} points a year, an interval "
             "that includes zero, so 27 years do not fix the sign of the gap.").replace("-", "\u2212") in html
     assert low < 0 < high
-    assert "On 19 November 2026 this comparison was corrected" in html and "The rules and the split are unchanged." in html
+    assert "was corrected" not in html and "The rules and the split are unchanged." not in html
     assert "by the author of this page" in html and "by the same author" not in html
     country = pd.read_csv(config.OUTPUTS_DIR / "lookthrough_equity_country.csv").set_index("country")
     share = country.loc["United States", "share_of_sleeve"] * 100

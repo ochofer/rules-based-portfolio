@@ -35,7 +35,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import config
+from . import config, rule_11
 from . import formatting as fmt
 from . import notes as notes_module
 from . import trading_days
@@ -455,9 +455,10 @@ class Issue:
 
     def allocation(self) -> Exhibit:
         end = self.days.iloc[-1]
-        low, high = config.BAND
-        rows = [["Equity", fmt.pct(end["weight_equity"]), fmt.pct(config.TARGET[config.EQUITY]), f"{low * 100:.0f} to {high * 100:.0f}"],
-                ["Bonds", fmt.pct(end["weight_bonds"]), fmt.pct(config.TARGET[config.BONDS]), "n/a"],
+        target = rule_11.target_on(end["date"])
+        low, high = rule_11.band_of(target[config.EQUITY])
+        rows = [["Equity", fmt.pct(end["weight_equity"]), fmt.pct(target[config.EQUITY]), f"{low * 100:.0f} to {high * 100:.0f}"],
+                ["Bonds", fmt.pct(end["weight_bonds"]), fmt.pct(target[config.BONDS]), "n/a"],
                 ["Cash", fmt.pct(end["weight_cash"]), fmt.pct(0.0), "n/a"]]  # fmt: skip
         caption = f"Per cent of the portfolio at the close of {_words_day(end['date'])}, the last valuation day of the quarter."
         return Exhibit("table", "Allocation at the quarter end against the target and the band", caption,
@@ -465,12 +466,13 @@ class Issue:
 
     def weight(self) -> Exhibit:
         data = self.days[["date", "weight_equity"]].dropna()
-        low, high = config.BAND
+        target = rule_11.target_on(self.days.iloc[-1]["date"])
+        low, high = rule_11.band_of(target[config.EQUITY])
         series = [("Equity weight", list(data["date"]), [float(v) * 100 for v in data["weight_equity"]], EQUITY_HUE, 2.0, False)]
         lo = min(low * 100 - 3, min(v for v in series[0][2]) - 1)
         hi = max(high * 100 + 3, max(v for v in series[0][2]) + 1)
         body = _drawings(lambda w: line_chart(series, self._ticks(), w, "Per cent of the portfolio", y_range=(lo, hi),
-                                              band=(low * 100, high * 100), lines=[(config.TARGET[config.EQUITY] * 100, INK, "")],
+                                              band=(low * 100, high * 100), lines=[(target[config.EQUITY] * 100, INK, "")],
                                               title="Equity weight in its band"))  # fmt: skip
         ends = self._month_ends()
         body += _table(["Month end", "Equity", "Bonds", "Cash"], [[d.strftime("%Y-%m-%d"), fmt.pct(e), fmt.pct(b), fmt.pct(c)]

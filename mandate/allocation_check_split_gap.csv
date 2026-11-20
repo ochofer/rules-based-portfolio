@@ -1,2 +1,2 @@
 first_split,second_split,first_month,last_month,months,first_split_growth_per_year,second_split_growth_per_year,gap_per_year,mean_difference_per_year,difference_standard_deviation_per_year,mean_difference_standard_error_independent_months,block_months,draws,seed,gap_standard_error,gap_lower_95,gap_upper_95
-100/0,40/60,1999-02,2025-12,323,0.078212,0.052924,0.025288,0.032094,0.089788,0.017306,12,9999,20261119,0.024744,-0.024744,0.073492
+100/0,40/60,1999-02,2025-12,323,0.083365,0.054671,0.028695,0.035698,0.091975,0.017728,12,9999,20261119,0.024492,-0.021158,0.076360

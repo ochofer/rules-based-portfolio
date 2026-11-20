@@ -14,7 +14,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from . import config, rules_engine, trading_days
+from . import config, rule_11, rules_engine, trading_days
 from .ledger import Ledger
 from .references import _cycle_days
 
@@ -284,7 +284,8 @@ def compliance(ledger: Ledger, navs_eur: pd.DataFrame, today: date) -> tuple:
         values = {s: state["units"][s] * unit_value[s] for s in (E, B)}
         used = int((placed["date"].dt.to_period("M") == pd.Period(day, "M")).sum() if len(placed) else 0)
         used -= int(((placed["date"] == pd.Timestamp(day))).sum() if len(placed) else 0)
-        plan = rules_engine.plan(values[E], values[B], state["cash"], orders_used_this_month=used)
+        plan = rules_engine.plan(values[E], values[B], state["cash"], orders_used_this_month=used,
+                                 target=rule_11.target_on(day), band=rule_11.band_on(day))  # fmt: skip
         on_day = placed[placed["date"] == pd.Timestamp(day)] if len(placed) else placed
         done = {(o.sleeve, o.side) for o in on_day.itertuples()}
         wanted = {(o.sleeve, o.side) for o in plan.orders}
@@ -362,7 +363,7 @@ def monthly(
             "weight_equity": table.loc[last, "weight_equity"],
             "weight_bonds": table.loc[last, "weight_bonds"],
             "weight_cash": table.loc[last, "weight_cash"],
-            "drift_points": (table.loc[last, "weight_equity"] - config.TARGET[E]) * 100,
+            "drift_points": (table.loc[last, "weight_equity"] - rule_11.target_on(last)[E]) * 100,
             "drawdown": table.loc[last, "drawdown_portfolio"],
             "worst_fall_to_date": -table.loc[:last, "drawdown_portfolio"].min(),
             "orders": len(month_orders),

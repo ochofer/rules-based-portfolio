@@ -1,0 +1,9 @@
+source,series,file,header,hashed,values_read,first_period,last_period,sha256
+Kenneth French's library,North America,North_America_3_Factors_CSV.zip,This file was created using the 202609 Bloomberg database.,the file,,,,90932f0935812fc03e5dffb05ea23136c81e6d8d718558de875bae64daec8c26
+Kenneth French's library,Europe,Europe_3_Factors_CSV.zip,This file was created using the 202609 Bloomberg database.,the file,,,,842332540d9c86681cbda628c6acc9d75d0c1563e364a2bf6a535072f651471e
+Kenneth French's library,Japan,Japan_3_Factors_CSV.zip,This file was created using the 202609 Bloomberg database.,the file,,,,525605ffa42317b6a66389fb5911d5b2a7f34359b5cecdfa1c3aa52f63a6a15d
+Kenneth French's library,Asia Pacific ex Japan,Asia_Pacific_ex_Japan_3_Factors_CSV.zip,This file was created using the 202609 Bloomberg database.,the file,,,,d4496131f1e6b372c1969ee8966681a924155be076fd2346efcab70247404096
+Kenneth French's library,Emerging markets,Emerging_5_Factors_CSV.zip,This file was created using the 202609 Bloomberg database.,the file,,,,0573fd60948178daad54f577a6c87d1e5a183dfdc4a1a89ced3991cc95fd8ad3
+European Central Bank,"Euro reference rate against the US dollar, month end",EXR/D.USD.EUR.SP00.A,,"the values the test reads, to 8 decimals",324,1999-01,2025-12,eba79ad73fcac4c7120a51f37da70abe4cc506e529bccf57a0d773bbe761defb
+European Central Bank,"Seven-year spot rate of the euro area government curve, month end",YC/B.U2.EUR.4F.G_N_C.SV_C_YM.SR_7Y,,"the values the test reads, to 8 decimals",256,2004-09,2025-12,906af8377354e8f17b457c26bab3b5aa6e1c921fefb08ca1a68ed14787dd9ce4
+European Central Bank,"Ten-year government bond yield, monthly average",IRS/M.U2.L.L40.CI.0000.EUR.N.Z,,"the values the test reads, to 8 decimals",69,1999-01,2004-09,6b4bdaa92ee960bed3d9de57fd69f5910a4224e307e1207a644c21a0109cefe6

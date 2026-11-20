@@ -1,0 +1,8 @@
+series,role,returns,before_december_2000,dividend_estimate_per_year,worst_fall_65_35,worst_fall_70_30,worst_fall_75_25,peak_70_30,low_70_30,largest_split_within_limit,first_month,last_month,months
+French's regional returns at the fund's weights by region,deciding,"total, before tax",the same series,,0.307081,0.345508,0.376251,2000-08,2003-03,70/30,1999-02,2025-12,323
+MSCI's regional returns in euro at the same weights,comparison,"net, after tax",price with the estimated dividend,0.015113,0.320684,0.357494,0.386033,2000-08,2003-03,65/35,1999-02,2025-12,323
+MSCI's regional returns in euro at the same weights,comparison,"net, after tax",price only,0.015113,0.328560,0.358819,0.387580,2000-08,2003-03,65/35,1999-02,2025-12,323
+MSCI's regional returns in euro at the same weights,measure of the tax on dividends,"gross, before tax",price with the estimated dividend,0.019612,0.313546,0.353277,0.381622,2000-08,2003-03,65/35,1999-02,2025-12,323
+MSCI's regional returns in euro at the same weights,measure of the tax on dividends,"gross, before tax",price only,0.019612,0.322092,0.355021,0.383656,2000-08,2003-03,65/35,1999-02,2025-12,323
+"MSCI ACWI, the fund's own index, with the weights it had in each month",comparison,"net, after tax",price with the estimated dividend,0.016135,0.334709,0.363877,0.392919,2000-08,2003-03,65/35,1999-02,2025-12,323
+"MSCI ACWI, the fund's own index, with the weights it had in each month",comparison,"net, after tax",price only,0.016135,0.335876,0.365255,0.397319,2000-08,2003-03,65/35,1999-02,2025-12,323

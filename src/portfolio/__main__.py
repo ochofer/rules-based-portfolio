@@ -13,6 +13,9 @@ Commands:
                      cycle day and the month's figures; the words are written by hand
   build  [--date D]  the public files in outputs/ and the dashboard, index.html at the root
   privacy            check that no figure in outputs/ is a private amount of the ledger
+  regions [--month M] the equity ETF's weights by country for the allocation test, written to
+                     mandate/allocation_check_regions.csv: from the cached holdings file, or with --month YYYY-MM
+                     from the issuer's file of that month end as rule 11 reads it
   guide --print      print the guide to the dashboard, guide/guide.pdf, from its page, which build writes;
                      without --print, check that the PDF carries the page's words, title and author
 Add --refresh to download every source again first.
@@ -32,7 +35,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from . import config, cycle_report, ledger as ledger_module, notes, positions, prices, rules_engine
+from . import config, cycle_report, ledger as ledger_module, notes, positions, prices, rule_11, rules_engine
 from . import formatting as fmt, trading_days, valuations
 
 
@@ -97,12 +100,25 @@ def cmd_status(args) -> int:
     return 0
 
 
+def _stop_without_rows(day: date, record: pd.DataFrame = None) -> None:
+    """From the cycle day of 7 December 2026, the cycle command stops when a month end it reads has no row in the
+    record of rule 11: the row is written by the build, before the rules are applied."""
+    if day < rule_11.cycle_day_after(rule_11.FIRST_MONTH_END):
+        return
+    missing = rule_11.missing_rows(day, rule_11.load_record() if record is None else record)
+    if missing:
+        ends = " and ".join(f"{m.to_timestamp(how='end').day} {m.to_timestamp(how='end'):%B %Y}" for m in missing)
+        raise SystemExit(f"The record of rule 11, outputs/allocation_record.csv, has no row for the month end of {ends}. "
+                         "Run the build first, which writes it before the rules are applied.")
+
+
 def cmd_cycle(args) -> int:
     today = date.today()
     day = args.date or trading_days.cycle_day(today.year, today.month)
     expected = trading_days.cycle_day(day.year, day.month)
     if day != expected:
         print(f"Note: the cycle day of {day:%Y-%m} under rule 3 is {expected}, not {day}.")
+    _stop_without_rows(day)
     records, held, navs, series = _load(args.refresh, day)
     # Units and cash as recorded up to the cycle day (a late top-up included), valued at the net asset
     # values of the last trading day before it: the latest published when the orders are placed.
@@ -114,7 +130,9 @@ def cmd_cycle(args) -> int:
         & (records.contributions["moment"].dt.month == day.month)
     ]
     used = positions.orders_in_month(records, day.year, day.month)
-    plan = rules_engine.plan(v[config.EQUITY], v[config.BONDS], v["cash"], orders_used_this_month=used)
+    target, band, rule11 = rule_11.in_force(records, navs, day)
+    plan = rules_engine.plan(v[config.EQUITY], v[config.BONDS], v["cash"], orders_used_this_month=used, target=target,
+                             band=band)  # fmt: skip
     lines = [f"Cycle day {day} (rule 3). Values at the net asset values of {v['nav_date']:%Y-%m-%d}.", ""]
     stale = _stale(series, last_close)
     if not trading_days.us_market_open(day):
@@ -132,8 +150,11 @@ def cmd_cycle(args) -> int:
         f"Before: equity {_pct(wb[config.EQUITY])}, bonds {_pct(wb[config.BONDS])}, "
         f"cash {_pct(wb['cash'])} ({plan.before['cash']:.2f} EUR not yet invested)."
     )
+    if rule11:
+        lines.append(f"Rule 11: {rule_11.line(rule11)}.")
     lines.append(
-        f"Band of rule 5 (65 to 75 per cent): {'triggered' if plan.band_triggered else 'not triggered'}."
+        f"Band of rule 5 ({round(band[0] * 100)} to {round(band[1] * 100)} per cent): "
+        f"{'triggered' if plan.band_triggered else 'not triggered'}."
     )
     lines.append(f"Orders this month before today: {used} of {config.ORDERS_PER_MONTH}.")
     lines.append("")
@@ -176,7 +197,7 @@ def cmd_cycle(args) -> int:
     lines += plan.notes
     at = _now()
     values = {s: v[s] for s in (*config.SLEEVES, "cash")}
-    checks = cycle_report.before_orders(records, day, at, values, plan.orders)
+    checks = cycle_report.before_orders(records, day, at, values, plan.orders, target, band, rule11)
     lines += ["", "Cycle report, before the orders:"]
     lines += [f"  rule {c.rule}: {'pass' if c.passed else 'FAIL'}. {c.subject}: {c.figure}." for c in checks]
     text = "\n".join(lines)
@@ -196,7 +217,8 @@ def cmd_cycle(args) -> int:
     report = cycle_report.path_for(day)
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(
-        cycle_report.write_before(records, day, at, values, plan.orders, v["nav_date"]), encoding="utf-8"
+        cycle_report.write_before(records, day, at, values, plan.orders, v["nav_date"], target, band, rule11),
+        encoding="utf-8"
     )
     print(f"Cycle report written to {report.relative_to(config.ROOT)}. After the orders are in the ledger, run: "
           "python3 -m portfolio post")  # fmt: skip
@@ -243,12 +265,13 @@ def cmd_note(args) -> int:
     placed = records.orders[on_day & records.orders["rule"].isin(["4", "5", "4+5"])]
     after = values[config.EQUITY] + sum(o.amount_eur if o.side == "buy" else -o.amount_eur
                                         for o in plan.orders if o.sleeve == config.EQUITY)  # fmt: skip
-    low, high = (round(x * 100) for x in config.BAND)
+    target_weights, band, _ = rule_11.in_force(records, navs, day)
+    low, high = (round(x * 100) for x in band)
     month_top_ups = records.contributions[(records.contributions["kind"] == "top-up")
                                           & (records.contributions["moment"].dt.to_period("M") == month)]  # fmt: skip
     top_up = (f"Top-up (the fixed monthly contribution) recorded {month_top_ups['moment'].min().date()}"
               if len(month_top_ups) else "No top-up (the fixed monthly contribution) recorded this month")  # fmt: skip
-    target = round(config.TARGET[config.EQUITY] * 100)
+    target = round(target_weights[config.EQUITY] * 100)
     figures = [top_up,
                f"Equity weight {fmt.pct(values[config.EQUITY] / total)} before the cycle day and {fmt.pct(after / total)} "
                f"after it, against a target weight (the weight the rules aim for) of {target}%",
@@ -284,6 +307,25 @@ def cmd_build(args) -> int:
     page = site.build()
     print(f"Outputs as of {result['as_of']:%Y-%m-%d}: {len(result['files'])} files in outputs/.")
     print(f"Dashboard written to {page.relative_to(config.ROOT)}.")
+    return 0
+
+
+def cmd_regions(args) -> int:
+    from . import lookthrough
+
+    if args.month:
+        found = rule_11.holdings_at(pd.Period(args.month, "M"), date.today(), args.refresh)
+        if found is None:
+            raise ValueError(f"The issuer serves no holdings file for the month end of {args.month} yet.")
+        path, as_of = found
+    else:
+        path = config.CACHE_DIR / "ishares" / "IE00B6R52259_holdings.csv"
+        _, as_of = lookthrough.parse_ishares_holdings(path)
+    frame, _ = lookthrough.parse_ishares_holdings(path)
+    table = lookthrough.allocation_regions(lookthrough.equity_lines(frame), as_of)
+    out = config.ROOT / "mandate" / "allocation_check_regions.csv"
+    table.to_csv(out, index=False, float_format="%.6f", lineterminator="\n")
+    print(f"Wrote {out.relative_to(config.ROOT)} from the holdings file of {pd.Timestamp(as_of):%Y-%m-%d}.")
     return 0
 
 
@@ -360,6 +402,9 @@ def main(argv=None) -> int:
     q.add_argument("--print", action="store_true")
     q.add_argument("--printed", type=lambda s: datetime.strptime(s, "%Y-%m-%d").date())
     q.add_argument("--font")
+    r = sub.add_parser("regions")
+    r.add_argument("--month")
+    r.add_argument("--refresh", action="store_true")
     g = sub.add_parser("guide")
     g.add_argument("--print", action="store_true")
     g.add_argument("--check", action="store_true")
@@ -367,7 +412,8 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     try:
         commands = {"check": cmd_check, "status": cmd_status, "cycle": cmd_cycle, "post": cmd_post, "note": cmd_note,
-                    "build": cmd_build, "privacy": cmd_privacy, "quarterly": cmd_quarterly, "guide": cmd_guide}  # fmt: skip
+                    "build": cmd_build, "privacy": cmd_privacy, "quarterly": cmd_quarterly, "guide": cmd_guide,
+                    "regions": cmd_regions}  # fmt: skip
         return commands[args.command](args)
     except (
         ledger_module.LedgerError,

@@ -18,7 +18,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from . import config, ledger as ledger_module, risk, rules_engine, trading_days
+from . import config, ledger as ledger_module, risk, rule_11, rules_engine, trading_days
 from . import formatting as fmt
 
 E, B = config.EQUITY, config.BONDS
@@ -97,15 +97,17 @@ def _matches(proposed: dict, expected: dict, left_out: set, allowed: float = CEN
     )
 
 
-def check_rule_4(values: dict, proposed: list, reference, budget_binds: bool) -> Check:
+def check_rule_4(values: dict, proposed: list, reference, budget_binds: bool, target: dict = None) -> Check:
+    target = target or config.TARGET
     total = values[E] + values[B] + values["cash"]
     cash = values["cash"]
     subject = (
         "The cash buys the sleeve (the part of the portfolio held in one ETF) furthest below its target weight "
-        "(70 per cent equity, 30 per cent bonds), and the remainder buys the other"
+        f"({round(target[E] * 100)} per cent equity, {round(target[B] * 100)} per cent bonds), and the remainder "
+        "buys the other"
     )
     gap = ", ".join(
-        f"{NAME[s]} {fmt.points((values[s] / total - config.TARGET[s]) * 100)}" for s in config.SLEEVES
+        f"{NAME[s]} {fmt.points((values[s] / total - target[s]) * 100)}" for s in config.SLEEVES
     )
     raw = reference.orders + reference.below_minimum
     left_out = {o.sleeve for o in reference.below_minimum}
@@ -140,16 +142,18 @@ def check_minimum(proposed: list, reference) -> Check:
     return Check("4, reading", "No order below one euro", figure, not small)
 
 
-def check_rule_5(values: dict, proposed: list, reference, waits: bool) -> Check:
+def check_rule_5(values: dict, proposed: list, reference, waits: bool, target: dict = None, band: tuple = None) -> Check:
+    target, band = target or config.TARGET, band or config.BAND
+    low, high = (round(x * 100) for x in band)
     total = values[E] + values[B] + values["cash"]
     subject = (
-        "The equity weight against the band, the interval from 65 to 75 per cent, before and after the orders"
+        f"The equity weight against the band, the interval from {low} to {high} per cent, before and after the orders"
     )
     p5 = _parts(proposed, "5")
     left_out = {o.sleeve for o in reference.below_minimum}
     if waits:
         expected = rules_engine.rule_5(
-            {s: values[s] for s in config.SLEEVES}, values["cash"], invest_cash=False
+            {s: values[s] for s in config.SLEEVES}, values["cash"], invest_cash=False, target=target, band=band
         )
         expected = {s: expected[s] if abs(expected[s]) >= CENT else 0.0 for s in config.SLEEVES}
         triggered = any(abs(a) >= CENT for a in expected.values())
@@ -160,14 +164,20 @@ def check_rule_5(values: dict, proposed: list, reference, waits: bool) -> Check:
         allowed = CENT
     after = values[E] + sum(_signed(o) for o in proposed if o.sleeve == E)
     passed = _matches(p5, expected, left_out, allowed)
-    low, high = (round(x * 100) for x in config.BAND)
     figure = f"Equity {fmt.pct(values[E] / total)} before and {fmt.pct(after / total)} after. "
     figure += (
-        f"Outside {low} to {high} after the top-up, so back to 70/30" if triggered else "Band not triggered"
+        f"Outside {low} to {high} after the top-up, so back to {rule_11.split_name(target[E])}" if triggered
+        else "Band not triggered"
     )
     if not passed:
         figure += ". The proposed band orders differ from the rule's"
     return Check("5", subject, figure, passed)
+
+
+def check_rule_11(row: dict, record: pd.DataFrame = None) -> Check:
+    """Rule 11: the two month ends the cycle day reads, the reading of each, and the target and the band in force."""
+    return Check("11", "The target follows the allocation test, read at the two month ends before the cycle day",
+                 rule_11.line(row, record), True)
 
 
 def check_rule_6(used: int, proposed: list) -> Check:
@@ -220,23 +230,25 @@ def check_rule_10(records, proposed: list) -> Check:
     return Check("10", subject, figure, known)
 
 
-def before_orders(records, day: date, at: datetime, values: dict, proposed: list) -> list:
+def before_orders(records, day: date, at: datetime, values: dict, proposed: list, target: dict = None,
+                  band: tuple = None, rule11: dict = None) -> list:  # fmt: skip
     """Every check of the report, in the order of the rules. values are euro values of each sleeve and of
-    cash at the last net asset values; proposed are the orders the cycle command gives."""
+    cash at the last net asset values; proposed are the orders the cycle command gives. target and band are those
+    in force on the day under rule 11, and rule11 the day's row of its table, from 5 January 2027."""
     used = orders_before(records, day, at)
-    reference = rules_engine.plan(values[E], values[B], values["cash"])  # rules 4 and 5, without the budget
+    reference = rules_engine.plan(values[E], values[B], values["cash"], target=target, band=band)  # without the budget
     budget_binds = used + len(reference.orders) > config.ORDERS_PER_MONTH
     waits = budget_binds and all(abs(_parts(proposed, "4")[s]) < CENT for s in config.SLEEVES)
     return [
         check_rule_2(records, day),
         check_rule_3(day),
-        check_rule_4(values, proposed, reference, budget_binds),
+        check_rule_4(values, proposed, reference, budget_binds, target),
         check_minimum(proposed, reference),
-        check_rule_5(values, proposed, reference, waits),
+        check_rule_5(values, proposed, reference, waits, target, band),
         check_rule_6(used, proposed),
         check_rule_7(day, at),
         check_rule_10(records, proposed),
-    ]
+    ] + ([check_rule_11(rule11)] if rule11 else [])
 
 
 def _cell(text: str) -> str:
@@ -262,9 +274,10 @@ def proposal_rows(values: dict, proposed: list) -> list:
     return rows
 
 
-def write_before(records, day: date, at: datetime, values: dict, proposed: list, nav_day) -> str:
+def write_before(records, day: date, at: datetime, values: dict, proposed: list, nav_day, target: dict = None,
+                 band: tuple = None, rule11: dict = None) -> str:  # fmt: skip
     """The text of the report before the orders."""
-    checks = before_orders(records, day, at, values, proposed)
+    checks = before_orders(records, day, at, values, proposed, target, band, rule11)
     failed = [c for c in checks if not c.passed]
     lines = [
         f"# Cycle report, {day:%B %Y}",
@@ -336,7 +349,8 @@ def proposal_on(records, navs_eur: pd.DataFrame, day: date) -> tuple:
     values = {s: state["units"][s] * float(unit_value[s]) for s in config.SLEEVES}
     values["cash"] = state["cash"]
     used = orders_before(records, day)
-    plan = rules_engine.plan(values[E], values[B], values["cash"], orders_used_this_month=used)
+    target, band, _ = rule_11.in_force(records, navs_eur, day)
+    plan = rules_engine.plan(values[E], values[B], values["cash"], orders_used_this_month=used, target=target, band=band)
     return values, plan
 
 

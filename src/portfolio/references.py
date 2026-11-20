@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import config, prices, rules_engine, trading_days
+from . import config, prices, rule_11, rules_engine, trading_days
 from .ledger import Ledger
 
 E, B = config.EQUITY, config.BONDS
@@ -54,10 +54,13 @@ def simulate(ledger: Ledger, navs_eur: pd.DataFrame, end: date, mode: str, targe
     """Daily values in euro of a reference portfolio: mode "rules" for A, "calendar" for B.
 
     target and band, when given, replace 70/30 and its band, so that the same rules run around another split
-    for the comparisons. Returns one row per valuation day from the first purchase: units of each sleeve, cash
-    and value.
+    for the comparisons. Without them the reference follows the target weights in force on each cycle day under
+    rule 11, and its own band from that day, as the rule reads it for its own equity weight. Returns one row per
+    valuation day from the first purchase: units of each sleeve, cash and value.
     """
+    fixed = target is not None
     target = target or config.TARGET
+    inside = rule_11.band_of(target[E])
     if mode not in ("rules", "calendar"):
         raise ValueError(mode)
     contributions = ledger.contributions
@@ -88,6 +91,11 @@ def simulate(ledger: Ledger, navs_eur: pd.DataFrame, end: date, mode: str, targe
             last_close = pd.Timestamp(trading_days.previous_trading_day(cycle.date()))
             before = navs_eur.loc[:last_close, [E, B]].iloc[-1]
             values = {s: units[s] * before[s] for s in (E, B)}
+            if not fixed:
+                target = rule_11.target_on(cycle)
+                buys = rules_engine.rule_4(values, cash, target)
+                weight = (values[E] + buys[E]) / (values[E] + values[B] + cash)
+                band, inside = rule_11.band_for(weight, target[E], inside)
             if mode == "rules":
                 plan = rules_engine.plan(values[E], values[B], cash, target=target, band=band)
                 signed = {o.sleeve: (o.amount_eur if o.side == "buy" else -o.amount_eur) for o in plan.orders}
@@ -212,6 +220,7 @@ def index_blend(growth: pd.Series, msci: pd.Series, bond_month: pd.Series, today
         if month not in level.index or previous not in level.index or month not in bond_month.index:
             break
         equity = level[month] / level[previous] - 1
-        blend = config.TARGET[E] * equity + config.TARGET[B] * float(bond_month[month])
+        target = rule_11.target_on(last_day[month])
+        blend = target[E] * equity + target[B] * float(bond_month[month])
         out[month] = out[previous] * (1 + blend)
     return pd.Series({last_day[m]: v for m, v in out.items()}, name="index_blend", dtype=float)
