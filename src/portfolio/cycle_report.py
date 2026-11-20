@@ -322,11 +322,17 @@ def tracking_line(values: dict, proposed: list, out_dir=None) -> str:
     after = {s: values[s] + sum(_signed(o) for o in proposed if o.sleeve == s) for s in config.SLEEVES}
     before_te = risk.tracking_error(risk.active_weights(values[E] / total, values[B] / total, shares), cov)
     after_te = risk.tracking_error(risk.active_weights(after[E] / total, after[B] / total, shares), cov)
-    return (f"Information, no check: the estimated tracking error (the standard deviation over a year of the "
-            f"portfolio's return less the benchmark's, 70 per cent equity and 30 per cent bonds, estimated from index "
-            f"returns at the covariance and look-through of the build of {components['as_of'].iloc[0]}) is "
-            f"{round(before_te * 1e4)} basis points at the weights before the orders and {round(after_te * 1e4)} at the "
-            f"weights the proposed orders give. It triggers nothing.")  # fmt: skip
+    as_of = components["as_of"].iloc[0]
+    start, end = (pd.Period(str(components[c].iloc[0]), "M") for c in ("window_start", "window_end"))
+    months = (end - start).n + 1
+    return (f"Information, no check. The benchmark is the index blend: 70 per cent MSCI ACWI net total return and 30 per "
+            f"cent the Bloomberg Euro-Aggregate Treasury index, in euro, rebalanced at each month end. The estimated "
+            f"tracking error against it is the standard deviation over a year of the portfolio's return less the "
+            f"benchmark's, computed from the covariance of index returns over the {months} months from {start} to {end} "
+            f"and the look-through (the portfolio's exposure to the securities inside the two ETFs) of {as_of}. A basis "
+            f"point is one hundredth of a percentage point. The estimated tracking error is {round(before_te * 1e4)} "
+            f"basis points at the weights before the orders and {round(after_te * 1e4)} at the weights the proposed "
+            f"orders give. It triggers nothing.")  # fmt: skip
 
 
 def state_before(records, day: date) -> dict:

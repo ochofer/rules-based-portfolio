@@ -152,5 +152,17 @@ def test_the_proposal_recomputed_from_the_ledger(records):
 def test_the_report_carries_the_estimated_tracking_error_as_information(records):
     text = cr.write_before(records(), DAY, AT, VALUES, plan().orders, "2026-11-04")
     line = cr.tracking_line(VALUES, plan().orders)
-    assert line.startswith("Information, no check: the estimated tracking error") and line in text
+    assert line.startswith("Information, no check. The benchmark is the index blend: 70 per cent") and line in text
     assert "It triggers nothing." in line and "checks pass" in text.split(line)[0]
+    # The report is a document of its own, so the line defines each term at its first use in it.
+    for definition in ("The benchmark is the index blend", "look-through (the portfolio's exposure to the securities",
+                       "A basis point is one hundredth of a percentage point."):
+        assert definition in line
+    assert line.index("A basis point is") < line.index("basis points at")
+    # The covariance carries the window of the build's components table, and the look-through its date.
+    components = pd.read_csv(config.OUTPUTS_DIR / "risk_components.csv")
+    start, end = (pd.Period(str(components[c].iloc[0]), "M") for c in ("window_start", "window_end"))
+    window = (f"computed from the covariance of index returns over the {(end - start).n + 1} months from {start} to {end} "
+              f"and the look-through (the portfolio's exposure to the securities inside the two ETFs) of "
+              f"{components['as_of'].iloc[0]}.")
+    assert window in line and "120 months" in window

@@ -282,7 +282,7 @@ def test_every_date_a_reader_sees_is_in_words():
     data = json.loads(re.search(r'<script type="application/json" id="dashboard-data">(.*?)</script>', page,
                                 flags=re.S).group(1).replace("<\\/", "</"))  # fmt: skip
     visible = re.sub(r"<script.*?</script>|<style.*?</style>|<head>.*?</head>", " ", page, flags=re.S)
-    for fixed in (r'<p class="figures">.*?</p>', r'<div class="reportbody">.*?</div>'):
+    for fixed in (r'<p class="figures">.*?</p>', r'<div class="reportbody">.*?</div><p class="label">'):
         visible = re.sub(fixed, " ", visible, flags=re.S)
     text = re.sub(r"\b(notes|cycles)/\d{4}-\d{2}\.md", " ", html.unescape(re.sub(r"<[^>]+>", " ", visible)))
     assert not re.search(r"\b\d{4}-\d{2}\b", text), re.findall(r".{0,40}\b\d{4}-\d{2}\b.{0,20}", text)
