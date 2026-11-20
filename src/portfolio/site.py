@@ -1777,7 +1777,8 @@ TRACKING_NOTE = (
     "reason for an order.")
 TRACKING_STUDY = (
     "{study} has the same measure as its objective: a constrained optimiser keeps a portfolio of French's 49 industries "
-    "close to its benchmark, and five covariance estimators understate their own tracking error, by 22 to 61 per cent. "
+    "close to its benchmark, and five covariance estimators understate their own tracking error, the realised active "
+    "return being 22 to 61 per cent more volatile than forecast. "
     "Here the rules set the weights, so nothing has searched for the weights that make the estimate small. The realised "
     "tracking error against the benchmark appears from the sixth month end, with the number of monthly differences it "
     "rests on. It also holds the two funds' tracking of their indices and their costs, which the estimate leaves out, so "
@@ -2577,24 +2578,26 @@ CITATIONS.update(zip(ESSAY_NOTES, NOTES))
 OTHER_PROJECTS = (
     ("Optimal versus naive diversification.",
      "Under an index-tracking mandate on French's 49 industries, five covariance estimators understate their own "
-     "tracking error, by 22 to 61 per cent. The replication of DeMiguel, Garlappi and Uppal (2009) reproduces 29 of "
-     "the 30 Sharpe ratios that carry a band.",
+     "tracking error over 1979 to 2026: the realised active return is 22 to 61 per cent more volatile than forecast. "
+     "The replication of DeMiguel, Garlappi and Uppal (2009) reproduces 29 of the 30 Sharpe ratios that carry a band, "
+     "26 of 27 with the value-weighted market counted once.",
      (("Page", STUDY_URL), ("dashboard", SITE_URL + "optimal-vs-naive-diversification/dashboard/B-P_dashboard.html"),
       ("note", SITE_URL + "optimal-vs-naive-diversification/note/B-P_note_2026-10.pdf"),
       ("code", "https://github.com/ochofer/optimal-vs-naive-diversification"))),
     ("Climate risk as an equity signal.",
-     "An ownership graph linking 328 listed companies to the 5,115 tracked assets they own. Of 19 apparent "
-     "ownership changes checked by hand, 12 had no transaction behind them.",
+     "An ownership graph linking 328 ownership entities in the US and developed Europe, 302 of them listed companies "
+     "with a price series, to 5,115 asset holdings, built from Global Energy Monitor's free tracker. Of 19 apparent "
+     "ownership changes drawn at random and checked by hand, 12 had no corporate event behind them.",
      (("Page", PROJECTS_URL + "climate-risk-equity-signal/"),
-      ("note", "https://github.com/ochofer/paper1-hazard-exposure-data/releases/download/note-v1.2/"
+      ("note", "https://github.com/ochofer/paper1-hazard-exposure-data/releases/download/note-v1.3/"
                "what-a-vintage-difference-measures.pdf"),
       ("code", "https://github.com/ochofer/paper1-hazard-exposure-data"))),
     ("Volatility-managed portfolios: a replication, the real-time critique, and the months after the sample.",
-     "Volatility estimation and position sizing on Ken French's equity factors, backtested out of sample and without "
-     "look-ahead, replicating Moreira and Muir (2017) and Cederburg, O'Doherty, Wang and Yan (2020). Scaled by "
-     "the inverse of last month's realised variance, a factor has a Sharpe ratio above the original's beyond its 95 "
-     "per cent interval for one of six factors, momentum, and the 136 months after Moreira and Muir's sample cannot "
-     "tell any difference from zero.",
+     "Volatility estimation and position sizing on Ken French's equity factors, replicating Moreira and Muir (2017) "
+     "and the real-time critique of Cederburg, O'Doherty, Wang and Yan (2020). Scaled by the inverse of last month's "
+     "realised variance, a factor has a Sharpe ratio above the original's beyond its 95 per cent interval for momentum "
+     "alone, among six intervals read without adjustment, and for no factor after Holm's correction for the six tests. "
+     "The 136 months after Moreira and Muir's sample cannot tell any difference from zero.",
      (("Page", PROJECTS_URL + "volatility-managed-portfolios/"),
       ("dashboard", SITE_URL + "volatility-managed-portfolios/dashboard/B-Q_dashboard.html"),
       ("note", SITE_URL + "volatility-managed-portfolios/note/B-Q_note_2026-11.pdf"),
@@ -2603,8 +2606,8 @@ OTHER_PROJECTS = (
      "A point-in-time S&P 500 universe from CRSP and Compustat, a long-only mandate held close to its cap-weighted "
      "benchmark, and an attribution of its active return by sector. Under the mandate, simulated from 1999 to 2024, "
      "four covariance estimators realise 78.9 to 83.6 basis points a year of tracking error, and each forecast "
-     "understates it: realised over forecast is 1.48 to 1.85. Index changes force 11.4 per cent of the turnover on the "
-     "Ledoit-Wolf estimator, and no active return is distinguishable from zero.",
+     "understates it: the realised active return is 48 to 85 per cent more volatile than forecast. Index changes force "
+     "11.4 per cent of the turnover on the Ledoit-Wolf estimator, and no active return is distinguishable from zero.",
      (("Page", PROJECTS_URL + "stock-level-tracking/"),
       ("dashboard", SITE_URL + "stock-level-tracking/dashboard/"),
       ("note", SITE_URL + "stock-level-tracking/note/stock-level-tracking_note_2026-11.pdf"),
