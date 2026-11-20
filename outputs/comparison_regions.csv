@@ -1,33 +1,41 @@
 as_of,comparator,snapshot,region,weight
-2026-11-13,first_ranked,2026-11-13,Emerging markets,0.1102400777
-2026-11-13,first_ranked,2026-11-13,Europe and Middle East,0.1408191199
-2026-11-13,first_ranked,2026-11-13,North America,0.6776677774
-2026-11-13,first_ranked,2026-11-13,Pacific,0.071273025
-2026-11-13,held,2026-11-13,Emerging markets,0.1107079716
-2026-11-13,held,2026-11-13,Europe and Middle East,0.1406916192
-2026-11-13,held,2026-11-13,North America,0.6773956478
-2026-11-13,held,2026-11-13,Pacific,0.0712047614
-2026-11-13,lifestrategy_60,2026-09-30,Emerging markets,0.1049116532
-2026-11-13,lifestrategy_60,2026-09-30,Europe and Middle East,0.1402759528
-2026-11-13,lifestrategy_60,2026-09-30,North America,0.6700537354
-2026-11-13,lifestrategy_60,2026-09-30,Pacific,0.0847586586
-2026-11-13,lifestrategy_80,2026-09-30,Emerging markets,0.102573647
-2026-11-13,lifestrategy_80,2026-09-30,Europe and Middle East,0.1391365821
-2026-11-13,lifestrategy_80,2026-09-30,North America,0.6671387998
-2026-11-13,lifestrategy_80,2026-09-30,Pacific,0.0911509711
-2026-11-13,mag7,2026-11-10,Emerging markets,0
-2026-11-13,mag7,2026-11-10,Europe and Middle East,0
-2026-11-13,mag7,2026-11-10,North America,1
-2026-11-13,mag7,2026-11-10,Pacific,0
-2026-11-13,msci_world,2026-11-13,Emerging markets,0
-2026-11-13,msci_world,2026-11-13,Europe and Middle East,0.1584103262
-2026-11-13,msci_world,2026-11-13,North America,0.7615289958
-2026-11-13,msci_world,2026-11-13,Pacific,0.080060678
-2026-11-13,nasdaq100,2026-11-10,Emerging markets,0
-2026-11-13,nasdaq100,2026-11-10,Europe and Middle East,0
-2026-11-13,nasdaq100,2026-11-10,North America,1
-2026-11-13,nasdaq100,2026-11-10,Pacific,0
-2026-11-13,sp500,2026-11-10,Emerging markets,0
-2026-11-13,sp500,2026-11-10,Europe and Middle East,0
-2026-11-13,sp500,2026-11-10,North America,1
-2026-11-13,sp500,2026-11-10,Pacific,0
+2026-11-19,first_ranked,2026-11-19,Emerging markets,0.1099860265
+2026-11-19,first_ranked,2026-11-19,Europe and Middle East,0.1416788313
+2026-11-19,first_ranked,2026-11-19,North America,0.6760361814
+2026-11-19,first_ranked,2026-11-19,Pacific,0.0722989608
+2026-11-19,held,2026-11-18,Emerging markets,0.1096103484
+2026-11-19,held,2026-11-18,Europe and Middle East,0.1404237648
+2026-11-19,held,2026-11-18,North America,0.6784026274
+2026-11-19,held,2026-11-18,Pacific,0.0715632594
+2026-11-19,lifestrategy_60,2026-09-30,Emerging markets,0.1049116532
+2026-11-19,lifestrategy_60,2026-09-30,Europe and Middle East,0.1402759528
+2026-11-19,lifestrategy_60,2026-09-30,North America,0.6700537354
+2026-11-19,lifestrategy_60,2026-09-30,Pacific,0.0847586586
+2026-11-19,lifestrategy_60,2026-10-31,Emerging markets,0.1010717985
+2026-11-19,lifestrategy_60,2026-10-31,Europe and Middle East,0.1403982616
+2026-11-19,lifestrategy_60,2026-10-31,North America,0.6755977177
+2026-11-19,lifestrategy_60,2026-10-31,Pacific,0.0829322221
+2026-11-19,lifestrategy_80,2026-09-30,Emerging markets,0.102573647
+2026-11-19,lifestrategy_80,2026-09-30,Europe and Middle East,0.1391365821
+2026-11-19,lifestrategy_80,2026-09-30,North America,0.6671387998
+2026-11-19,lifestrategy_80,2026-09-30,Pacific,0.0911509711
+2026-11-19,lifestrategy_80,2026-10-31,Emerging markets,0.099040874
+2026-11-19,lifestrategy_80,2026-10-31,Europe and Middle East,0.139793621
+2026-11-19,lifestrategy_80,2026-10-31,North America,0.670500495
+2026-11-19,lifestrategy_80,2026-10-31,Pacific,0.0906650101
+2026-11-19,mag7,2026-11-10,Emerging markets,0
+2026-11-19,mag7,2026-11-10,Europe and Middle East,0
+2026-11-19,mag7,2026-11-10,North America,1
+2026-11-19,mag7,2026-11-10,Pacific,0
+2026-11-19,msci_world,2026-11-19,Emerging markets,0
+2026-11-19,msci_world,2026-11-19,Europe and Middle East,0.1593467543
+2026-11-19,msci_world,2026-11-19,North America,0.7594478784
+2026-11-19,msci_world,2026-11-19,Pacific,0.0812053673
+2026-11-19,nasdaq100,2026-11-10,Emerging markets,0
+2026-11-19,nasdaq100,2026-11-10,Europe and Middle East,0
+2026-11-19,nasdaq100,2026-11-10,North America,1
+2026-11-19,nasdaq100,2026-11-10,Pacific,0
+2026-11-19,sp500,2026-11-10,Emerging markets,0
+2026-11-19,sp500,2026-11-10,Europe and Middle East,0
+2026-11-19,sp500,2026-11-10,North America,1
+2026-11-19,sp500,2026-11-10,Pacific,0
