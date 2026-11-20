@@ -385,6 +385,12 @@ BANK_STATUS = ("Rabobank publishes returns by calendar year only, after the fund
                "over the record's dates")
 
 
+def late_status(values: pd.Series, last: pd.Timestamp) -> str:
+    """Why a comparator has no figures when its net asset values end before the record's last day, or "" when they
+    reach it."""
+    return f"net asset values only to {values.index.max():%Y-%m-%d}" if values.index.max() < last else ""
+
+
 def _comparison_inputs(refresh, today, navs, table, alt_usd, alt_eur, look, equity_as_of, sheet, out_dir) -> tuple:
     """The second stage's inputs to the comparisons, each from its publisher, and their rows of the sources table.
 
@@ -405,8 +411,8 @@ def _comparison_inputs(refresh, today, navs, table, alt_usd, alt_eur, look, equi
         except UNREADABLE:
             spec[key] = {"eur": None, "status": f"series not read on {read_on}"}
             continue
-        if values.index.max() < last:
-            spec[key] = {"eur": None, "status": f"net asset values only to {values.index.max():%Y-%m-%d}"}
+        if late_status(values, last):
+            spec[key] = {"eur": None, "status": late_status(values, last)}
             continue
         on_days = values.reindex(values.index.union(navs.index)).ffill().reindex(navs.index)
         dollar = currency == "USD"

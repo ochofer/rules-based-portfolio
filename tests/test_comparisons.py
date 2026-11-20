@@ -207,7 +207,12 @@ def test_the_comparisons_part_on_the_page():
     method = page.split('id="view-method"', 1)[1]
     assert ('<details class="ch-pane" id="method-history"><summary><span class="ch-pane__head"><span class="ch-pane__title">'
             'History, 1999 to 2025</span><span class="ch-pane__members">The split and the dollar effects</span>') in method
-    assert "4 Nov to" in summary_rows(part, "The Mag7 fund") and "How the one-fund comparators&#x27; funds were chosen" in part
+    assert "How the one-fund comparators&#x27; funds were chosen" in part
+    # The Mag7 fund's row follows the data the page is built from. Where its net asset values reach the record's last day,
+    # the row gives its days from 4 November to that day. Where they end before it, the row is n/a with their last day.
+    row = summary_rows(part, "The Mag7 fund")
+    for text, held in mag7_row_texts().items():
+        assert (text in row) is held, (text, row)
     # The market portfolio's pane: the note opens on what the comparator is, and its weight table follows the chart.
     pane = part.split('id="pane-market"', 1)[1].split('<details class="ch-pane"', 1)[0]
     assert pane.index("is a comparator the portfolio&#x27;s design names, and the benchmark remains the index blend") \
@@ -234,6 +239,39 @@ def test_the_comparisons_part_on_the_page():
     assert charts["comparisons-same-rules"]["layout_narrow"]["xaxis"]["tickvals"] == [min(days), max(days)]
     assert charts["c12"]["layout_narrow"]["xaxis"]["nticks"] == 4
     assert [t["name"] for t in charts["c21"]["traces"]][2] == "US series"
+
+
+def mag7_row_texts() -> dict:
+    """The text the Mag7 fund's summary row must hold (True) and must not hold (False), decided from
+    outputs/comparisons_daily.csv: whether the fund's growth, a column the table drops when the fund has none, reaches
+    the record's last day, and if not, the last day its net asset values reach as outputs/comparisons.csv gives it."""
+    from portfolio import config
+    from portfolio import formatting as fmt
+
+    daily = pd.read_csv(config.OUTPUTS_DIR / "comparisons_daily.csv")
+    last = daily["date"].max()
+    rows = pd.read_csv(config.OUTPUTS_DIR / "comparisons.csv", keep_default_na=False).set_index("comparator")
+    reaches = "growth_mag7" in daily and bool(daily.loc[daily["date"] == last, "growth_mag7"].notna().any())
+    if reaches:
+        assert rows.loc["mag7", "status"] == "" and rows.loc["mag7", "last_day"] == last
+        return {f"4 Nov to {fmt.day_short(last)}": True, "Net asset values only to": False}
+    status = rows.loc["mag7", "status"]
+    assert status.startswith("net asset values only to ") and status.split()[-1] < last
+    return {f"Net asset values only to {fmt.day_short(status.split()[-1])}": True, "4 Nov to": False}
+
+
+def test_a_comparator_whose_prices_end_before_the_record_s_last_day_shows_n_a_with_their_last_day():
+    from portfolio import outputs, site
+
+    days = pd.bdate_range("2026-11-04", "2026-11-19")
+    last = days[-1]
+    assert outputs.late_status(pd.Series(1.0, index=days), last) == ""
+    late = outputs.late_status(pd.Series(1.0, index=days[:-1]), last)
+    assert late == "net asset values only to 2026-11-18"
+    row = {"comparator": "mag7", "status": late, "first_day": float("nan"), "last_day": float("nan"), "periods": 0}
+    assert site._window(row) == "Net asset values only to 18 Nov 2026"
+    row = {"comparator": "mag7", "status": "", "first_day": "2026-11-04", "last_day": "2026-11-19", "periods": 11}
+    assert site._window(row) == "4 Nov to 19 Nov 2026, 11 days"
 
 
 def summary_rows(part, name):
