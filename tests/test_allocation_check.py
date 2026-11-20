@@ -278,3 +278,14 @@ def test_the_files_table_holds_french_s_five_files_and_the_ecb_s_three_series():
     ecb = files[files["source"] == ac.ECB_SOURCE].set_index("file")
     assert ecb.loc["EXR/D.USD.EUR.SP00.A", ["values_read", "first_period", "last_period"]].tolist() == ["324", "1999-01", "2025-12"]
     assert all(len(h) == 64 for h in files["sha256"])
+
+
+def test_the_fund_documents_name_the_two_funds_of_the_fund_check():
+    documents = pd.read_csv(ROOT / "mandate" / "allocation_check_fund_documents.csv", dtype=str)
+    assert list(documents["isin"]) == ["LU1829220216", "IE00BH04GL39"]
+    for row, key in zip(documents.itertuples(), ("equity", "bonds")):
+        assert row.isin in ac.FUND_CHECK[key][0] and row.page.isdigit() and len(row.sha256) == 64
+        assert row.address.startswith("https://") and pd.Timestamp(row.as_at) <= pd.Timestamp(row.downloaded)
+        assert ac.FUND_CHECK[key][0].startswith(row.fund)
+    text = (ROOT / "mandate" / "allocation_check_results.md").read_text(encoding="utf-8")
+    assert ac.fund_documents_text() in text

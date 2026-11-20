@@ -64,7 +64,7 @@ The table gives, for 70/30, the fall in each period and the return of each sleev
 
 ## How closely the constructed returns follow two funds
 
-The table gives calendar-year returns in euro, in per cent, of the constructed series and of a fund that tracks the same market. The equity fund is Amundi MSCI All Country World UCITS ETF EUR Acc (LU1829220216), an MSCI ACWI fund that reports its returns in euro, and the bond fund is Vanguard EUR Eurozone Government Bond UCITS ETF (EUR) Accumulating (IE00BH04GL39), the bond ETF the portfolio holds. The fund returns are from the issuers' factsheets of 31 August 2026. The difference is the constructed return minus the fund's, in percentage points.
+The table gives calendar-year returns in euro, in per cent, of the constructed series and of a fund that tracks the same market. The equity fund is Amundi MSCI All Country World Swap UCITS ETF EUR Acc (LU1829220216), an MSCI ACWI fund that reports its returns in euro, and the bond fund is Vanguard EUR Eurozone Government Bond UCITS ETF (EUR) Accumulating (IE00BH04GL39), the bond ETF the portfolio holds. The fund returns are from the issuers' factsheets as at 31 October 2026, page 1 of Amundi's and page 2 of Vanguard's, downloaded on 20 November 2026. The two documents are kept outside the repository, and mandate/allocation_check_fund_documents.csv gives each one's address, table and SHA-256 hash. The difference is the constructed return minus the fund's, in percentage points.
 
 | Year | Equity, constructed | Equity fund | Difference | Bonds, constructed | Bond fund | Difference |
 |---|---|---|---|---|---|---|

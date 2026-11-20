@@ -204,14 +204,29 @@ SOURCES.update({f"msci_{code}_{variant.lower()}": MSCI_URL.format(variant=varian
 # markets, as their issuers publish them. The comparison shows how closely the
 # constructed returns follow returns an investor in euro received.
 FUND_CHECK = {
-    "equity": ("Amundi MSCI All Country World UCITS ETF EUR Acc (LU1829220216)",
+    "equity": ("Amundi MSCI All Country World Swap UCITS ETF EUR Acc (LU1829220216)",
                "an MSCI ACWI fund that reports its returns in euro",
                {2021: 27.33, 2022: -13.15, 2023: 17.91, 2024: 25.19, 2025: 7.68}),
     "bonds": ("Vanguard EUR Eurozone Government Bond UCITS ETF (EUR) Accumulating (IE00BH04GL39)",
               "the bond ETF the portfolio holds",
               {2021: -3.54, 2022: -18.45, 2023: 7.15, 2024: 1.77, 2025: 0.57}),
 }
-FACTSHEET_DATE = "31 August 2026"
+# The two factsheets these returns are read from, kept outside the repository: each document's name, date, the day
+# it was downloaded, its page and table, its address and its SHA-256 hash. Each address serves the latest factsheet,
+# so the hash belongs to the day of the download.
+FUND_DOCUMENTS = os.path.join(ROOT, "mandate", "allocation_check_fund_documents.csv")
+
+
+def fund_documents_text():
+    """The sentence that names the two factsheets of FUND_DOCUMENTS."""
+    documents = pd.read_csv(FUND_DOCUMENTS, dtype=str)
+    dates = sorted(set(documents["as_at"]))
+    when = " and ".join(f"{pd.Timestamp(d).day} {pd.Timestamp(d):%B %Y}" for d in dates)
+    pages = " and ".join(f"page {r.page} of {r.document.split(chr(39))[0]}'s" for r in documents.itertuples())
+    downloaded = " and ".join(f"{pd.Timestamp(d).day} {pd.Timestamp(d):%B %Y}" for d in sorted(set(documents["downloaded"])))
+    return (f"The fund returns are from the issuers' factsheets as at {when}, {pages}, downloaded on {downloaded}. The two "
+            "documents are kept outside the repository, and mandate/allocation_check_fund_documents.csv gives each one's "
+            "address, table and SHA-256 hash.")
 
 
 def fetch(name, attempts=3):
@@ -1131,7 +1146,7 @@ def main():
     (equity_fund, equity_role, equity_published), (bond_fund, bond_role, bond_published) = FUND_CHECK["equity"], FUND_CHECK["bonds"]
     out.append(f"The table gives calendar-year returns in euro, in per cent, of the constructed series and of a fund that tracks the same market. "
                f"The equity fund is {equity_fund}, {equity_role}, and the bond fund is {bond_fund}, {bond_role}. "
-               f"The fund returns are from the issuers' factsheets of {FACTSHEET_DATE}. "
+               f"{fund_documents_text()} "
                f"The difference is the constructed return minus the fund's, in percentage points.")
     out.append("")
     out.append("| Year | Equity, constructed | Equity fund | Difference | Bonds, constructed | Bond fund | Difference |")
