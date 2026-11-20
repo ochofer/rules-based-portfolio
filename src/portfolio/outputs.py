@@ -203,6 +203,10 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     written.append(_write(loadings, "factor_loadings.csv", loadings["window_end"].max(), out_dir))
     written.append(_write(rolling, "factor_rolling.csv", rolling["window_end"].max(), out_dir))
 
+    # The cost of ownership is written before the comparisons, whose table of costs reads it, so that the table
+    # carries the figure of this build.
+    kids = risk.fetch_kids(refresh)
+    written.append(_write(_ownership(kids, weights_now), "cost_of_ownership.csv", as_of, out_dir))
     extra, comparison_sources = _comparison_inputs(refresh, today, navs, table, alt_usd, alt_eur, look, equity_as_of,
                                                    factsheets.iloc[-1], out_dir)  # fmt: skip
     compared = comparisons.build(records, navs, values, table, ref_a, ref_b, blend, rate, today, extra)
@@ -216,7 +220,7 @@ def build(refresh: bool = False, today: date = None, out_dir: Path = config.OUTP
     # The risk comes after the comparisons, since the month-end record keeps the realised tracking error against the
     # benchmark beside the estimate.
     risk_written, risk_sources = _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, records,
-                                       now["nav_date"], daily_out, compared["summary"])  # fmt: skip
+                                       now["nav_date"], daily_out, compared["summary"], kids)  # fmt: skip
     written += risk_written
 
     checks = _checks(records, navs, look, weights_now, loadings)
@@ -252,10 +256,29 @@ def _checks(records, navs, look, weights_now, loadings) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["check", "result", "detail"])
 
 
-def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, records, nav_date, daily, compared) -> tuple:
+def _ownership(kids: dict, weights_now) -> pd.DataFrame:
+    """The cost of ownership: each ETF's ongoing costs, its TER and transaction costs from its key information
+    document, and the two weighted by the sleeve weights of the record's date."""
+    cost_rows = []
+    for sleeve in config.SLEEVES:
+        k = kids[sleeve]
+        cost_rows.append({"sleeve": sleeve, "fund": config.NAME[sleeve], "isin": config.ISIN[sleeve], "weight": weights_now[sleeve],
+                          "management_fees": k["management_fees"], "transaction_costs": k["transaction_costs"],
+                          "ongoing_costs": k["management_fees"] + k["transaction_costs"], "document_date": k["document_date"]})  # fmt: skip
+    costs = pd.DataFrame(cost_rows)
+    return pd.concat([costs, pd.DataFrame([{"sleeve": "portfolio", "fund": "Weighted by the sleeve weights",
+                                            "weight": float(costs["weight"].sum()),
+                                            "management_fees": float((costs["weight"] * costs["management_fees"]).sum()),
+                                            "transaction_costs": float((costs["weight"] * costs["transaction_costs"]).sum()),
+                                            "ongoing_costs": float((costs["weight"] * costs["ongoing_costs"]).sum())}])],
+                     ignore_index=True)  # fmt: skip
+
+
+def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, records, nav_date, daily, compared,
+          kids) -> tuple:  # fmt: skip
     """The look-through's risk (risk.py): components, correlations, risk contributions, the frontier, the
-    estimates and their record, the estimated tracking error against the benchmark, the episodes, and the cost of
-    ownership."""
+    estimates and their record, the estimated tracking error against the benchmark and the episodes. kids holds the
+    two ETFs' key information documents, whose dates go into the sources."""
     levels = risk.fetch_regions(refresh, today)
     spot = risk.fetch_curve(refresh)
     components = risk.component_returns(levels, spot)
@@ -334,20 +357,6 @@ def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, re
                              "estimated_volatility_reported_duration": estimate_reported}])  # fmt: skip
     test = risk.allocation_test_returns()
     episodes = risk.stress(components, test, weights)
-    kids = risk.fetch_kids(refresh)
-    cost_rows = []
-    for sleeve in config.SLEEVES:
-        k = kids[sleeve]
-        cost_rows.append({"sleeve": sleeve, "fund": config.NAME[sleeve], "isin": config.ISIN[sleeve], "weight": weights_now[sleeve],
-                          "management_fees": k["management_fees"], "transaction_costs": k["transaction_costs"],
-                          "ongoing_costs": k["management_fees"] + k["transaction_costs"], "document_date": k["document_date"]})  # fmt: skip
-    costs = pd.DataFrame(cost_rows)
-    costs = pd.concat([costs, pd.DataFrame([{"sleeve": "portfolio", "fund": "Weighted by the sleeve weights",
-                                             "weight": float(costs["weight"].sum()),
-                                             "management_fees": float((costs["weight"] * costs["management_fees"]).sum()),
-                                             "transaction_costs": float((costs["weight"] * costs["transaction_costs"]).sum()),
-                                             "ongoing_costs": float((costs["weight"] * costs["ongoing_costs"]).sum())}])],
-                      ignore_index=True)  # fmt: skip
     sources = [
         ("MSCI North America, Europe, Pacific and Emerging Markets, net total return in euro, month-end levels",
          f"msci/region_{risk.REGIONS[0][1]}_netr_eur_monthly.json", levels.attrs["last_day"]),
@@ -363,7 +372,6 @@ def _risk(refresh, today, out_dir, as_of, look, equity, weights_now, monthly, re
         _write(summary, "risk_summary.csv", as_of, out_dir),
         _write(history, "ex_ante_risk.csv", as_of, out_dir),
         _write(episodes, "stress.csv", as_of, out_dir),
-        _write(costs, "cost_of_ownership.csv", as_of, out_dir),
     ], sources
 
 

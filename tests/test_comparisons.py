@@ -532,6 +532,16 @@ def test_the_costs_beside_the_comparisons():
     assert all_in["bps_low"] == pytest.approx(74) and all_in["bps_high"] == pytest.approx(79)
 
 
+def test_the_table_of_costs_carries_the_ongoing_costs_of_its_own_build():
+    from portfolio import config
+
+    fees = pd.read_csv(config.OUTPUTS_DIR / "comparison_fees.csv").set_index(["comparator", "item"])
+    ownership = pd.read_csv(config.OUTPUTS_DIR / "cost_of_ownership.csv").set_index("sleeve")
+    row = fees.loc[("portfolio", "Ongoing costs of the two ETFs at the portfolio's weights")]
+    assert row["as_of"] == ownership.loc["portfolio", "as_of"]
+    assert row["bps_low"] == pytest.approx(ownership.loc["portfolio", "ongoing_costs"] * 1e4, abs=1e-6)
+
+
 def test_the_rabobank_cost_overview_is_read_from_its_text():
     from portfolio import prices
 
