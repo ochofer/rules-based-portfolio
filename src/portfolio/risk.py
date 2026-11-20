@@ -412,8 +412,8 @@ def tail(window_returns: pd.DataFrame, weights: pd.Series, volatility_a_year: fl
 
 # Tracking error against the benchmark ----------------------------------------------------------------
 #
-# The benchmark is the policy the rules implement: the target weights of rule 1, with each sleeve's shares of the
-# components taken as its fund's. Each fund's look-through is rescaled to its invested holdings, so that the fund's
+# The benchmark is the policy the rules implement: the target weights in force, 70 and 30 per cent until rule 11
+# changes them, with each sleeve's shares of the components taken as its fund's. Each fund's look-through is rescaled to its invested holdings, so that the fund's
 # own cash line, part of the fund's tracking of its index, is not counted as cash; the portfolio's own cash is.
 # A component's active weight is its weight in the portfolio less its weight in the benchmark. The estimated
 # tracking error against the benchmark is the standard deviation of the active return over a year that the covariance implies for the
@@ -458,11 +458,12 @@ def covariance_from_tables(components: pd.DataFrame, pairs: pd.DataFrame) -> pd.
     return corr * np.outer(vol, vol)
 
 
-def active_weights(equity: float, bonds: float, shares: pd.Series) -> pd.Series:
+def active_weights(equity: float, bonds: float, shares: pd.Series, target: dict = None) -> pd.Series:
     """The components' active weights at the given sleeve weights, in shares of the portfolio. The rest of the
-    portfolio is its own cash, whose active weight is the cash itself and which has no return."""
+    portfolio is its own cash, whose active weight is the cash itself and which has no return. The benchmark is at
+    the target weights in force, or at target when given."""
     sleeve_weight = {config.EQUITY: equity, config.BONDS: bonds}
-    target = rule_11.current_target()
+    target = target or rule_11.current_target()
     return pd.Series({c: (sleeve_weight[SLEEVE_OF[c]] - target[SLEEVE_OF[c]]) * shares[c] for c in COMPONENTS})
 
 

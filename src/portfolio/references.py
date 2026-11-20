@@ -4,13 +4,15 @@ Reference portfolio A receives the same contributions on the same days as the po
 same rules on the same cycle days: the orders come from the rules engine on the net asset values of the
 last trading day before the cycle day, as for the portfolio, and execute at the net asset value of the
 cycle day, in fractional units and without costs. Reference portfolio B receives the same contributions
-and goes back to 70/30 on every cycle day. Both invest the starting amount at 70/30 at the net asset
-value of the day of the first purchase.
+and goes back to the target weights in force on every cycle day. Both invest the starting amount at 70/30
+at the net asset value of the day of the first purchase.
 
-The index blend is 70 per cent MSCI ACWI net total return in euro and 30 per cent the Bloomberg
-Euro-Aggregate Treasury index, rebalanced at each month end. Bloomberg publishes no public series, so the
-bond part is the benchmark's one-month return in Vanguard's monthly factsheet, and the blend is monthly.
-It starts at the first month end after the first purchase, at the portfolio's level on that day.
+The index blend is MSCI ACWI net total return in euro and the Bloomberg Euro-Aggregate Treasury index at
+the target weights, rebalanced at each month end to the target weights in force on that day: 70 and 30 per
+cent until rule 11 changes them, and a change enters the blend at the first month end after the cycle day it
+applies from. Bloomberg publishes no public series, so the bond part is the benchmark's one-month return in
+Vanguard's monthly factsheet, and the blend is monthly. It starts at the first month end after the first
+purchase, at the portfolio's level on that day.
 """
 
 from __future__ import annotations
@@ -198,6 +200,14 @@ def parse_msci(path: Path) -> pd.Series:
     return pd.Series(values, name="msci_acwi_netr_eur").sort_index()
 
 
+def blend_weights(month_end) -> dict:
+    """The target weights the index blend holds over the month after a month end: those in force on that month
+    end's last valuation day. A change of the target weights on a cycle day therefore enters the blend at the first
+    month end after it, and no month's return is computed at a split decided after the month began. The
+    benchmark's effects take the same weights (comparisons._benchmark_effects)."""
+    return rule_11.target_on(month_end)
+
+
 def index_blend(growth: pd.Series, msci: pd.Series, bond_month: pd.Series, today: date) -> pd.Series:
     """The index blend at each completed month end, starting at the portfolio's level on the first.
 
@@ -220,7 +230,7 @@ def index_blend(growth: pd.Series, msci: pd.Series, bond_month: pd.Series, today
         if month not in level.index or previous not in level.index or month not in bond_month.index:
             break
         equity = level[month] / level[previous] - 1
-        target = rule_11.target_on(last_day[month])
+        target = blend_weights(last_day[previous])
         blend = target[E] * equity + target[B] * float(bond_month[month])
         out[month] = out[previous] * (1 + blend)
     return pd.Series({last_day[m]: v for m, v in out.items()}, name="index_blend", dtype=float)

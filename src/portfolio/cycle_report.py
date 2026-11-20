@@ -299,14 +299,14 @@ def write_before(records, day: date, at: datetime, values: dict, proposed: list,
                   _table(["Order", "Sleeve", "Side", "Share of the portfolio", "Rule"], proposal_rows(values, proposed)), ""]  # fmt: skip
     else:
         lines += ["No order is proposed.", ""]
-    tracking = tracking_line(values, proposed)
+    tracking = tracking_line(values, proposed, target=target)
     if tracking:
         lines += [tracking, ""]
     lines += ["## After the orders", "", PENDING, ""]
     return "\n".join(lines)
 
 
-def tracking_line(values: dict, proposed: list, out_dir=None) -> str:
+def tracking_line(values: dict, proposed: list, out_dir=None, target: dict = None) -> str:
     """One information line: the estimated tracking error against the benchmark at the weights before the orders
     and at the weights the proposed orders give, at the covariance and look-through of the last build. It is no
     check and triggers nothing. Empty when the build's risk tables are missing."""
@@ -320,13 +320,17 @@ def tracking_line(values: dict, proposed: list, out_dir=None) -> str:
     shares = risk.shares_from_components(components)
     total = values[E] + values[B] + values["cash"]
     after = {s: values[s] + sum(_signed(o) for o in proposed if o.sleeve == s) for s in config.SLEEVES}
-    before_te = risk.tracking_error(risk.active_weights(values[E] / total, values[B] / total, shares), cov)
-    after_te = risk.tracking_error(risk.active_weights(after[E] / total, after[B] / total, shares), cov)
+    # The figures stand against the target its words give: on the cycle day a change applies, the cycle day's
+    # target, before the build writes it to outputs/allocation_targets.csv.
+    held = target or rule_11.current_target()
+    before_te = risk.tracking_error(risk.active_weights(values[E] / total, values[B] / total, shares, held), cov)
+    after_te = risk.tracking_error(risk.active_weights(after[E] / total, after[B] / total, shares, held), cov)
     as_of = components["as_of"].iloc[0]
     start, end = (pd.Period(str(components[c].iloc[0]), "M") for c in ("window_start", "window_end"))
     months = (end - start).n + 1
-    return (f"Information, no check. The benchmark is the index blend: 70 per cent MSCI ACWI net total return and 30 per "
-            f"cent the Bloomberg Euro-Aggregate Treasury index, in euro, rebalanced at each month end. The estimated "
+    return (f"Information, no check. The benchmark is the index blend: {held[E] * 100:.0f} per cent MSCI ACWI net total "
+            f"return and {held[B] * 100:.0f} per cent the Bloomberg Euro-Aggregate Treasury index, in euro, rebalanced at "
+            f"each month end. The estimated "
             f"tracking error against it is the standard deviation over a year of the portfolio's return less the "
             f"benchmark's, computed from the covariance of index returns over the {months} months from {start} to {end} "
             f"and the look-through (the portfolio's exposure to the securities inside the two ETFs) of {as_of}. A basis "

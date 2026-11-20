@@ -116,6 +116,34 @@ def test_index_blend_starts_at_the_first_month_end_and_moves_monthly():
     assert blend.iloc[1] == pytest.approx(100 * (1 + 0.7 * 0.02 + 0.3 * 0.01))
 
 
+def made_up_change(cycle_day: str = "2027-01-05", split: str = "65/35") -> pd.DataFrame:
+    """A targets table of rule 11 with one invented change of the target weights on a cycle day."""
+    from portfolio import rule_11
+
+    equity = rule_11.split_weight(split)
+    return pd.DataFrame([{"cycle_day": cycle_day, "first_month_end": "2026-11", "first_reading": split,
+                          "second_month_end": "2026-12", "second_reading": split, "target_before": "70/30",
+                          "target_after": split, "band_low": str(round(equity - 0.05, 4)),
+                          "band_high": str(round(equity + 0.05, 4))}], columns=rule_11.TARGET_COLUMNS)  # fmt: skip
+
+
+def test_a_change_of_target_enters_the_index_blend_at_the_month_end_after_its_cycle_day(monkeypatch):
+    from portfolio import rule_11
+
+    monkeypatch.setattr(rule_11, "load", lambda *args, **kwargs: made_up_change())
+    days = pd.to_datetime(["2026-12-31", "2027-01-29", "2027-02-26", "2027-03-01"])
+    growth = pd.Series([100.0, 101.0, 102.0, 102.5], index=days)
+    msci = pd.Series([500.0, 510.0, 520.2], index=days[:3])
+    bonds = pd.Series([0.01, -0.005], index=pd.PeriodIndex(["2027-01", "2027-02"], freq="M"))
+    blend = references.index_blend(growth, msci, bonds, date(2027, 3, 2))
+    # January's return is at 70/30, the weights of 31 December, though the change applies from 5 January.
+    assert blend.iloc[1] == pytest.approx(100 * (1 + 0.70 * 0.02 + 0.30 * 0.01))
+    # February's is at 65/35, the weights in force on January's last valuation day.
+    assert blend.iloc[2] == pytest.approx(blend.iloc[1] * (1 + 0.65 * (520.2 / 510 - 1) + 0.35 * -0.005))
+    assert references.blend_weights(pd.Timestamp("2026-12-31")) == {"equity": 0.70, "bonds": 0.30}
+    assert references.blend_weights(pd.Timestamp("2027-01-29")) == {"equity": 0.65, "bonds": 0.35}
+
+
 def test_cycle_days_after_the_first_purchase():
     assert references._cycle_days(date(2026, 10, 8), date(2026, 12, 31)) == [
         date(2026, 11, 5),

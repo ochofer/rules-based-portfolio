@@ -31,7 +31,7 @@ so the bonds against the rate, cash, split and the dollar sum to it exactly. Ove
 residual is the difference of the cumulative returns minus the sum of the daily effects, and timing is the
 comparator's money-weighted minus time-weighted return, less the portfolio's.
 
-The second stage adds 70/30 under the same rules with the first-ranked equity fund, and one fund in place of two:
+The second stage adds the same rules with the first-ranked equity fund, and one fund in place of two:
 the S&P 500 alternative, the MSCI World fund, the two LifeStrategy funds, the Nasdaq-100 fund and the Mag7 fund,
 each bought with the same contributions on the same days at its net asset value in euro and held. The Mag7 fund's
 series starts on 4 November 2026, so its comparison starts at that day's close with the portfolio's value, and
@@ -67,21 +67,28 @@ MIN_DAILY_RETURNS = 20  # daily returns before a daily comparator's volatility, 
 REGION_NAMES = ("North America", "Europe and Middle East", "Pacific", "Emerging markets")
 CASH_REGION = "Cash"
 
-# Key, name and equity target of each split. 70/30 is reference portfolio A.
+# Key, name and equity target of each split. Reference portfolio A holds the target weights in force, 70/30 until
+# rule 11 changes them.
 SPLITS = (
     ("split_100_0", "100/0", 1.00),
     ("split_90_10", "90/10", 0.90),
     ("split_80_20", "80/20", 0.80),
     ("split_60_40", "60/40", 0.60),
 )
+# 70/30 at its band, held fixed, beside the record from the first cycle day on which the target weights in force
+# under rule 11 differ from 70/30, so that a change of the target stays visible. Before that day it is reference
+# portfolio A and has no row.
+FIXED_SPLIT = ("split_70_30", "70/30 fixed", 0.70)
 # Key, name and pane of every row of the summary table, in its order. The portfolio is the base row.
 ROWS = (
     ("portfolio", "The portfolio", None),
     ("benchmark", "The benchmark, the index blend", "same_rules"),
     ("reference_a", "Reference portfolio A", "same_rules"),
     ("reference_b", "Reference portfolio B", "same_rules"),
-    *((key, name, "splits") for key, name, _ in SPLITS),
-    ("first_ranked", "70/30 with the first-ranked funds", "same_rules"),
+    *((key, name, "splits") for key, name, _ in SPLITS[:3]),
+    (FIXED_SPLIT[0], FIXED_SPLIT[1], "splits"),
+    *((key, name, "splits") for key, name, _ in SPLITS[3:]),
+    ("first_ranked", "The same rules with the first-ranked funds", "same_rules"),
     ("sp500", "The S&P 500 alternative", "one_fund"),
     ("msci_world", "The MSCI World fund", "one_fund"),
     ("lifestrategy_60", "LifeStrategy 60% Equity", "one_fund"),
@@ -109,6 +116,14 @@ def split_target(equity: float) -> dict:
 def split_band(equity: float) -> tuple:
     """Rule 5's band around another target, within 0 and 1. For 100/0 it never binds."""
     return (max(0.0, round(equity - BAND_HALF_WIDTH, 10)), min(1.0, round(equity + BAND_HALF_WIDTH, 10)))
+
+
+def fixed_split_shown(end, table: pd.DataFrame = None) -> bool:
+    """Whether 70/30 fixed is beside the record: once a cycle day on or before end has target weights in force under
+    rule 11 other than 70/30."""
+    table = rule_11.load() if table is None else table
+    rows = rule_11._rows_to(end, table)
+    return bool(len(rows)) and any(rule_11.split_weight(str(t)) != FIXED_SPLIT[2] for t in rows["target_after"])
 
 
 def savings(ledger: Ledger, rate: pd.Series, days: pd.DatetimeIndex) -> pd.DataFrame:
@@ -494,6 +509,9 @@ def simulations(ledger: Ledger, navs: pd.DataFrame, values: pd.DataFrame, table:
     sims = {"reference_a": ref_a, "reference_b": ref_b}
     for key, _, equity in SPLITS:
         sims[key] = references.simulate(ledger, navs, end, "rules", split_target(equity), split_band(equity))
+    if fixed_split_shown(end):
+        key, _, equity = FIXED_SPLIT
+        sims[key] = references.simulate(ledger, navs, end, "rules", split_target(equity), split_band(equity))
     first = extra.get("first_ranked")
     if first is not None and first.get("eur") is not None:
         sims["first_ranked"] = references.simulate(ledger, _with_equity(navs, first["eur"]), end, "rules")
@@ -656,7 +674,7 @@ def build(ledger: Ledger, navs: pd.DataFrame, values: pd.DataFrame, table: pd.Da
 
     r = pd.DataFrame({k: _returns(g) for k, g in growth.items()})
     funds = _fund_returns(navs, days)
-    state = {k: _state(sims[k], navs, days) for k in ["reference_a", *(s[0] for s in SPLITS)]}
+    state = {k: _state(sims[k], navs, days) for k in ["reference_a", *(s[0] for s in (*SPLITS, FIXED_SPLIT))] if k in sims}
     if "first_ranked" in sims:
         navs_f = _with_equity(navs, extra["first_ranked"]["eur"])
         state["first_ranked"] = _state(sims["first_ranked"], navs_f, days)
@@ -773,8 +791,9 @@ def _benchmark_row(name: str, pane: str, blend: pd.Series, portfolio: pd.Series)
 
 def _benchmark_effects(row, blend, r, funds, state, ref_b, navs, days) -> list:
     """The benchmark's effects by month once its difference is shown: implementation and drift summed by day,
-    split, the dollar and cash from reference portfolio B's weights at each month start against 70/30, and the
-    funds' costs and tracking differences in the residual until the fund-cost effect is built."""
+    split, the dollar and cash from reference portfolio B's weights at each month start against the weights the
+    blend holds over the month (references.blend_weights), and the funds' costs and tracking differences in the
+    residual until the fund-cost effect is built."""
     blend = blend.dropna()
     if len(blend) < BENCHMARK_MONTH_ENDS:
         return []
@@ -788,7 +807,7 @@ def _benchmark_effects(row, blend, r, funds, state, ref_b, navs, days) -> list:
         line["drift"] = (r.loc[window, "reference_b"] - r.loc[window, "reference_a"]).sum()
         growth = fund_level.loc[end] / fund_level.loc[previous] - 1
         w = b_state.loc[previous]
-        tilt = rule_11.target_on(previous)[E] - w["equity"]
+        tilt = references.blend_weights(previous)[E] - w["equity"]
         line["split"] = tilt * (growth["r_d"] - growth["r_b"])
         line["dollar"] = tilt * (growth["r_e"] - growth["r_d"])
         line["cash"] = w["cash"] * (w["equity"] * growth["r_e"] + (1 - w["equity"]) * growth["r_b"])

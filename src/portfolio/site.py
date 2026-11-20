@@ -410,6 +410,11 @@ def _after_record(orders, now_row, counted=False) -> str:
 # Overview ------------------------------------------------------------------------------------------
 
 
+def _split_in_force() -> str:
+    """The target weights in force under rule 11, written equity/bonds."""
+    return rule_11.split_name(rule_11.current_target()[config.EQUITY])
+
+
 def _whole(share: float) -> str:
     """A share as a whole number of per cent, 0.7 -> 70."""
     return fmt.count(round(share * 100))
@@ -490,7 +495,7 @@ def _key_facts(first_day, costs: pd.DataFrame) -> str:
     rows += [("Valuation", "Euro, at the issuers' net asset values"),
              ("First purchase", fmt.day_words(first_day) if first_day is not None else "n/a")]  # fmt: skip
     facts = "".join(f'<div class="ch-fact"><dt>{_esc(a)}</dt><dd>{_esc(b)}</dd></div>' for a, b in rows)
-    benchmark = _esc("The 70/30 blend of the two funds' own indices, rebalanced at each month end")
+    benchmark = _esc("The blend of the two funds' own indices at the target weights, rebalanced at each month end")
     facts += (f'<div class="ch-fact"><dt>Benchmark</dt><dd>{benchmark} '
               f'({_link("method-not-done", "the index blend")})</dd></div>')  # fmt: skip
     return f'<aside class="ch-facts" id="key-facts"><h3>Key facts</h3><dl>{facts}</dl></aside>'
@@ -645,7 +650,7 @@ def overview(page: Page, daily: pd.DataFrame, monthly: pd.DataFrame, now: pd.Dat
     same = (len(daily) > 1 and {"growth_reference_a", "growth_reference_b"} <= set(daily.columns)
             and float((daily["growth_reference_a"] - daily["growth_reference_b"]).abs().max()) < 1e-4)  # fmt: skip
     overlap = ("<p class=\"note\">Reference B&#x27;s dotted line lies on reference A&#x27;s so far: on each cycle day "
-               "the top-up alone has brought reference portfolio A back to 70/30, which is where reference portfolio B "
+               "the top-up alone has brought reference portfolio A back to the target weights, which is where reference portfolio B "
                "goes on every cycle day.</p>") if same else ""  # fmt: skip
     why = overlap + ("<p class=\"note\">Why the portfolio has no optimiser, no single market index as its benchmark, no views "
            "and no signal: "
@@ -854,12 +859,13 @@ COMPARATOR_NAME = {
     "portfolio": ("The portfolio", "The portfolio"),
     "benchmark": ("The benchmark, the index blend", "Benchmark"),
     "reference_a": ("Reference A, the same rules without costs", "Reference A"),
-    "reference_b": ("Reference B, 70/30 every cycle day", "Reference B"),
+    "reference_b": ("Reference B, back to the target weights every cycle day", "Reference B"),
     "split_100_0": ("100/0, the same rules", "100/0"),
     "split_90_10": ("90/10, the same rules", "90/10"),
     "split_80_20": ("80/20, the same rules", "80/20"),
     "split_60_40": ("60/40, the same rules", "60/40"),
-    "first_ranked": ("70/30 with the first-ranked funds, the same rules", "First-ranked funds"),
+    "split_70_30": ("70/30 fixed, the same rules", "70/30 fixed"),
+    "first_ranked": ("The same rules with the first-ranked funds", "First-ranked funds"),
     "sp500": ("The S&P 500 fund", "S&P 500"),
     "msci_world": ("The MSCI World fund", "MSCI World"),
     "lifestrategy_60": ("LifeStrategy 60% Equity", "LifeStrategy 60"),
@@ -872,7 +878,7 @@ COMPARATOR_NAME = {
 }
 COMPARATOR_ROLE = {"benchmark": "@index_blend", "reference_a": "@reference_a", "reference_b": "@reference_b",
                    "split_100_0": "@comparator_1", "split_90_10": "@comparator_2", "split_80_20": "@comparator_3",
-                   "split_60_40": "@comparator_4", "first_ranked": "@comparator_7", "sp500": "@sp500_alternative",
+                   "split_60_40": "@comparator_4", "split_70_30": "@cash", "first_ranked": "@comparator_7", "sp500": "@sp500_alternative",
                    "msci_world": "@comparator_5", "lifestrategy_60": "@comparator_3", "lifestrategy_80": "@comparator_4",
                    "nasdaq100": "@comparator_2", "mag7": "@comparator_6", "market_portfolio": "@comparator_7",
                    "savings": "@savings"}  # fmt: skip
@@ -886,10 +892,10 @@ EFFECT_NAME = {"implementation": "Implementation", "drift": "Drift", "split": "S
 # comparators of its table, those with daily values also in its chart, its chart's id and the pane's own address.
 PANES = (
     ("same_rules", "The benchmark and the rules without costs",
-     "The index blend, 70/30 with the first-ranked funds, reference portfolios A and B",
+     "The index blend, the same rules with the first-ranked funds, reference portfolios A and B",
      ("benchmark", "first_ranked", "reference_a", "reference_b"), "comparisons-same-rules", "pane-same-rules"),
     ("splits", "Other splits of equity and bonds", "100/0, 90/10, 80/20, 60/40",
-     ("split_100_0", "split_90_10", "split_80_20", "split_60_40"), "comparisons-splits", "pane-splits"),
+     ("split_100_0", "split_90_10", "split_80_20", "split_70_30", "split_60_40"), "comparisons-splits", "pane-splits"),
     ("one_fund", "One fund instead of two", "S&P 500, MSCI World, Nasdaq-100, Mag7, LifeStrategy 60 and 80",
      ("sp500", "msci_world", "lifestrategy_60", "lifestrategy_80", "nasdaq100", "mag7"), "comparisons-one-fund",
      "pane-one-fund"),
@@ -1047,9 +1053,18 @@ def _differences(summary: pd.DataFrame, shown: list) -> tuple:
     return traces, layout, table
 
 
+def _ladder_line(shown: list) -> str:
+    """The ladder note's first sentence: the line the splits under the same rules lie on."""
+    if "split_70_30" in shown:
+        return ("The splits under the same rules lie on one line through 70/30 fixed, and reference portfolio A, the "
+                f"same rules at the target weights in force, {_split_in_force()}, is marked on its own.")
+    return f"The splits under the same rules lie on one line through reference portfolio A, which is {_split_in_force()}."
+
+
 def _ladder(summary: pd.DataFrame, shown: list) -> tuple:
     """Realised volatility against the return since the first purchase: the splits on one line through reference
-    portfolio A, which is 70/30 under the same rules, the portfolio marked."""
+    portfolio A, the same rules at the target weights in force, or through 70/30 fixed once it is shown, the
+    portfolio marked."""
     def point(k):
         return fmt.rounded(summary.loc[k, "volatility"] * 100, 2), fmt.rounded(summary.loc[k, "return_time_weighted"] * 100, 2)
 
@@ -1058,7 +1073,8 @@ def _ladder(summary: pd.DataFrame, shown: list) -> tuple:
         return (f"{COMPARATOR_NAME[k][1]}: volatility {fmt.pct(r['volatility'])}, return {fmt.pct(r['return_time_weighted'], True)}"
                 f"<br>Worst fall {_fall(r)}, band {_band(r, True)}")  # fmt: skip
 
-    ladder = [k for k in ("split_60_40", "reference_a", "split_80_20", "split_90_10", "split_100_0") if k in shown]
+    middle = "split_70_30" if "split_70_30" in shown else "reference_a"
+    ladder = [k for k in ("split_60_40", middle, "split_80_20", "split_90_10", "split_100_0") if k in shown]
     traces = [{"type": "scatter", "mode": "lines+markers", "name": "Splits under the same rules",
                "x": [point(k)[0] for k in ladder], "y": [point(k)[1] for k in ladder],
                "line": {"color": "@other", "width": 2}, "marker": {"size": 8, "color": "@ink2"},
@@ -1073,7 +1089,7 @@ def _ladder(summary: pd.DataFrame, shown: list) -> tuple:
                              ("savings", "left", 10)):  # fmt: skip
         if k in shown or k == "portfolio":
             x, y = point(k)
-            label = "The portfolio, 70/30" if k == "portfolio" else COMPARATOR_NAME[k][1]
+            label = f"The portfolio, {_split_in_force()}" if k == "portfolio" else COMPARATOR_NAME[k][1]
             annotations.append(_label(x, y, label, anchor=anchor, role="@accent" if k == "portfolio" else "@ink2",
                                       xshift=shift, yshift=8 if k != "portfolio" else 14))  # fmt: skip
     layout = {"showlegend": True, "legend": {"traceorder": "normal"},
@@ -1307,7 +1323,7 @@ def _managed_card(summary: pd.DataFrame, fees: pd.DataFrame, as_of) -> str:
         else:
             head = parts.iloc[0]
             made_up = COST_WORDS.get(str(head["item"]), str(head["item"]))
-        who = COMPARATOR_NAME.get(key, (key,))[0] + (", 70/30" if key == "bank_offensief" else "")
+        who = COMPARATOR_NAME.get(key, (key,))[0]
         dated = fmt.month_short(str(head["dated"])[:7]) if key == "bank_offensief" else fmt.day_short(head["dated"])
         rows.append([who, _bps(float(head["bps_low"]), float(head["bps_high"])), made_up, f"{head['source']}, {dated}"])
     columns = ["", "Costs a year, basis points", "Made up of", "Source"]
@@ -1316,8 +1332,7 @@ def _managed_card(summary: pd.DataFrame, fees: pd.DataFrame, as_of) -> str:
     note = (f"{_status(status)}, so this table sets the costs a year side by side and nothing else: there is no return "
             "over the record's dates, volatility or worst fall to set beside the portfolio's, and the profile is not like for like. Rabobank "
             "manages index funds for its clients in Rabo Beheerd Beleggen Basis, in four profiles from Defensief to Zeer "
-            "Offensief, and its brochure and Risicometer give Offensief 70 per cent equity and 30 per cent bonds, the "
-            "portfolio's split. Its costs are read from Rabobank's published cost overview at each build: the basic "
+            "Offensief, and its brochure and Risicometer give Offensief 70 and 30 per cent in equity and bonds. Its costs are read from Rabobank's published cost overview at each build: the basic "
             "service and the portfolio management are each charged a quarter at a time on the first 100,000 euro "
             "invested, as the overview's examples show, and the funds' own costs are the range the overview states.")  # fmt: skip
     after = ""
@@ -1385,8 +1400,8 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
     traces_l, layout_l, ladder_table = _ladder(summary, shown)
     ladder_card = _card("comparisons-ladder", "Volatility against return since the first purchase",
                         _asof(as_of), "outputs/comparisons.csv", table=ladder_table, height=380,
-                        note=("The splits under the same rules lie on one line through reference portfolio A, which is 70/30. "
-                              "The benchmark joins at the sixth month end. " + CHANCE.format(days=days)))  # fmt: skip
+                        note=(_ladder_line(shown) + " The benchmark joins at the sixth month end. "
+                              + CHANCE.format(days=days)))  # fmt: skip
     page.add("comparisons", f'<div class="wide ch-pair">{diff_card}{ladder_card}</div>')
     page.charts += [{"id": "comparisons-differences", "view": "comparisons", "traces": traces, "layout": layout,
                      "layout_narrow": {"xaxis": {"title": {"text": "Points"}}}},
@@ -1413,17 +1428,20 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
     pane_notes = {
         "same_rules": ("Reference portfolio A follows the rules at net asset value without costs, so its difference to the "
                        "portfolio is the implementation cost with the opposite sign. Reference portfolio B goes back to "
-                       "70/30 on every cycle day, so its difference to reference portfolio A is the drift effect. "
-                       + ("70/30 with the first-ranked funds runs reference portfolio A's rules with the first equity fund "
-                          "of the rules' own ranking, SPDR MSCI ACWI, which the account does not offer, in place of the held "
-                          "one, and the bond fund held, which ranks first. Its two funds track the benchmark's two indices, "
+                       "the target weights on every cycle day, so its difference to reference portfolio A is the drift effect. "
+                       + ("The same rules with the first-ranked funds holds the first equity fund of the rules' own ranking, "
+                          "SPDR MSCI ACWI, which the account does not offer, in place of the held one, and the bond fund held, "
+                          "which ranks first, under reference portfolio A's rules. Its two funds track the benchmark's two indices, "
                           "and it has a value every day. The benchmark remains the index blend. It" if first_ranked
                           else "The benchmark")
                        + " has values at month ends only, so it has a row in this pane's table and no line in "
                          f"its chart. Its figures appear as the note under {_ref('comparisons')} says, and its growth is in "
                          f"{_ref('c3')}.", _realised_tracking_text(summary)),
         "splits": ("The same two ETFs at other target weights, under rules 3 to 6 with the band of rule 5 five points either "
-                   "side of each target, which never binds for 100/0."),
+                   "side of each target, which never binds for 100/0."
+                   + (" 70/30 fixed holds 70 and 30 per cent with the band from 65 to 75 on every cycle day, where reference "
+                      "portfolio A holds the target weights in force under rule 11, so that a change of the target weights "
+                      "stays visible beside the record." if "split_70_30" in summary.index else "")),
         "one_fund": ("Each fund takes the same contributions on the same days at its net asset value in euro, US dollar "
                      "values at the ECB's reference rate of the day, and is held throughout without costs, as the S&P 500 "
                      "alternative of the Method view is. The Mag7 fund publishes net asset values from 4 November 2026, "
@@ -1438,6 +1456,8 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
         keys = tuple(k for k in keys if k in summary.index)
         if not keys:
             continue
+        if pane == "splits":
+            line = ", ".join(COMPARATOR_NAME[k][1] for k in keys)
         if pane == "managed":
             body = _managed_card(summary, fees, as_of)
         else:
@@ -1480,7 +1500,7 @@ def comparisons_part(page, summary: pd.DataFrame, daily: pd.DataFrame, effects: 
         "against the indices. The funds and the indices are valued at different times of the day, so a fund's gap "
         "against the indices can reach some tenths of a point on a day and reverse the next. The gap cancels between a "
         "comparator and the held fund when both are converted at the ECB's rate, and a gap under a tenth of a point "
-        "between two rows is within what the valuation times alone produce. 70/30 with the first-ranked funds splits its "
+        "between two rows is within what the valuation times alone produce. The same rules with the first-ranked funds splits its "
         "equity fund's return the same way. Region "
         "weights are each fund's latest, held for the record so far and kept at each month end. The S&P 500, Nasdaq-100 "
         "and Mag7 funds count as North America, a LifeStrategy fund's equity part takes its underlying funds' regions, "
@@ -1749,7 +1769,9 @@ def _window_text(summary) -> str:
 TRACKING_NOTE = (
     "The estimated tracking error is the standard deviation of the portfolio's return less the benchmark's over a year "
     "that the components' covariance implies for today's active weights, the tracking-error volatility of Jorion "
-    "(2003).\u2e28note:jorion_2003\u2e29 It covers the split between equity and bonds and the portfolio's cash. Inside "
+    "(2003).\u2e28note:jorion_2003\u2e29 It covers the split between equity and bonds and the portfolio's cash. In the "
+    "month in which a change of the target weights under rule 11 applies, the estimate is against the new target "
+    "weights from the cycle day, while the index blend takes them at the month end. Inside "
     "each sleeve the benchmark's shares of the components are taken as the fund's, so the figure leaves out the two "
     "funds' own tracking of their indices, and it leaves out all costs. It is no limit, and under rule 8 it is never a "
     "reason for an order.")
@@ -2288,7 +2310,7 @@ def _sources_text(allocation: pd.DataFrame, comparison: pd.DataFrame = None, mat
             text += (f" Rule 11's record at the month end of {end.day} {end:%B %Y}, on the holdings file of "
                      f"{held_on.day} {held_on:%B %Y}: 70/30 falls {p2(last['worst_fall_70_30'])} per cent on the "
                      f"deciding series, and the largest split within 35 per cent is {last['largest_split']}.")
-    return text + (" The target is 70/30, and from the cycle day of 5 January 2027 rule 11 moves it when the test, "
+    return text + (f" The target is {_split_in_force()}, and from the cycle day of 5 January 2027 rule 11 moves it when the test, "
                    "run again at each month end, gives the same split, other than the target, at two month ends in a "
                    "row.")
 
@@ -2300,27 +2322,28 @@ def _allocation_curve(page, allocation: pd.DataFrame, us: pd.DataFrame = None, s
     splits = list(allocation["split"])
     x = [fmt.rounded(v * 100, 2) for v in allocation["worst_fall"]]
     y = [fmt.rounded(v * 100, 2) for v in allocation["growth_per_year"]]
-    held = [c == "yes" for c in allocation["chosen"]]
+    held_split = _split_in_force()
+    held = [s == held_split for s in splits]
     hover = [f"{s}: worst fall {_fall2(f)}, growth per year {fmt.pct(g)}"
              for s, f, g in zip(splits, allocation["worst_fall"], allocation["growth_per_year"])]  # fmt: skip
     traces = [{"type": "scatter", "mode": "lines+markers", "name": "Splits", "x": x, "y": y, "showlegend": False,
                "line": {"color": "@other", "width": 2}, "marker": {"size": 8, "color": "@ink2"}, **_hover(hover)},
-              {"type": "scatter", "mode": "markers", "name": "70/30, held", "showlegend": False,
+              {"type": "scatter", "mode": "markers", "name": f"{held_split}, held", "showlegend": False,
                "x": [v for v, h in zip(x, held) if h], "y": [v for v, h in zip(y, held) if h],
                "marker": {"size": 13, "color": "@accent"}, **_hover([t for t, h in zip(hover, held) if h])}]  # fmt: skip
     us = us if us is not None and len(us) else None
     if us is not None:
-        # The same test on the US stock market in euro: the second curve of the ladder, 70/30 marked on it as well.
+        # The same test on the US stock market in euro: the second curve of the ladder, the split held marked on it as well.
         ux = [fmt.rounded(v * 100, 2) for v in us["worst_fall"]]
         uy = [fmt.rounded(v * 100, 2) for v in us["growth_per_year"]]
         uhover = [f"US series, {s}: worst fall {_fall2(f)}, growth per year {fmt.pct(g)}"
                   for s, f, g in zip(us["split"], us["worst_fall"], us["growth_per_year"])]  # fmt: skip
-        at = list(us["split"]).index("70/30") if "70/30" in list(us["split"]) else None
+        at = list(us["split"]).index(held_split) if held_split in list(us["split"]) else None
         traces.append({"type": "scatter", "mode": "lines+markers", "name": "US series", "x": ux, "y": uy,
                        "showlegend": False, "line": {"color": "@us_series", "width": 2},
                        "marker": {"size": 7, "color": "@us_series"}, **_hover(uhover)})  # fmt: skip
         if at is not None:
-            traces.append({"type": "scatter", "mode": "markers", "name": "70/30 on the US series", "showlegend": False,
+            traces.append({"type": "scatter", "mode": "markers", "name": f"{held_split} on the US series", "showlegend": False,
                            "x": [ux[at]], "y": [uy[at]], "marker": {"size": 12, "color": "@us_series",
                            "line": {"color": "@surface", "width": 2}}, **_hover([uhover[at]])})  # fmt: skip
     annotations = [_label(35, 1, "35%", yref="paper", anchor="right", role="@status_breach", xshift=-4, yshift=8),
@@ -2329,11 +2352,11 @@ def _allocation_curve(page, allocation: pd.DataFrame, us: pd.DataFrame = None, s
         last = len(ux) - 1
         annotations += [_label(x[-1], y[-1], "Global", anchor="left", role="@ink2", xshift=8, yshift=-10),
                         _label(ux[last], uy[last], "US", anchor="left", role="@us_series", xshift=8, yshift=-10)]  # fmt: skip
-    for split, anchor, shift in (("40/60", "left", 10), ("70/30", "right", -10), ("100/0", "right", -10)):
+    for split, anchor, shift in (("40/60", "left", 10), (held_split, "right", -10), ("100/0", "right", -10)):
         if split in splits:
             i = splits.index(split)
             role = "@accent" if held[i] else "@ink2"
-            annotations.append(_label(x[i], y[i], split, anchor=anchor, role=role, xshift=shift, yshift=8 if split == "70/30" else 0))
+            annotations.append(_label(x[i], y[i], split, anchor=anchor, role=role, xshift=shift, yshift=8 if held[i] else 0))
     layout = {"xaxis": {"title": {"text": "Worst fall, per cent"}},
               "yaxis": {"title": {"text": "Growth per year, per cent"}},
               "shapes": [_vline(35, "@status_breach"), _vline(40, "@status_breach")], "annotations": annotations,
@@ -2625,7 +2648,8 @@ def _us_test(allocation: pd.DataFrame, us: pd.DataFrame, period: tuple, added) -
     on the US stock market, as paired bars."""
     splits = list(allocation["split"])
     us = us.set_index("split").reindex(splits).reset_index()
-    held = [c == "yes" for c in allocation["chosen"]]
+    held_split = _split_in_force()
+    held = [s == held_split for s in splits]
     traces = []
     for frame, name, colour, label in (
             (allocation, "Global equity series", ["@accent" if h else "@other" for h in held], "global series"),
@@ -2655,8 +2679,8 @@ def _us_test(allocation: pd.DataFrame, us: pd.DataFrame, period: tuple, added) -
             f"series' worst fall runs from {_month_name(g70['peak'])} to {_month_name(g70['low'])}, and the US "
             f"series' from {_month_name(u70['peak'])} to {_month_name(u70['low'])}. The US series was added in "
             f"{pd.Timestamp(added).strftime('%B %Y')}, after the first cycle day, in answer to a question readers ask, "
-            "and the split was set on the global series alone. The global series' 70/30 bar, in the primary ink, is "
-            "the split held.")  # fmt: skip
+            "and the split was set on the global series alone. The global series' "
+            f"{held_split} bar, in the primary ink, is the split held.")  # fmt: skip
     asof = (f"Monthly euro returns, {_month_name(first)} to {_month_name(last)}, rebalanced by the band, splits from "
             "40/60 to 100/0")  # fmt: skip
     card = _card("c33", "The allocation test on the US stock market: the worst fall of each split beside the global series",
@@ -2760,12 +2784,13 @@ def _not_done(page, allocation: pd.DataFrame, us_test: pd.DataFrame, daily: pd.D
         ("The benchmark, and why not the S&P 500.",
          "A benchmark is the portfolio a client would hold without the manager, so that the manager's contribution can "
          "be measured as the difference and bounded. This portfolio's benchmark is the blend of its two funds' own "
-         "indices at 70/30, rebalanced at each month end, the policy the rules implement. The difference to it is the "
-         "cost of implementing that policy: the funds' costs and tracking differences, the band's drift from 70/30, "
+         "indices at the target weights, rebalanced at each month end to the target weights in force on that day, the "
+         "policy the rules implement. The difference to it is the "
+         "cost of implementing that policy: the funds' costs and tracking differences, the band's drift from the target weights, "
          "cash waiting for the cycle day, and trading. The rules take no position against the benchmark, so there is "
          "no active return to claim, and the difference is expected to be small and negative. The two reference "
          "portfolios split it into its parts: reference A, the same contributions under the same rules at net asset "
-         "value, and reference B, the same contributions returned to 70/30 on every cycle day ({growth}). No single "
+         "value, and reference B, the same contributions returned to the target weights on every cycle day ({growth}). No single "
          "market index is the benchmark. The question readers ask most is why the portfolio does not simply hold the "
          "S&P 500. The global equity fund already holds the "
          "index's companies at about {us_share} per cent of its weight, so holding the index alone sells the rest of the "
@@ -3407,8 +3432,10 @@ def _part_leads() -> dict:
     return leads
 
 
-DESCRIPTION = ("A real-money portfolio run under written rules, 70/30 equity and euro government bonds: allocation, "
-               "rebalancing, costs, look-through and factor exposures.")  # fmt: skip
+def _description() -> str:
+    """The page's description and its preview's, with the target weights in force."""
+    return (f"A real-money portfolio run under written rules, {_split_in_force()} equity and euro government bonds: "
+            "allocation, rebalancing, costs, look-through and factor exposures.")
 PREVIEW_IMAGE = config.PREVIEW_IMAGE
 
 
@@ -3418,7 +3445,7 @@ def _link_preview() -> str:
         return ""
     width, height = quarterly_module.image_size(config.ROOT / PREVIEW_IMAGE)
     tags = [("property", "og:type", "website"), ("property", "og:title", "Rules-based portfolio"),
-            ("property", "og:description", DESCRIPTION), ("property", "og:url", config.DASHBOARD_URL),
+            ("property", "og:description", _description()), ("property", "og:url", config.DASHBOARD_URL),
             ("property", "og:image", config.DASHBOARD_URL + PREVIEW_IMAGE), ("property", "og:image:width", str(width)),
             ("property", "og:image:height", str(height)), ("name", "twitter:card", "summary_large_image")]  # fmt: skip
     return "".join(f'<meta {kind}="{key}" content="{_esc(value)}">\n' for kind, key, value in tags)
@@ -3806,8 +3833,10 @@ def build(out_dir: Path = None) -> Path:
     css = _palette_css(palette) + (config.SITE_DIR / "style.css").read_text()
     script = (config.SITE_DIR / "app.js").read_text()
     since = f" since {fmt.day_words(first)}" if first else ""
-    lead = (f"A real-money portfolio run under written rules{since}, with a target of 70 per cent in a global equity ETF "
-            "and 30 per cent in a euro government bond ETF, funded by a starting amount and a fixed monthly top-up. Every "
+    held = rule_11.current_target()
+    lead = (f"A real-money portfolio run under written rules{since}, with a target of {_whole(held[config.EQUITY])} per "
+            f"cent in a global equity ETF and {_whole(held[config.BONDS])} per cent in a euro government bond ETF, funded "
+            "by a starting amount and a fixed monthly top-up. Every "
             "figure of the record is computed from the ledger and the issuers' published data.")  # fmt: skip
     menu = quarterly_module.site_menu()
     documents = (f'<a href="{config.REPOSITORY_URL}/blob/main/rules/RULES.md">Rules</a>'
@@ -3821,7 +3850,7 @@ def build(out_dir: Path = None) -> Path:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rules-based portfolio</title>
 <link rel="icon" href="{FAVICON_URL}" type="image/svg+xml">
-<meta name="description" content="{_esc(DESCRIPTION)}">
+<meta name="description" content="{_esc(_description())}">
 {_link_preview()}<style>
 {css}</style>
 <script src="{PLOTLY}" integrity="{PLOTLY_INTEGRITY}" crossorigin="anonymous" defer></script>

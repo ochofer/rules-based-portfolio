@@ -190,7 +190,8 @@ def test_the_comparisons_part_on_the_page():
         ("pane-savings", "Savings"), ("pane-managed", "A bank&#x27;s managed profile"),
         ("pane-effects", "Where each difference came from")]  # fmt: skip
     assert [line for _, _, line in heads] == [
-        "The index blend, 70/30 with the first-ranked funds, reference portfolios A and B", "100/0, 90/10, 80/20, 60/40",
+        "The index blend, the same rules with the first-ranked funds, reference portfolios A and B",
+        "100/0, 90/10, 80/20, 60/40",
         "S&amp;P 500, MSCI World, Nasdaq-100, Mag7, LifeStrategy 60 and 80", "Every asset class at its market value",
         "The contributions held at the euro short-term rate", "What Rabobank charges, not like for like",
         "The split, the dollar, the regions"]  # fmt: skip
@@ -223,8 +224,9 @@ def test_the_comparisons_part_on_the_page():
     assert '<details class="ch-pane" open' not in part
     summary = part.split('<div class="ch-pair">', 1)[0] if '<div class="ch-pair">' in part else part.split('ch-pair', 1)[0]
     names = re.findall(r"<tr><td>([^<]+)</td>", summary)
-    assert names[:5] == ["The portfolio", "The benchmark, the index blend", "70/30 with the first-ranked funds, the same rules",
-                         "Reference A, the same rules without costs", "Reference B, 70/30 every cycle day"]  # fmt: skip
+    assert names[:5] == ["The portfolio", "The benchmark, the index blend", "The same rules with the first-ranked funds",
+                         "Reference A, the same rules without costs",
+                         "Reference B, back to the target weights every cycle day"]  # fmt: skip
     assert "inside the band" in summary and "the square root of 252" in summary
     for word in ("ahead", "behind", "beat", "trail", "outperform", "attribution"):
         assert word not in part.lower(), word
@@ -308,7 +310,7 @@ def test_the_first_ranked_funds_sit_in_the_first_pane_and_each_figure_takes_its_
         first = html.split('id="pane-same-rules"', 1)[1].split('<details class="ch-pane"', 1)[0].split("</summary>", 1)[1]
         second = html.split('id="pane-splits"', 1)[1].split('<details class="ch-pane"', 1)[0]
         assert "first-ranked" not in second
-        assert ("70/30 with the first-ranked funds, the same rules" in first) is not drop
+        assert ("The same rules with the first-ranked funds" in first) is not drop
         assert ("Its two funds track the benchmark&#x27;s two indices, and it has a value every day" in first) is not drop
         assert "so it has a row in this pane&#x27;s table and no line in its chart" in first and "joins" not in first
         # The benchmark's row sits directly under the portfolio's in the pane's table, read from the summary.
@@ -445,7 +447,8 @@ def test_the_second_stage_rows(record):
     extra = _extra(record["navs"])
     out = _build(record, extra=extra)
     summary = out["summary"].set_index("comparator")
-    keys = [k for k, _, _ in comparisons.ROWS if k not in ("sp500", "lifestrategy_80", "market_portfolio")]
+    # 70/30 fixed has no row while the target weights in force are 70/30.
+    keys = [k for k, _, _ in comparisons.ROWS if k not in ("sp500", "lifestrategy_80", "market_portfolio", "split_70_30")]
     assert list(summary.index) == keys
     # A fund held alone: its time-weighted return is its net asset value's, in euro.
     unit = extra["one_fund"]["msci_world"]["eur"]
@@ -515,6 +518,52 @@ def test_a_lifestrategy_fund_takes_its_regions_from_its_underlying_funds():
     assert weights["Pacific"] == pytest.approx((0.3 * 0.1 + 0.1) / 0.6) and weights.sum() == pytest.approx(1.0)
     with pytest.raises(ValueError):
         comparisons.mixed_regions(pd.DataFrame({"fund": ["Vanguard Something New"], "share": [1.0]}), mapping, held, held)
+
+
+def test_the_benchmark_effects_take_the_split_the_blend_holds_in_every_month(monkeypatch):
+    from portfolio import rule_11
+    from test_metrics_references import made_up_change
+
+    monkeypatch.setattr(rule_11, "load", lambda *args, **kwargs: made_up_change())
+    days = pd.to_datetime(["2026-10-30", "2026-11-30", "2026-12-31", "2027-01-29", "2027-02-26", "2027-03-31",
+                           "2027-04-30"])  # fmt: skip
+    msci = pd.Series([500.0 * 1.02**k for k in range(len(days))], index=days)
+    bonds = pd.Series(0.005, index=pd.PeriodIndex([d.strftime("%Y-%m") for d in days[1:]], freq="M"))
+    blend = references.index_blend(pd.Series(100.0, index=days), msci, bonds, date(2027, 5, 3))
+    held = pd.DataFrame({"equity": 70.0, "bonds": 30.0, "cash": 0.0, "value": 100.0}, index=days)
+    navs = pd.DataFrame({"equity": 1.0, "bonds": 1.0}, index=days)
+    funds = pd.DataFrame({"r_e": 0.02, "r_b": 0.005, "r_d": 0.015}, index=days)
+    r = pd.DataFrame(0.0, index=days, columns=["portfolio", "reference_a", "reference_b"])
+    effects = comparisons._benchmark_effects(pd.Series({"difference": 0.0}), blend, r, funds, {}, held, navs, days)
+    split = {e["period"]: e["value"] for e in effects if e["effect"] == "split" and e["period"] != "record"}
+    for previous, end in zip(blend.index, blend.index[1:]):
+        month = end.strftime("%Y-%m")
+        of_blend = (blend[end] / blend[previous] - 1 - 0.005) / (0.02 - 0.005)
+        of_effects = 0.70 + split[month] / (0.015 - 0.005)  # reference B holds 70/30 throughout
+        assert of_effects == pytest.approx(of_blend)
+        assert of_blend == pytest.approx(0.70 if end <= pd.Timestamp("2027-01-29") else 0.65)
+
+
+def test_70_30_fixed_joins_the_splits_once_rule_11_changes_the_target(record, monkeypatch):
+    from portfolio import rule_11
+    from test_metrics_references import made_up_change
+
+    monkeypatch.setattr(rule_11, "load", lambda *args, **kwargs: pd.DataFrame(columns=rule_11.TARGET_COLUMNS))
+    assert not comparisons.fixed_split_shown(END)
+    assert "split_70_30" not in set(_build(record)["summary"]["comparator"])
+    monkeypatch.setattr(rule_11, "load", lambda *args, **kwargs: made_up_change("2026-11-05", "60/40"))
+    assert comparisons.fixed_split_shown(END) and not comparisons.fixed_split_shown(date(2026, 11, 4))
+    changed = dict(record, ref_a=references.simulate(record["records"], record["navs"], END, "rules"))
+    out = _build(changed)
+    rows = out["summary"].set_index("comparator")
+    assert rows.loc["split_70_30", "name"] == "70/30 fixed" and rows.loc["split_70_30", "pane"] == "splits"
+    daily = out["daily"].set_index("date")
+    fixed = references.simulate(record["records"], record["navs"], END, "rules", comparisons.split_target(0.70),
+                                comparisons.split_band(0.70))  # fmt: skip
+    assert fixed["value"].iloc[-1] == pytest.approx(out["daily"].shape[0] and fixed["value"].iloc[-1])
+    # Reference portfolio A follows the target weights in force, so after the change the two part.
+    assert not np.allclose(daily["growth_split_70_30"].iloc[1:], daily["growth_reference_a"].iloc[1:])
+    assert {"implementation", "split"} <= set(out["effects"][out["effects"]["comparator"] == "split_70_30"]["effect"])
 
 
 def test_the_costs_beside_the_comparisons():

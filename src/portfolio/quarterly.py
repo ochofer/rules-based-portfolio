@@ -426,7 +426,7 @@ class Issue:
         lines, table_columns = [], []
         for name, column, colour, stroke in (("Portfolio", "growth_portfolio", NAVY, 2.0),
                                              ("Reference A, the same rules without costs", "growth_reference_a", REF_A, 1.5),
-                                             ("Reference B, 70/30 every cycle day", "growth_reference_b", REF_B, 1.5),
+                                             ("Reference B, back to the target weights every cycle day", "growth_reference_b", REF_B, 1.5),
                                              ("Index blend", "growth_index_blend", BLEND, 1.5)):  # fmt: skip
             data = frame[["date", column]].dropna()
             if not len(data):
@@ -478,9 +478,11 @@ class Issue:
         body += _table(["Month end", "Equity", "Bonds", "Cash"], [[d.strftime("%Y-%m-%d"), fmt.pct(e), fmt.pct(b), fmt.pct(c)]
                        for d, e, b, c in zip(ends["date"], ends["weight_equity"], ends["weight_bonds"], ends["weight_cash"])],
                        rounding=True)  # fmt: skip
-        caption = (f"The equity weight at each valuation day, against its target weight of 70 per cent, the dark line, and "
-                   f"the band of rule 5 from {low * 100:.0f} to {high * 100:.0f} per cent, shaded. Outside the band on a "
-                   "cycle day, the portfolio is brought back to 70/30.")  # fmt: skip
+        # The target on the quarter's last day: an issue is never rebuilt.
+        caption = (f"The equity weight at each valuation day, against its target weight of {target[config.EQUITY] * 100:.0f} "
+                   f"per cent, the dark line, and the band of rule 5 from {low * 100:.0f} to {high * 100:.0f} per cent, "
+                   f"shaded. Outside the band on a cycle day, the portfolio is brought back to "
+                   f"{rule_11.split_name(target[config.EQUITY])}.")  # fmt: skip
         return Exhibit("figure", f"Equity weight in its band, {self.period_words()}", caption, body, ("outputs/portfolio_daily.csv",))
 
     def orders_table(self) -> Exhibit:

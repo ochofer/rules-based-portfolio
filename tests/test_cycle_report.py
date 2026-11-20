@@ -159,6 +159,10 @@ def test_the_report_carries_the_estimated_tracking_error_as_information(records)
                        "A basis point is one hundredth of a percentage point."):
         assert definition in line
     assert line.index("A basis point is") < line.index("basis points at")
+    # The benchmark's two percentages are the target weights in force.
+    moved = cr.tracking_line(VALUES, plan().orders, target={E: 0.60, B: 0.40})
+    assert moved.startswith("Information, no check. The benchmark is the index blend: 60 per cent MSCI ACWI net total "
+                            "return and 40 per cent the Bloomberg Euro-Aggregate Treasury index")  # fmt: skip
     # The covariance carries the window of the build's components table, and the look-through its date.
     components = pd.read_csv(config.OUTPUTS_DIR / "risk_components.csv")
     start, end = (pd.Period(str(components[c].iloc[0]), "M") for c in ("window_start", "window_end"))
@@ -166,3 +170,33 @@ def test_the_report_carries_the_estimated_tracking_error_as_information(records)
               f"and the look-through (the portfolio's exposure to the securities inside the two ETFs) of "
               f"{components['as_of'].iloc[0]}.")
     assert window in line and "120 months" in window
+
+
+def test_on_the_day_a_change_applies_the_line_measures_against_the_target_its_words_give(monkeypatch):
+    """The report is written before the build writes the cycle day's row to outputs/allocation_targets.csv, so the
+    targets table still gives 70/30 while the line's words give the new target. Both figures stand against the new
+    target."""
+    import numpy as np
+
+    from portfolio import risk, rule_11
+
+    monkeypatch.setattr(rule_11, "load", lambda *args, **kwargs: pd.DataFrame(columns=rule_11.TARGET_COLUMNS))
+    assert rule_11.current_target() == {E: 0.70, B: 0.30}
+    new = {E: 0.60, B: 0.40}
+    line = cr.tracking_line(VALUES, plan().orders, target=new)
+    components = pd.read_csv(config.OUTPUTS_DIR / "risk_components.csv")
+    cov = risk.covariance_from_tables(components, pd.read_csv(config.OUTPUTS_DIR / "risk_correlation.csv"))
+    shares = risk.shares_from_components(components)
+    total = sum(VALUES.values())
+    after = {s: VALUES[s] + sum(cr._signed(o) for o in plan().orders if o.sleeve == s) for s in config.SLEEVES}
+
+    def bp(weights, target):
+        active = np.array([(weights[risk.SLEEVE_OF[c]] / total - target[risk.SLEEVE_OF[c]]) * shares[c]
+                           for c in risk.COMPONENTS])  # fmt: skip
+        return round(float(np.sqrt(active @ cov.loc[list(risk.COMPONENTS), list(risk.COMPONENTS)].to_numpy() @ active)) * 1e4)
+
+    figures = (f"The estimated tracking error is {bp(VALUES, new)} basis points at the weights before the orders and "
+               f"{bp(after, new)} at the weights the proposed orders give.")
+    assert line.startswith("Information, no check. The benchmark is the index blend: 60 per cent") and figures in line
+    # Against the targets table's 70/30 the figures would differ, so the test tells the two apart.
+    assert (bp(VALUES, new), bp(after, new)) != (bp(VALUES, {E: 0.70, B: 0.30}), bp(after, {E: 0.70, B: 0.30}))
