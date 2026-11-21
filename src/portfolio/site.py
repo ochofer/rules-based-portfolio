@@ -2595,9 +2595,11 @@ OTHER_PROJECTS = (
     ("Volatility-managed portfolios: a replication, the real-time critique, and the months after the sample.",
      "Volatility estimation and position sizing on Ken French's equity factors, replicating Moreira and Muir (2017) "
      "and the real-time critique of Cederburg, O'Doherty, Wang and Yan (2020). Scaled by the inverse of last month's "
-     "realised variance, a factor has a Sharpe ratio above the original's beyond its 95 per cent interval for momentum "
-     "alone, among six intervals read without adjustment, and for no factor after Holm's correction for the six tests. "
-     "The 136 months after Moreira and Muir's sample cannot tell any difference from zero.",
+     "realised variance, a factor's Sharpe ratio is higher than the original's by a margin that is statistically "
+     "significant at the 5 per cent level for momentum alone when each of the six factors is tested on its own, and "
+     "for no factor after Holm's correction for the six tests. In the 136 months after Moreira and Muir's sample no "
+     "factor's difference is statistically significant, and the intervals are too wide to rule out the differences "
+     "found on their sample.",
      (("Page", PROJECTS_URL + "volatility-managed-portfolios/"),
       ("dashboard", SITE_URL + "volatility-managed-portfolios/dashboard/B-Q_dashboard.html"),
       ("note", SITE_URL + "volatility-managed-portfolios/note/B-Q_note_2026-11.pdf"),
@@ -2607,7 +2609,9 @@ OTHER_PROJECTS = (
      "benchmark, and an attribution of its active return by sector. Under the mandate, simulated from 1999 to 2024, "
      "four covariance estimators realise 78.9 to 83.6 basis points a year of tracking error, and each forecast "
      "understates it: the realised active return is 48 to 85 per cent more volatile than forecast. Index changes force "
-     "11.4 per cent of the turnover on the Ledoit-Wolf estimator, and no active return is distinguishable from zero.",
+     "11.4 per cent of the turnover on the Ledoit-Wolf estimator, and no estimator's mean active return is "
+     "statistically significant at the 5 per cent level, which over these 306 months would take one of about 35 basis "
+     "points a year.",
      (("Page", PROJECTS_URL + "stock-level-tracking/"),
       ("dashboard", SITE_URL + "stock-level-tracking/dashboard/"),
       ("note", SITE_URL + "stock-level-tracking/note/stock-level-tracking_note_2026-11.pdf"),
