@@ -36,11 +36,22 @@ def test_every_card_has_a_title_an_as_of_line_a_source_and_a_table():
     assert "<summary>Table</summary>" in html
 
 
-def test_the_page_shows_the_readme_terms_once_each():
-    terms = site.terms()
+def test_the_page_shows_the_full_list_of_terms_once_each():
+    terms = site.terms_from((config.ROOT / "guide" / "terms.md").read_text(encoding="utf-8"), "guide/terms.md")
+    assert terms == site.terms()
     names = [name.lower() for name, _ in terms]
     assert len(names) == len(set(names))
     assert {"drawdown", "worst fall", "net asset value", "implementation cost", "basis point"} <= set(names)
+
+
+def test_each_readme_term_opens_the_full_list_entry_for_the_same_term_word_for_word():
+    readme = (config.ROOT / "README.md").read_text(encoding="utf-8")
+    short = site.terms_from(readme.split("\n## Terms\n", 1)[1].split("\n## ", 1)[0], "README.md")
+    full = dict(site.terms())
+    assert short
+    for name, definition in short:
+        assert name in full, name
+        assert full[name].startswith(definition), name
 
 
 def test_a_short_date_axis_has_one_tick_per_valuation_day_and_none_twice():

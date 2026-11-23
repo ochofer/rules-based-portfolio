@@ -51,7 +51,7 @@ def test_the_values_in_the_text_are_computed_from_the_committed_files():
             "2000 to February 2003") in html  # fmt: skip
     assert "would be in An S&amp;P 500 fund, the S&amp;P 500 ETF" in html
     assert "Added on 6 November 2026, after the first cycle day, in answer to the questions readers ask most." in html
-    assert "The US series was added in November 2026, after the first cycle day" in html
+    assert "The split was set on the global series alone, and the US series chooses nothing." in html
 
 
 def test_the_sentence_on_the_us_market_is_written_from_the_committed_periods():
@@ -205,6 +205,6 @@ def test_the_benchmark_is_the_index_blend_in_the_key_facts_the_method_view_and_t
             "rebalanced at each month end to the target weights in force on that day") in section
     assert "No single market index is the benchmark. The question readers ask most" in section
     assert "None by design" not in page and "no index benchmark" not in page
-    terms = dict(site.terms())
+    terms = dict(site.terms_from((config.ROOT / "guide" / "terms.md").read_text(encoding="utf-8"), "guide/terms.md"))
     assert "rebalanced at each month end to the target weights in force on that day, the portfolio's benchmark." in terms["Index blend"]
     assert terms["Index blend"].endswith("a change enters the blend at the first month end after the cycle day it applies from.")

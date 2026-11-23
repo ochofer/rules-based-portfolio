@@ -1,0 +1,79 @@
+# Terms
+
+The definition of every term the dashboard and the guide use in a sense of their own, from A to Z.
+
+- **Active return**: the portfolio's return less the benchmark's.
+- **Active weight**: a component's weight in the portfolio less its weight in the benchmark.
+- **Allocation test**: the historical test in `mandate/allocation_check.py` that derived the split from the risk limit, on monthly euro returns from February 1999 to December 2025. From 5 January 2027 rule 11 reads it again at each month end.
+- **Band**: the interval from 65 to 75 per cent for the equity weight. When the equity weight is outside it on a cycle day, after the top-up, the portfolio is brought back to its target weights.
+- **Band chance alone produces**: plus or minus twice the tracking error against a comparator, times the square root of the years, around zero. It is the difference between two series that chance alone produces over the same span. It ignores compounding and treats the daily differences as independent.
+- **Basis point**: one hundredth of a percentage point.
+- **Bond classes**: for the global market portfolio, the weight of each bond class times its fund's return in euro minus the held bond ETF's, less each fund's conversion from US dollars, which goes to the dollar.
+- **Bootstrap**: the resampling of the allocation test's returns in blocks of twelve consecutive months, each starting at a random month, into paths of five and ten years, with the worst fall measured on each path.
+- **Cap-weighted**: holding each security in proportion to its market value, as the indices of both ETFs do.
+- **Comparator**: a portfolio that receives the same contributions on the same days as the portfolio, valued in euro without costs and set beside the record in the Comparisons part, e.g., a reference portfolio, another split under the same rules, the global market portfolio, or savings at the euro short-term rate.
+- **Component**: one of the four equity regions and three maturity groups into which the look-through divides the portfolio to estimate its risk, with cash, which has no return.
+- **Contribution**: money paid into the portfolio, i.e., the starting amount and each top-up, which is 5 per cent of the starting amount.
+- **Covariance**: how far two returns move together, in the units of variance, the square of volatility: their correlation times the product of their standard deviations.
+- **Cycle day**: the day each month on which the rules are applied. It is the 5th, or the first trading day after it when the 5th is not one.
+- **Cycle report**: the file `cycles/YYYY-MM.md`, written on a cycle day before any order, with each rule that bears on the proposed orders, its figure and a pass or a fail, and one line after the orders that compares them with the proposal. The report is committed and pushed before the first order of the day, and the line after the orders is a second commit.
+- **Deciding series**: the allocation test's equity series, Kenneth French's market returns for five regions at the equity ETF's weights by region, the same weights in every month of the history. The two MSCI series beside it choose nothing.
+- **Departure**: an order placed, or left unplaced, other than as the rules require. The departures register lists each one with its rule and its consequence.
+- **Drawdown**: the fall in the portfolio's value below its previous peak on a given day, with contributions removed, in per cent.
+- **Drift effect**: reference portfolio A's return minus reference portfolio B's. It is the effect of letting the weights drift inside the band, before costs.
+- **Duration**: a bond's average time to its payments, weighted by their value, in years. It is also, approximately, the percentage fall in the bond's price when its yield rises by one percentage point. For the bond sleeve it is the average duration in the issuer's factsheet.
+- **Efficient frontier**: the long-only, fully invested portfolios of the components with the lowest estimated volatility for each estimated return, on the means and covariances of one window of 120 months.
+- **Equity classes**: for the global market portfolio, the weight of private equity and of real estate times each class fund's return in euro minus the held equity ETF's, less each fund's dollar conversion beyond the equity ETF's, which goes to the dollar.
+- **Estimated tracking error against the benchmark**: the standard deviation of the active return over a year that the components' covariance implies for today's active weights. Jorion (2003) calls it tracking-error volatility.
+- **Estimated volatility**: the standard deviation of the portfolio's return over a year, estimated from the components' monthly returns over the last 120 months at the latest look-through weights.
+- **Euro short-term rate**: the rate at which banks borrow euro overnight without collateral, which the European Central Bank publishes each working day.
+- **Expected shortfall**: the mean loss at or beyond the value at risk. The historical figure is the mean of the six worst months of the 120-month window, and the normal figure is the normal distribution's mean beyond the value at risk.
+- **Factor**: one of the return series in Kenneth French's data library for developed markets: the market's return minus the risk-free rate, and the returns of long-short portfolios for size, value, profitability, investment and momentum.
+- **Forecast's calibration**: the standard deviation, over the months that have a forecast, of each month's return divided by the monthly volatility estimated for it at the end of the month before. 1 means the estimates matched the returns, and above 1 that they were too low.
+- **Global market portfolio**: every asset class held at its share of the world's invested market value, here by the weights of Doeswijk, Lam and Swinkels (2014, data update 2024) at the end of 2023, held through one ETF per class.
+- **Growth per year**: the compound annual return, with contributions removed.
+- **Half-spread**: half the gap between the ask and the bid quoted when an order is placed.
+- **Implementation cost**: reference portfolio A's value relative to the portfolio's, with contributions removed, in basis points, positive when the portfolio's value is below reference portfolio A's. It is negative when the portfolio's value is above.
+- **In-sample**: computed on the data on which a choice was made, here the returns from 1999 to 2025 on which the split was chosen.
+- **Index blend**: MSCI ACWI net total return and the Bloomberg Euro-Aggregate Treasury index, in euro, at the target weights, rebalanced at each month end to the target weights in force on that day, the portfolio's benchmark. The target weights are 70 and 30 per cent until rule 11 changes them, and a change enters the blend at the first month end after the cycle day it applies from.
+- **Ledger**: the private record of every contribution and every order. It is kept outside the repository.
+- **Loading**: the coefficient of the ETF's return minus the risk-free rate on a factor's return.
+- **Look-through**: the portfolio's exposure to the securities inside the two ETFs, each ETF's holdings weighted by its weight in the portfolio.
+- **Market effect**: a month's change in the portfolio's value that did not come from contributions, in per cent of the value at the start of the month.
+- **Maturity group**: the bonds of the bond sleeve with 1 to 5, 5 to 10 or over 10 years to maturity, each priced as a zero-coupon euro area government bond at 3, 7.5 or 20 years from the European Central Bank's yield curve.
+- **Mechanics simulation**: the rules applied to the allocation test's returns, with a starting amount of 100 and a top-up of 5 a month, for the counts of their orders.
+- **Minimum-variance portfolio**: the portfolio on the efficient frontier with the lowest estimated volatility.
+- **Money-weighted return**: the rate at which the contributions, each from its date, grow to the portfolio's value. The timing of the contributions therefore counts. It is cumulative in the first year and per year after it.
+- **Monthly note**: the note of 120 to 200 words, in `notes/YYYY-MM.md`, written by hand after each cycle day.
+- **Net asset value**: the value of one share of an ETF at the close of a day, as its issuer publishes it.
+- **Ongoing costs**: what an ETF takes from its assets each year, as its key information document states them, inside its net asset value. They are its TER plus its transaction costs.
+- **Portfolio**: the two ETFs held under these rules, plus any contribution not yet invested.
+- **Produced by the rules**: a column of `outputs/orders.csv`. It reads yes for an order the rules produce on its cycle day, no for an order they do not produce, and starting amount for the two first purchases, which invested the starting amount at the target weights on 8 October 2026, a day no rule names.
+- **Realised tracking error against the benchmark**: the standard deviation of the monthly active returns, times the square root of 12.
+- **Realised volatility**: the standard deviation of the portfolio's last 12 monthly time-weighted returns, times the square root of 12, so a figure for a year.
+- **Rebalancing**: moving the weights back towards the target weights, through top-ups (rule 4) or through the band (rule 5).
+- **Record**: what the program computes from the ledger and the prices. It covers holdings, weights, orders and their costs, returns, the look-through and the reference portfolios.
+- **Reference portfolio**: a portfolio computed from the same contributions and prices as the portfolio, without costs. Reference portfolio A follows the same rules, and reference portfolio B goes back to the target weights on every cycle day.
+- **Regions**: the effect of holding the four MSCI regions in other weights than the held equity ETF does: the comparator's equity share times the sum over the regions of its weight minus the held ETF's, times the region's index return in euro, the allocation term of Brinson and Fachler (1985).
+- **Resampled paths**: the bootstrap's ten-year paths carried forward from the first purchase with the top-up and the rules, in units of the starting amount.
+- **Risk contribution**: a component's weight times the covariance of its return with the portfolio's return, divided by the portfolio's variance. The contributions sum to 100 per cent.
+- **Risk limit**: the worst fall the mandate aims to stay within, about one third, tested as 35 per cent.
+- **Risk-free rate**: the one-month US Treasury bill return in French's files.
+- **Rolling correlation**: the correlation of two series of monthly returns over the 36 months to each month end.
+- **S&P 500 alternative**: the same contributions on the same days into one S&P 500 ETF at its net asset value in euro, in fractional units and without costs, starting with the starting amount at the net asset value of the day of the first purchase, as reference portfolio A starts. It stands for the rule "hold the S&P 500 and nothing else" with no costs, so that it is compared with reference portfolio A like for like, two rule sets on the same money.
+- **Sharpe ratio**: the mean of a portfolio's return above the risk-free rate, divided by the standard deviation of that excess return, so the return earned per unit of volatility.
+- **Sleeve**: the part of the portfolio held in one ETF.
+- **Split**: a pair of target weights, written equity/bonds, e.g., 60/40.
+- **Standard error**: the estimated standard deviation of an estimate.
+- **Starting amount**: the first contribution, fixed before the first order.
+- **Target weight**: the weight the rules aim for in a sleeve. Rule 1 sets 70 and 30 per cent for equity and bonds, rule 11 can change them, and the dashboard gives those in force.
+- **TER**: total expense ratio, the management and other operating costs an ETF takes from its assets each year, as a percentage of them.
+- **Time-weighted return**: the return with contributions removed, chained from day to day. The timing and the size of the contributions therefore do not affect it.
+- **Top-up**: the fixed monthly contribution, 5 per cent of the starting amount.
+- **Tracking difference**: an ETF's return minus its index's return over a calendar year, in percentage points.
+- **Tracking error**: the standard deviation of the difference between the portfolio's return and a named reference's, as a figure for a year. The tracking error against a comparator is taken from daily differences, times the square root of 252.
+- **Trading day**: a day on which Xetra, the Frankfurt exchange where both ETFs are listed in euro, is open.
+- **Value at risk**: the loss over one month at 95 per cent at today's weights. It is given historical or normal. The historical figure is the sixth worst month of the 120-month window, a loss reached or exceeded in six months of the 120, and the normal figure comes from the normal distribution with the estimated volatility.
+- **Weight**: a sleeve's value divided by the portfolio's.
+- **Within each region**: what a comparator's difference to the two ETFs held at its equity share leaves after regions and the dollar: the choice of companies inside each region, the funds' costs and their timing against the indices.
+- **Worst fall**: the largest fall in value from a previous peak to a later low, with contributions removed.

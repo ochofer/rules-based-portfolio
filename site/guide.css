@@ -22,4 +22,6 @@
   .gd-contents h2 { font-size: 14pt; }
   /* One column in print, so that the contents read in the order of the guide. */
   .gd-contents ul ul { columns: 1; }
+  /* A term or its definition is never split by a page break, which Chromium can otherwise drop from a grid. */
+  .gd .rp-terms dt, .gd .rp-terms dd { break-inside: avoid; }
 }

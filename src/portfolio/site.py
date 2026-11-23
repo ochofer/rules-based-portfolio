@@ -2684,9 +2684,8 @@ def _us_test(allocation: pd.DataFrame, us: pd.DataFrame, period: tuple, added) -
     note = ("The allocation test run again with the US stock market in euro in place of the global equity series, "
             "with the same bonds, the same band rule, the same splits and the same months. At 70/30 the global "
             f"series' worst fall runs from {_month_name(g70['peak'])} to {_month_name(g70['low'])}, and the US "
-            f"series' from {_month_name(u70['peak'])} to {_month_name(u70['low'])}. The US series was added in "
-            f"{pd.Timestamp(added).strftime('%B %Y')}, after the first cycle day, in answer to a question readers ask, "
-            "and the split was set on the global series alone. The global series' "
+            f"series' from {_month_name(u70['peak'])} to {_month_name(u70['low'])}. The split was set on the global "
+            "series alone, and the US series chooses nothing. The global series' "
             f"{held_split} bar, in the primary ink, is the split held.")  # fmt: skip
     asof = (f"Monthly euro returns, {_month_name(first)} to {_month_name(last)}, rebalanced by the band, splits from "
             "40/60 to 100/0")  # fmt: skip
@@ -3378,16 +3377,22 @@ def _next_cycle_day(now_row) -> str:
     return fmt.day_words(cycle)
 
 TERM_LINE = re.compile(r"^- \*\*(.+?)\*\*: (.+)$")
+TERMS_FILE = Path("guide") / "terms.md"
+
+
+def terms_from(text: str, name: str) -> list:
+    """The entries of a list of terms, each line reading '- **term**: definition'."""
+    lines = [line.strip() for line in text.splitlines() if line.strip().startswith("- ")]
+    found = [TERM_LINE.match(line) for line in lines]
+    if not found or not all(found):
+        raise ValueError(f"{name}: every entry must read '- **term**: definition'")
+    return [(m.group(1)[0].upper() + m.group(1)[1:], m.group(2).replace("`", "")) for m in found]
 
 
 def terms() -> list:
-    """The terms of the README's Terms section, the one list the page's footer shows."""
-    text = (config.ROOT / "README.md").read_text()
-    section = text.split("\n## Terms\n", 1)[1].split("\n## ", 1)[0]
-    found = [TERM_LINE.match(line.strip()) for line in section.splitlines() if line.strip()]
-    if not found or not all(found):
-        raise ValueError("README.md: every line of the Terms section must read '- **term**: definition'")
-    return [(m.group(1)[0].upper() + m.group(1)[1:], m.group(2).replace("`", "")) for m in found]
+    """The full list of terms, guide/terms.md, which the page's footer and the guide's Terms show. The README's Terms
+    section holds a short list, each entry the opening of the same term's entry here."""
+    return terms_from((config.ROOT / TERMS_FILE).read_text(encoding="utf-8"), str(TERMS_FILE))
 
 
 # Each view opens with the question it answers.

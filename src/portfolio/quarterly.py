@@ -660,9 +660,14 @@ class Issue:
 
 
 def _terms(root: Path, text: str) -> list:
-    """The README's terms that the issue uses, in the singular or the plural, in the README's order."""
-    readme = (root / "README.md").read_text(encoding="utf-8")
-    section = readme.split("\n## Terms\n", 1)[1].split("\n## ", 1)[0]
+    """The terms that the issue uses, in the singular or the plural, in the list's order: from guide/terms.md, the full
+    list, or from the README's Terms section in a commit that has no such file."""
+    full = root / "guide" / "terms.md"
+    if full.exists():
+        section = full.read_text(encoding="utf-8")
+    else:
+        readme = (root / "README.md").read_text(encoding="utf-8")
+        section = readme.split("\n## Terms\n", 1)[1].split("\n## ", 1)[0]
     found = []
     for line in section.splitlines():
         m = re.match(r"^- \*\*(.+?)\*\*: (.+)$", line.strip())
