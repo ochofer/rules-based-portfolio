@@ -1777,8 +1777,8 @@ TRACKING_NOTE = (
     "reason for an order.")
 TRACKING_STUDY = (
     "{study} has the same measure as its objective: a constrained optimiser keeps a portfolio of French's 49 industries "
-    "close to its benchmark, and five covariance estimators understate their own tracking error, the realised active "
-    "return being 22 to 61 per cent more volatile than forecast. "
+    "close to its benchmark, and each of five covariance estimators forecasts less tracking error than its portfolio "
+    "realises, the realised active return being 22 to 61 per cent more volatile than forecast. "
     "Here the rules set the weights, so nothing has searched for the weights that make the estimate small. The realised "
     "tracking error against the benchmark appears from the sixth month end, with the number of monthly differences it "
     "rests on. It also holds the two funds' tracking of their indices and their costs, which the estimate leaves out, so "
@@ -2577,10 +2577,10 @@ CITATIONS.update(zip(ESSAY_NOTES, NOTES))
 # The wording of the cards on the site's projects page. The README's section Other projects carries the same.
 OTHER_PROJECTS = (
     ("Optimal versus naive diversification.",
-     "Under an index-tracking mandate on French's 49 industries, five covariance estimators understate their own "
-     "tracking error over 1979 to 2026: the realised active return is 22 to 61 per cent more volatile than forecast. "
-     "The replication of DeMiguel, Garlappi and Uppal (2009) reproduces 29 of the 30 Sharpe ratios that carry a band, "
-     "26 of 27 with the value-weighted market counted once.",
+     "Under a long-only index-tracking mandate on French's 49 industries, 1979 to 2026, each of five covariance "
+     "estimators forecasts less tracking error than its portfolio realises: the realised active return is 22 to 61 per "
+     "cent more volatile than forecast. The replication of DeMiguel, Garlappi and Uppal (2009) reproduces 29 of the 30 "
+     "out-of-sample Sharpe ratios within 0.03 of the published values.",
      (("Page", STUDY_URL), ("dashboard", SITE_URL + "optimal-vs-naive-diversification/dashboard/B-P_dashboard.html"),
       ("note", SITE_URL + "optimal-vs-naive-diversification/note/B-P_note_2026-10.pdf"),
       ("code", "https://github.com/ochofer/optimal-vs-naive-diversification"))),
@@ -2605,13 +2605,12 @@ OTHER_PROJECTS = (
       ("note", SITE_URL + "volatility-managed-portfolios/note/B-Q_note_2026-11.pdf"),
       ("code", "https://github.com/ochofer/volatility-managed-portfolios"))),
     ("Stock-level index tracking: a point-in-time benchmark, a long-only mandate, and its performance attribution by sector.",
-     "A point-in-time S&P 500 universe from CRSP and Compustat, a long-only mandate held close to its cap-weighted "
-     "benchmark, and an attribution of its active return by sector. Under the mandate, simulated from 1999 to 2024, "
-     "four covariance estimators realise 78.9 to 83.6 basis points a year of tracking error, and each forecast "
-     "understates it: the realised active return is 48 to 85 per cent more volatile than forecast. Index changes force "
-     "11.4 per cent of the turnover on the Ledoit-Wolf estimator, and no estimator's mean active return is "
-     "statistically significant at the 5 per cent level, which over these 306 months would take one of about 35 basis "
-     "points a year.",
+     "Rebuilds the S&P 500 month by month from CRSP's list of members, at a tracking error of 11.5 basis points a year "
+     "against CRSP's own return of the same list, and runs a long-only index-tracking mandate on it from 1999 to 2024, "
+     "with its active return attributed by sector. The portfolios realise 78.9 to 83.6 basis points a year of tracking "
+     "error, and each of four covariance estimators forecasts less: the realised active return is 48 to 85 per cent "
+     "more volatile than forecast. Index changes require 11.4 per cent of the turnover of the portfolio built with "
+     "Ledoit-Wolf shrinkage.",
      (("Page", PROJECTS_URL + "stock-level-tracking/"),
       ("dashboard", SITE_URL + "stock-level-tracking/dashboard/"),
       ("note", SITE_URL + "stock-level-tracking/note/stock-level-tracking_note_2026-11.pdf"),
