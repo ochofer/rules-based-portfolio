@@ -34,7 +34,7 @@ The definition of every term the dashboard and the guide use in a sense of their
 - **Growth per year**: the compound annual return, with contributions removed.
 - **Half-spread**: half the gap between the ask and the bid quoted when an order is placed.
 - **Implementation cost**: reference portfolio A's value relative to the portfolio's, with contributions removed, in basis points, positive when the portfolio's value is below reference portfolio A's. It is negative when the portfolio's value is above.
-- **In-sample**: computed on the data on which a choice was made, here the returns from 1999 to 2025 on which the split was chosen.
+- **In-sample**: computed on the data on which a choice was made, here the returns from 1999 to 2025 on which the split is set.
 - **Index blend**: MSCI ACWI net total return and the Bloomberg Euro-Aggregate Treasury index, in euro, at the target weights, rebalanced at each month end to the target weights in force on that day, the portfolio's benchmark. The target weights are 70 and 30 per cent until rule 11 changes them, and a change enters the blend at the first month end after the cycle day it applies from.
 - **Ledger**: the private record of every contribution and every order. It is kept outside the repository.
 - **Loading**: the coefficient of the ETF's return minus the risk-free rate on a factor's return.

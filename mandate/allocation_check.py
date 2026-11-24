@@ -21,7 +21,7 @@ of that month end, through run_at below.
 In November 2026, after the first cycle day, a second run was added to answer
 a question readers ask: the same test with the US stock market in place of the
 global equity series, with the same bonds, the same band rule, the same splits
-and the same months. The split was set on the global series alone, and the US
+and the same months. Rule 1 sets the split on the global series alone, and the US
 run chooses nothing: its table reads no in the column chosen on every row. The
 same run gives the cumulative return in US dollars, dividends included, of the
 US stock market and of the developed markets outside the United States over

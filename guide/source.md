@@ -60,7 +60,7 @@ Each entry opens with a link to its place on the dashboard, and every figure or 
 
 **The design and the record**
 
-- How the split was chosen: ⟦c21⟧, ⟦c25⟧, ⟦c33⟧
+- How the split is set: ⟦c21⟧, ⟦c25⟧, ⟦c33⟧
 - Why these two ETFs: ⟦c22⟧
 - Why the portfolio has no optimiser, no views and no signal, and does not hold the S&P 500 alone: [What the portfolio does not do, and why](#method-not-done), ⟦c34⟧
 - The rules, and how a rule changes: [The rules](#method-rules)
@@ -408,7 +408,7 @@ The second section runs the whole history as one path, from February 1999 to Dec
 
 ### ⟦c27a⟧ Simulation: growth of 100 under the rules
 
-⟦c27a⟧ compares the growth of 100 under the rules, the navy line, with the same portfolio taken back to 70/30 on every cycle day, the grey line, with contributions removed. The gap between them is the drift effect over 27 years of history. The simulation is in-sample, that is, computed on the data on which the split was chosen, and its index series run back before the two ETFs existed. The table gives the year ends, and the months are in the source file.
+⟦c27a⟧ compares the growth of 100 under the rules, the navy line, with the same portfolio taken back to 70/30 on every cycle day, the grey line, with contributions removed. The gap between them is the drift effect over 27 years of history. The simulation is in-sample, that is, computed on the data on which the split is set, and its index series run back before the two ETFs existed. The table gives the year ends, and the months are in the source file.
 
 ### ⟦c27b⟧ Simulation: fall from the previous peak under the rules
 
@@ -430,17 +430,17 @@ The Method view explains how the portfolio was set up: how the split and the two
 
 ### ⟦c21⟧ The allocation test: growth per year against the worst fall of each split, on the global and the US equity series
 
-⟦c21⟧ shows how the split was chosen. The allocation test, in `mandate/allocation_check.py`, runs every split from 40/60 to 100/0, in steps of five points, through monthly euro returns from February 1999 to December 2025. The equity series is Kenneth French's market returns for five regions, North America, Europe, Japan, Asia Pacific ex Japan and emerging markets, at the equity ETF's weights by region in the holdings file of 13 November 2026, the same weights in every month, converted to euro. It shows what French's regional markets, at the weights by region the fund had on that date, would have lost, and not what the index lost with the weights it had then. The bond series is a seven-year euro area government bond priced from the European Central Bank's yields. Each split is rebalanced by its band, and for each the test measures the growth per year and the worst fall.
+⟦c21⟧ shows how the split is set. The allocation test, in `mandate/allocation_check.py`, runs every split from 40/60 to 100/0, in steps of five points, through monthly euro returns from February 1999 to December 2025. The equity series is Kenneth French's market returns for five regions, North America, Europe, Japan, Asia Pacific ex Japan and emerging markets, at the equity ETF's weights by region in the holdings file of 13 November 2026, the same weights in every month, converted to euro. It shows what French's regional markets, at the weights by region the fund had on that date, would have lost, and not what the index lost with the weights it had then. The bond series is a seven-year euro area government bond priced from the European Central Bank's yields. Each split is rebalanced by its band, and for each the test measures the growth per year and the worst fall.
 
 Each grey dot is a split, placed by its worst fall on the horizontal axis and its growth per year on the vertical axis, and the curve joins the splits from 40/60 to 100/0. The navy dot is the split held, the target weights in force, and the red lines are the risk limit of 35 per cent and the outer bound of 40 per cent. The mandate's rule is the largest equity target weight whose worst fall stayed within 35 per cent, and on this history, at the weights by region of 13 November 2026, that is 70/30, with a worst fall of 34.55 per cent from August 2000 to March 2003. On MSCI's regional net returns at the same weights 70/30 fell 35.75 to 35.88 per cent, and on MSCI ACWI, the index the fund tracks, with the weights it had in each month, 36.39 to 36.53 per cent, so on those series the test gives 65/35, and across the two sources it does not decide between 70/30 and 65/35. French's series is the test's deciding series, and the two MSCI series choose nothing. The note under the figure gives the comparison and why the sources differ. From the cycle day of 5 January 2027, rule 11 runs the test again at each month end and moves the target weights when the test gives the same split, other than the target, at two month ends in a row, and the note gives the record's latest month end. With two assets every split lies on this one curve, so the limit picks the point and no estimate of future returns enters. The test is in-sample, that is, computed on the data on which the choice was made: the split is set on the returns the chart shows.
 
-The teal curve repeats the test with the US stock market in euro in place of the global equity series, with the same bonds, band rule, splits and months, and its point at the split held is marked as well. On this history the US series grew more per year at every split, and fell further at every split from 60/40 to 100/0. The split was set on the global series alone.
+The teal curve repeats the test with the US stock market in euro in place of the global equity series, with the same bonds, band rule, splits and months, and its point at the split held is marked as well. On this history the US series grew more per year at every split, and fell further at every split from 60/40 to 100/0. Rule 1 sets the split on the global series alone.
 
 ### ⟦c25⟧ Simulated worst fall of each split over resampled ten-year paths
 
 ⟦c25⟧ shows how often each split could fall more than the limit over ten years if the test's history were reshuffled. The bootstrap, a resampling of the allocation test's returns, builds 10,000 paths of ten years, each joining blocks of twelve consecutive months that start at random months, and applies the band at each month end. A block keeps its twelve months in their order, so a fall and the correlation of the two sleeves within a year stay as they happened.
 
-For each split, a line runs from the median worst fall over the paths, a filled dot, to the 95th percentile, an open circle, which is the fall exceeded in one path in twenty. The black diamond is the allocation test's single historical path, 70/30 is in navy, and the red lines are 35 and 40 per cent. The note gives how often 70/30 and 60/40 fall more than 35 per cent, and the table adds paths of five years and blocks of 6, 24 and 36 months. The paths reuse the same returns, so they say nothing about years unlike those, and the split was chosen on this sample. The results are an input to the review of the rules in October 2027 and change no rule.
+For each split, a line runs from the median worst fall over the paths, a filled dot, to the 95th percentile, an open circle, which is the fall exceeded in one path in twenty. The black diamond is the allocation test's single historical path, 70/30 is in navy, and the red lines are 35 and 40 per cent. The note gives how often 70/30 and 60/40 fall more than 35 per cent, and the table adds paths of five years and blocks of 6, 24 and 36 months. The paths reuse the same returns, so they say nothing about years unlike those, and the split is set on this sample. The results are an input to the review of the rules in October 2027 and change no rule.
 
 ### ⟦c29⟧ Rolling 36-month correlation of the two sleeves' monthly returns
 
@@ -462,7 +462,7 @@ The section's notes, numbered from 1, give the full reference for each source wi
 
 ⟦c33⟧ repeats the allocation test with the US stock market in euro in place of the global equity series, with the same bonds, the same band rule, the same splits and the same months. For each split, the upper bar is the global series, as in ⟦c21⟧, with the split held in navy and the other splits in grey, and the lower bar, in teal, is the US series. The red lines are 35 and 40 per cent, and the table gives both series' worst falls, their growth per year and whether each split stayed within 35 per cent.
 
-The split was set on the global series alone, so this figure chooses nothing. It shows how a single-country equity sleeve would have fared under the same limit, and the section's second paragraph gives the largest US split within 35 per cent and the US worst fall at 70/30.
+Rule 1 sets the split on the global series alone, so this figure chooses nothing. It shows how a single-country equity sleeve would have fared under the same limit, and the section's second paragraph gives the largest US split within 35 per cent and the US worst fall at 70/30.
 
 ### ⟦c34⟧ Growth of 100: reference portfolio A and the S&P 500 alternative
 

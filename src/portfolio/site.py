@@ -2683,7 +2683,7 @@ def _us_test(allocation: pd.DataFrame, us: pd.DataFrame, period: tuple, added) -
     note = ("The allocation test run again with the US stock market in euro in place of the global equity series, "
             "with the same bonds, the same band rule, the same splits and the same months. At 70/30 the global "
             f"series' worst fall runs from {_month_name(g70['peak'])} to {_month_name(g70['low'])}, and the US "
-            f"series' from {_month_name(u70['peak'])} to {_month_name(u70['low'])}. The split was set on the global "
+            f"series' from {_month_name(u70['peak'])} to {_month_name(u70['low'])}. Rule 1 sets the split on the global "
             "series alone, and the US series chooses nothing. The global series' "
             f"{held_split} bar, in the primary ink, is the split held.")  # fmt: skip
     asof = (f"Monthly euro returns, {_month_name(first)} to {_month_name(last)}, rebalanced by the band, splits from "
@@ -3067,7 +3067,7 @@ def _bootstrap(page, boot):
     note = (f"Simulation on index returns, monthly, in euro, gross of costs and without contributions: {paths:,} paths of ten "
             f"years, each joining twelve-month blocks of {SAMPLE} that start at random months, with the band of rule 5 "
             "at each month end. The paths are resampled from the same returns, so they say nothing about years unlike "
-            "those, and the split was chosen on this sample. Over ten years, 70/30 falls more than 35 per cent in about "
+            "those, and the split is set on this sample. Over ten years, 70/30 falls more than 35 per cent in about "
             f"one path in {_one_in(share['70/30'])}, and 60/40 in about one in {_one_in(share['60/40'])}. The table adds "
             f"five years and block lengths of 6, 24 and 36 months. {_longer_blocks(checks)}The results are an input to the review of the rules "
             f"in October 2027 and change no rule. {SIMULATION_BASIS}")  # fmt: skip
@@ -3115,7 +3115,7 @@ def simulations(page, history, paths, monthly):
             f"5 a month: {SAMPLE}, with the cycle at each month end in place of the 5th. The line is the equity weight at "
             "each month end, before the top-up. Each top-up buys the sleeve "
             "furthest below its target weight up to that weight, and the remainder buys the other sleeve (rule 4). The band "
-            "of rule 5 then applies. Every purchase counts as an order, whatever its size. The split was chosen on this "
+            "of rule 5 then applies. Every purchase counts as an order, whatever its size. The split is set on this "
             f"sample. {SIMULATION_BASIS}")  # fmt: skip
     page.add("simulations", _section("Mechanics simulation", "simulations-mechanics",
              sub="The rules applied to the allocation test's returns, for the counts of their orders"))  # fmt: skip
@@ -3150,7 +3150,7 @@ def simulations(page, history, paths, monthly):
     table = _table(columns, rows, numeric=tuple(columns[1:]))
     note = ("A simulation on index returns, and not the portfolio's record, which starts in October 2026. Gross of costs, "
             "with the starting amount of 100 and the top-up of 5 a month, and the rules applied at each month end. The split "
-            "was chosen on this sample, so the simulation is in-sample. The index series run back before the two ETFs "
+            "is set on this sample, so the simulation is in-sample. The index series run back before the two ETFs "
             "existed: the equity share class since 21 October 2011 and the bond share class since 19 February 2019. "
             "Time-weighted, with contributions removed. The table gives the year ends, and the months are in the source file.")  # fmt: skip
     page.add("simulations", _section("Historical simulation", "simulations-history",
@@ -3202,7 +3202,7 @@ def simulations(page, history, paths, monthly):
     note = ("These are resampled paths and not the portfolio's record: 10,000 paths of the portfolio's value over ten years "
             f"from the first purchase that reuse {SAMPLE} in random twelve-month blocks and assume nothing beyond them, so "
             "the bands say what that sample implies and not what will happen. Gross of costs, with the top-up of 5 a month and "
-            "the rules applied at each month end, in units of the starting amount, 100. The split was chosen on this sample, so "
+            "the rules applied at each month end, in units of the starting amount, 100. The split is set on this sample, so "
             f"the paths are in-sample. {record_text} A record below the lower band is a question for the review of the rules "
             "in October 2027.")  # fmt: skip
     page.add("simulations", _section("Resampled paths", "simulations-paths",

@@ -51,7 +51,7 @@ def test_the_values_in_the_text_are_computed_from_the_committed_files():
             "2000 to February 2003") in html  # fmt: skip
     assert "would be in An S&amp;P 500 fund, the S&amp;P 500 ETF" in html
     assert "Added on 6 November 2026, after the first cycle day, in answer to the questions readers ask most." in html
-    assert "The split was set on the global series alone, and the US series chooses nothing." in html
+    assert "Rule 1 sets the split on the global series alone, and the US series chooses nothing." in html
 
 
 def test_the_sentence_on_the_us_market_is_written_from_the_committed_periods():
