@@ -41,7 +41,8 @@ were known, and the two tables are the record of the test as it stood until 19 N
 A fourth run, added on 19 November 2026 after its outcome was known, sets the deciding series beside two series
 built on MSCI's indices in euro, with the same bonds, band rule and months: MSCI's regional returns at the same
 weights, net and gross of the tax on dividends, and MSCI ACWI, the index the equity ETF tracks, with the weights it
-had in each month. It chooses nothing. A fifth gives the deciding series with the bond at 5, 6.7, 7 and 9 years.
+had in each month. It chooses nothing. A fifth, added on 20 November 2026 after the test's outcome was known, gives
+the deciding series with the bond at 5, 6.7, 7 and 9 years.
 
 A sixth, added with rule 11 after its outcome was known, gives the deciding series at other weights by region: the
 fund's weights rolled back by French's regional returns to each month end from December 2009, the smallest shift
@@ -120,6 +121,7 @@ FIRST_MONTH, LAST_MONTH = "1999-01", "2025-12"
 REGION_WEIGHTS = os.path.join(ROOT, "mandate", "allocation_check_regions.csv")
 REGIONS = (("North America", "north_america"), ("Europe", "europe"), ("Japan", "japan"),
            ("Asia Pacific ex Japan", "asia_pacific_ex_japan"), ("Emerging markets", "emerging"))
+# The bond's maturities, added on 20 November 2026 after the test's outcome was known.
 MATURITIES = (5.0, 6.7, 7.0, 9.0)  # the bond's maturity as a setting of the deciding series, in years
 FALL_SPLITS = (0.65, 0.70, 0.75)   # the splits whose worst fall the comparison gives
 # The comparison, added on 19 November 2026 after its outcome was known: the same test on MSCI's indices in euro. The
@@ -149,13 +151,15 @@ NORTH_AMERICA_SCAN = (0.55, 0.80, 0.0005)  # North America's weight from 55 to 8
 MSCI_URL = ("https://app2.msci.com/products/service/index/indexmaster/getLevelDataForGraph?currency_symbol=EUR"
             "&index_variant={variant}&start_date=19981231&end_date=20251231&data_frequency=END_OF_MONTH"
             "&index_codes={code}")
-# The history of the comparisons: 70/30 against three comparators on the test's own series, by calendar year, over
-# the two periods of US_PERIODS and over rolling windows of ten calendar years.
+# The history of the comparisons, its two tables added on 10 November 2026 after the test's outcome was known: 70/30
+# against three comparators on the test's own series, by calendar year, over the two periods of US_PERIODS and over
+# rolling windows of ten calendar years.
 HISTORY_TARGET = 0.70
 HISTORY_COMPARATORS = (("100/0", "global", 1.00), ("60/40", "global", 0.60), ("the US stock market at 70/30", "united_states", 0.70))
 WINDOW_YEARS = 10
-# The gap between the 100/0 and the 40/60 split: its standard error and 95 per cent interval from a circular block
-# bootstrap of the two splits' paired months, with a fixed seed so that a run reproduces them.
+# The gap between the 100/0 and the 40/60 split, added on 18 November 2026 after the test's outcome was known: its
+# standard error and 95 per cent interval from a circular block bootstrap of the two splits' paired months, with a
+# fixed seed so that a run reproduces them.
 GAP_BLOCK_MONTHS = 12
 GAP_DRAWS = 9999
 GAP_SEED = 20261119

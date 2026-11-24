@@ -1,9 +1,10 @@
 """The benchmark and the comparators that follow the target weights in force: with a made-up change of the target
-weights under rule 11, the page and the guide give 70/30 and 70 per cent only where they stay by design. Those are
-the rules, which change only by amendment; the simulations and the history exhibit, which run the rules of
-7 October 2026 at 70/30 and say so; the allocation test's own figures for its splits; 70/30 fixed, the comparator
-that keeps a change of the target visible; and the issued records, the cycle reports and the monthly notes, which
-keep their words. The README's opening gives the target of today and is not on the page."""
+weights under rule 11, the page and the guide give 70/30, 70 per cent and the band of 65 to 75 only where they stay
+by design. Those are the rules, which change only by amendment; the simulations and the history exhibit, which run
+the rules of 7 October 2026 at 70/30 and say so; the allocation test's own figures for its splits; 70/30 fixed, the
+comparator that keeps a change of the target visible; the band's definition, which gives its figures at the target
+weights of rule 1; and the issued records, the cycle reports and the monthly notes, which keep their words. The
+README's opening gives the target of today and is not on the page."""
 
 import html
 import json
@@ -14,13 +15,14 @@ import pandas as pd
 from portfolio import rule_11, site
 from test_metrics_references import made_up_change
 
-FOUND = re.compile(r"70/30|70 per cent")
+FOUND = re.compile(r"70/30|70 per cent|65 to 75|65 and 75")  # the split and the band of rule 1
 # The parts that keep 70/30 by design, by the heading they stand under.
 KEPT_UNDER = re.compile(r"\bThe rules\b|Simulat|Resampled paths|History\b|rolling ten-year windows|The allocation test")
 # The sentences that keep it by design wherever they stand: the fixed comparator, the simulations' figure in the
 # Risk view, and the allocation test's result in the section on what the portfolio does not do.
+# The band's definition, which gives its figures at the target weights of rule 1, is kept too.
 KEPT_PHRASES = re.compile(r"70/30 fixed|the split nearest the equity weight|is the largest target weight whose worst "
-                          r"fall|the worst fall at 70/30 is")  # fmt: skip
+                          r"fall|the worst fall at 70/30 is|at the target weights of rule 1")  # fmt: skip
 # The charts of the simulations, the history exhibit and the allocation test.
 KEPT_CHARTS = {"c21", "c25", "c26", "c27a", "c27b", "c33", "history-windows"}
 HEADING = re.compile(r"<h[23][^>]*>(.*?)</h[23]>", re.S)

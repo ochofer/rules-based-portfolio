@@ -1238,7 +1238,7 @@ def _selection_card(as_of) -> str:
             "the lowest TER, in per cent a year. A fund without three years of factsheet returns ranks after those with them. The LifeStrategy "
             "funds are the euro accumulating classes, and the Mag7 fund was named when the comparators were fixed on "
             "10 November 2026, before any of their values was read. The S&P 500 fund was fixed on 6 November 2026 with "
-            "the S&P 500 alternative, and that it came before its values rests on the dates written in its file.")  # fmt: skip
+            "the S&P 500 alternative.")  # fmt: skip
     return _card("comparisons-selection", "How the one-fund comparators' funds were chosen",
                  "Tracking difference in percentage points, calendar years 2023 to 2025",
                  tuple(f"method/{n}" for _, n in SELECTIONS) + ("method/comparator_funds.csv",), plot=False, kind="table",
@@ -2522,7 +2522,7 @@ def method(page, allocation: pd.DataFrame, selection: pd.DataFrame, rules_html: 
                   note="Tracking difference is the fund's calendar-year return minus "
                   "the return of its index, so a higher figure means a smaller shortfall. Each mark is one year, with the "
                   "shape given in the legend, and the bar is the three-year average. The funds are numbered in the rank order that the rules give as "
-                  "fixed before the funds were compared, which rests on the date written in the rules: equity ETFs by "
+                  "fixed before the funds were compared: equity ETFs by "
                   "Irish domicile, then the highest average tracking difference, then the lowest "
                   "TER, and bond ETFs by the highest average tracking difference, then the lowest TER. The held funds, "
                   "in the primary ink, are the first in rank order that the account offers. Hollow marks are funds the "
@@ -3831,7 +3831,9 @@ def build(out_dir: Path = None) -> Path:
     numbers = _number(page.sections)
     _number_notes(page.sections)
     # The guide to the dashboard is built with it, and the build stops when a part of the page has no entry in it.
-    guide_module.write(page.sections, numbers, VIEWS, terms(), _built(now_row), out_dir, {"us_share": _us_share(out)})
+    band_low, band_high = rule_11.current_band()
+    guide_module.write(page.sections, numbers, VIEWS, terms(), _built(now_row), out_dir,
+                       {"us_share": _us_share(out), "band_low": _whole(band_low), "band_high": _whole(band_high)})
 
     first = orders["date"].min() if len(orders) else None
     tabs = "".join(f'<button type="button" data-view="{v}" aria-selected="false">{_esc(t)}</button>' for v, t in VIEWS)

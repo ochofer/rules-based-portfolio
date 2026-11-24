@@ -12,11 +12,11 @@ On the cycle day, the 5th of each month or the first trading day after it when t
 
 A rule changes only by a dated amendment, which applies from the first cycle day at least 30 days after it is committed, and a correction that changes an order counts as an amendment. `rules/RULES.md` dates every amendment and erratum.
 
-On each cycle day a *cycle report*, `cycles/YYYY-MM.md`, is written before any order, with each rule that bears on the proposed orders, its figure and a pass or a fail. It is committed and pushed before the first order of the day, and the line after the orders, which compares them with the proposal, is a second commit, so that the history shows the order. A *monthly note* of 120 to 200 words follows in `notes/YYYY-MM.md`, written by hand.
+On each cycle day a *cycle report*, `cycles/YYYY-MM.md`, is written before any order, with each rule that bears on the proposed orders, its figure and a pass or a fail. From the cycle day of 7 December 2026 it is committed and pushed before the first order of the day, and the line after the orders, which compares them with the proposal, is a second commit, so that the history shows the order. A *monthly note* of 120 to 200 words follows in `notes/YYYY-MM.md`, written by hand.
 
 ## The split
 
-The mandate's risk limit is a worst fall of about one third, tested as 35 per cent, and the allocation test measures each split's worst fall on monthly euro returns from February 1999 to December 2025. Its *deciding series* for equity is Kenneth French's market returns for five regions at the equity ETF's weights by region, and two MSCI series stand beside it and choose nothing. At the equity ETF's weights by region of 13 November 2026, 70/30's worst fall is 34.55 per cent on the deciding series, 0.45 points inside the limit, and 35.75 to 36.53 per cent on the two MSCI series, so the test does not decide between 70/30 and 65/35 across the two sources. Rule 1 sets the target at 70/30. The split was set on the global series alone. The tables of the allocation test that were added after its outcome was known are marked as such in `mandate/allocation_check.py`, and none of them chooses anything.
+The mandate's risk limit is a worst fall of about one third, tested as 35 per cent, and the allocation test measures each split's worst fall on monthly euro returns from February 1999 to December 2025. Its *deciding series* for equity is Kenneth French's market returns for five regions at the equity ETF's weights by region, and two MSCI series stand beside it and choose nothing. At the equity ETF's weights by region of 13 November 2026, 70/30's worst fall is 34.55 per cent on the deciding series, 0.45 points inside the limit, and 35.75 to 36.53 per cent on the two MSCI series, so the test does not decide between 70/30 and 65/35 across the two sources. On the deciding series 65/35 is also the result if the limit is read as one third, 33.3 per cent, or if the bond's maturity is five years in place of the test's seven. Rule 1 sets the target at 70/30. Rule 1 sets the split on the global series alone. The tables of the allocation test that were added after its outcome was known are marked as such in `mandate/allocation_check.py`, and none of them chooses anything.
 
 ## What the record measures
 
@@ -37,7 +37,7 @@ The Comparisons part of the Performance view sets the record beside *comparators
 - savings at the euro short-term rate
 - a bank's managed profile at 70 and 30 per cent, with its published costs, by calendar year only
 
-Each fund was fixed, with its ISIN and the date, in `method/` before its values were read for the comparisons, and for the S&P 500 fund that order rests on the dates written in its file. For each comparator the dashboard gives the time-weighted and money-weighted return since the first purchase, the volatility of daily returns, the worst fall, the correlation with the portfolio, and the difference to the portfolio's return beside the band chance alone produces over the same span. Each difference is split into effects computed day by day and summed by month, i.e., implementation, drift, split, the dollar, cash, regions and within each region, with the asset classes for the global market portfolio and the bond yield for savings. Over the record's first months a difference says nothing about either rule set, and a record of five to ten years is too short to show that one set of rules is better than another, so the returns are not offered as evidence for the rules.
+Each fund was fixed, with its ISIN and the date, in `method/` before its values were read for the comparisons, and the ranking of the market portfolio's funds records each value seen on a fund's own pages before it was fixed. For each comparator the dashboard gives the time-weighted and money-weighted return since the first purchase, the volatility of daily returns, the worst fall, the correlation with the portfolio, and the difference to the portfolio's return beside the band chance alone produces over the same span. Each difference is split into effects computed day by day and summed by month, i.e., implementation, drift, split, the dollar, cash, regions and within each region, with the asset classes for the global market portfolio and the bond yield for savings. Over the record's first months a difference says nothing about either rule set, and a record of five to ten years is too short to show that one set of rules is better than another, so the returns are not offered as evidence for the rules.
 
 ## What is published and what is not
 
@@ -98,7 +98,7 @@ The program reads the private ledger. With `PYTHONPATH=src`, `python3 -m portfol
 - **Sleeve**: the part of the portfolio held in one ETF.
 - **Weight**: a sleeve's value divided by the portfolio's.
 - **Target weight**: the weight the rules aim for in a sleeve. Rule 1 sets 70 and 30 per cent for equity and bonds, rule 11 can change them, and the dashboard gives those in force.
-- **Band**: the interval from 65 to 75 per cent for the equity weight.
+- **Band**: the interval five points either side of the equity target weight, from 65 to 75 per cent at the target weights of rule 1.
 - **Split**: a pair of target weights, written equity/bonds, e.g., 60/40.
 - **Contribution**: money paid into the portfolio, i.e., the starting amount and each top-up, which is 5 per cent of the starting amount.
 - **Cycle day**: the day each month on which the rules are applied.
@@ -112,7 +112,7 @@ The program reads the private ledger. With `PYTHONPATH=src`, `python3 -m portfol
 - **Drift effect**: reference portfolio A's return minus reference portfolio B's.
 - **Tracking difference**: an ETF's return minus its index's return over a calendar year, in percentage points.
 - **Tracking error**: the standard deviation of the difference between the portfolio's return and a named reference's, as a figure for a year.
-- **Band chance alone produces**: plus or minus twice the tracking error against a comparator, times the square root of the years, around zero.
+- **Band chance alone produces**: plus or minus twice the tracking error against a comparator, times the square root of the years, around zero. It ignores compounding and treats the daily differences as independent.
 - **Time-weighted return**: the return with contributions removed, chained from day to day.
 - **Money-weighted return**: the rate at which the contributions, each from its date, grow to the portfolio's value.
 - **Component**: one of the four equity regions and three maturity groups into which the look-through divides the portfolio to estimate its risk, with cash, which has no return.

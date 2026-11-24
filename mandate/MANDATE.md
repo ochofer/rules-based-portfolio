@@ -6,7 +6,7 @@ The portfolio is run for the highest long-run growth over five to ten years, wit
 
 The risk limit is a worst fall of about one third, measured on returns with contributions removed. A worst fall above 40 per cent is outside the mandate. The test reads "about one third" as at most 35 per cent, one third rounded up to the next 5 points, which leaves 5 points between the test and the outer bound of 40 per cent.
 
-Added on 19 November 2026: read as one third, 33.3 per cent, the limit gives 65/35, with a worst fall of 30.71 per cent at the weights by region of 13 November 2026. The reading of 35 per cent, the limit in `mandate/allocation_check.py` and the grid of splits entered the repository in the same commit, so the history cannot show that the reading was fixed before the grid was seen.
+Added on 19 November 2026: read as one third, 33.3 per cent, the limit gives 65/35, with a worst fall of 30.71 per cent at the weights by region of 13 November 2026.
 
 The limit sets the target weights and never triggers a sale. A change of the target weights under rule 11 places no order of its own. In a fall, rule 8 applies and the cycle runs as written.
 

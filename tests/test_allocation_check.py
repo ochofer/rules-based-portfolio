@@ -16,8 +16,9 @@ import allocation_check as ac  # noqa: E402
 ECB = ("ecb_usd_per_eur.csv", "ecb_10y.csv", "ecb_7y.csv")
 GLOBAL = ("north_america.zip", "europe.zip", "japan.zip", "asia_pacific_ex_japan.zip", "emerging.zip") + ECB
 EARLIER = ("developed.zip", "emerging.zip") + ECB  # the equity series as it stood until 19 November 2026
-MSCI = tuple(f"msci_{code}_{variant}.json" for code in ("990200", "990500", "990800", "891800", "892400")
-             for variant in ("strd", "netr", "grtr"))
+# The regions' three variants and MSCI ACWI's price and net levels: the program reads no gross level of MSCI ACWI.
+MSCI = tuple(f"msci_{code}_{variant}.json" for code in ("990200", "990500", "990800", "891800")
+             for variant in ("strd", "netr", "grtr")) + ("msci_892400_strd.json", "msci_892400_netr.json")
 
 
 def cached(*names):
