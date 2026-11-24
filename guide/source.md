@@ -502,7 +502,7 @@ The rules card shows `rules/RULES.md`: the ten rules as fixed before the first o
 
 ### ⟦#method-projects⟧ Other projects
 
-The card after the rules links to the author's other investment research projects, each with its page, its dashboard or note, and its code.
+The card after the rules links to the author's other investment research projects, each with its page and its code, and its dashboard or note where it has one.
 
 ### ⟦#glossary⟧ Terms
 

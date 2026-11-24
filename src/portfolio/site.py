@@ -2580,7 +2580,8 @@ OTHER_PROJECTS = (
      "Under a long-only index-tracking mandate on French's 49 industries, 1979 to 2026, each of five covariance "
      "estimators forecasts less tracking error than its portfolio realises: the realised active return is 22 to 61 per "
      "cent more volatile than forecast. The replication of DeMiguel, Garlappi and Uppal (2009) reproduces 29 of the 30 "
-     "out-of-sample Sharpe ratios within 0.03 of the published values.",
+     "out-of-sample Sharpe ratios it tests within 0.03 of the published values, 26 of 27 with the value-weighted market "
+     "counted once.",
      (("Page", STUDY_URL), ("dashboard", SITE_URL + "optimal-vs-naive-diversification/dashboard/B-P_dashboard.html"),
       ("note", SITE_URL + "optimal-vs-naive-diversification/note/B-P_note_2026-10.pdf"),
       ("code", "https://github.com/ochofer/optimal-vs-naive-diversification"))),
@@ -2589,7 +2590,7 @@ OTHER_PROJECTS = (
      "with a price series, to 5,115 asset holdings, built from Global Energy Monitor's free tracker. Of 19 apparent "
      "ownership changes drawn at random and checked by hand, 12 had no corporate event behind them.",
      (("Page", PROJECTS_URL + "climate-risk-equity-signal/"),
-      ("note", "https://github.com/ochofer/paper1-hazard-exposure-data/releases/download/note-v1.3/"
+      ("note", "https://github.com/ochofer/paper1-hazard-exposure-data/releases/download/note-v1.4/"
                "what-a-vintage-difference-measures.pdf"),
       ("code", "https://github.com/ochofer/paper1-hazard-exposure-data"))),
     ("Volatility-managed portfolios: a replication, the real-time critique, and the months after the sample.",
@@ -2598,15 +2599,15 @@ OTHER_PROJECTS = (
      "realised variance, a factor's Sharpe ratio is higher than the original's by a margin that is statistically "
      "significant at the 5 per cent level for momentum alone when each of the six factors is tested on its own, and "
      "for no factor after Holm's correction for the six tests. In the 136 months after Moreira and Muir's sample no "
-     "factor's difference is statistically significant, and the intervals are too wide to rule out the differences "
-     "found on their sample.",
+     "factor's difference is statistically significant, and for the six volatility-managed factors the intervals are "
+     "too wide to rule out the differences found on their sample.",
      (("Page", PROJECTS_URL + "volatility-managed-portfolios/"),
       ("dashboard", SITE_URL + "volatility-managed-portfolios/dashboard/B-Q_dashboard.html"),
       ("note", SITE_URL + "volatility-managed-portfolios/note/B-Q_note_2026-11.pdf"),
       ("code", "https://github.com/ochofer/volatility-managed-portfolios"))),
     ("Stock-level index tracking: a point-in-time benchmark, a long-only mandate, and its performance attribution by sector.",
      "Rebuilds the S&P 500 month by month from CRSP's list of members, at a tracking error of 11.5 basis points a year "
-     "against CRSP's own return of the same list, and runs a long-only index-tracking mandate on it from 1999 to 2024, "
+     "from 1926 to 2024 against CRSP's own return of the same list, and runs a long-only index-tracking mandate on it from 1999 to 2024, "
      "with its active return attributed by sector. The portfolios realise 78.9 to 83.6 basis points a year of tracking "
      "error, and each of four covariance estimators forecasts less: the realised active return is 48 to 85 per cent "
      "more volatile than forecast. Index changes require 11.4 per cent of the turnover of the portfolio built with "
@@ -2615,6 +2616,14 @@ OTHER_PROJECTS = (
       ("dashboard", SITE_URL + "stock-level-tracking/dashboard/"),
       ("note", SITE_URL + "stock-level-tracking/note/stock-level-tracking_note_2026-11.pdf"),
       ("code", "https://github.com/ochofer/stock-level-tracking"))),
+    ("Return prediction: machine learning on the S&P 500's members, corrected for overfitting.",
+     "Forecasts of each S&P 500 member's return over the next month from twelve characteristics built from CRSP and "
+     "Compustat, by six models from least squares to a neural network, out of sample from 2006 to 2024. The study "
+     "follows the method of Gu, Kelly and Xiu (2020), reduced to the index's members, and corrects the best result for "
+     "overfitting, that is, for having tried many versions and kept the best one. In build: its findings are stated "
+     "when the study is complete.",
+     (("Page", PROJECTS_URL + "ml-return-prediction-backtest-overfitting/"),
+      ("code", "https://github.com/ochofer/ml-return-prediction-backtest-overfitting"))),
 )
 
 
