@@ -16,7 +16,7 @@ On each cycle day a *cycle report*, `cycles/YYYY-MM.md`, is written before any o
 
 ## The split
 
-The mandate's risk limit is a worst fall of about one third, tested as 35 per cent, and the allocation test measures each split's worst fall on monthly euro returns from February 1999 to December 2025. Its *deciding series* for equity is Kenneth French's market returns for five regions at the equity ETF's weights by region, and two MSCI series stand beside it and choose nothing. At the equity ETF's weights by region of 13 November 2026, 70/30's worst fall is 34.55 per cent on the deciding series, 0.45 points inside the limit, and 35.75 to 36.53 per cent on the two MSCI series, so the test does not decide between 70/30 and 65/35 across the two sources. On the deciding series 65/35 is also the result if the limit is read as one third, 33.3 per cent, or if the bond's maturity is five years in place of the test's seven. Rule 1 sets the target at 70/30. Rule 1 sets the split on the global series alone. The tables of the allocation test that were added after its outcome was known are marked as such in `mandate/allocation_check.py`, and none of them chooses anything.
+The mandate's risk limit is a worst fall of about one third, tested as 35 per cent, and the allocation test measures each split's worst fall on monthly euro returns from February 1999 to December 2025. Its *deciding series* for equity is Kenneth French's market returns for five regions at the equity ETF's weights by region, and two MSCI series stand beside it and choose nothing. At the equity ETF's weights by region of 13 November 2026, 70/30's worst fall is 34.55 per cent on the deciding series, 0.45 points inside the limit, and 35.75 to 36.53 per cent on the two MSCI series, so the test does not decide between 70/30 and 65/35 across the two sources. On the deciding series 65/35 is also the result if the limit is read as one third, 33.3 per cent, or if the bond's maturity is five years in place of the test's seven. Rule 1 sets the target at 70/30, on the deciding series alone. The tables of the allocation test that were added after its outcome was known are marked as such in `mandate/allocation_check.py`, and none of them chooses anything.
 
 ## What the record measures
 
@@ -83,7 +83,7 @@ Executed prices, fees and units come from the broker's statements, which are als
 From the repository root:
 
 ```
-pip install -r requirements.txt pytest
+pip install -r requirements.txt pytest scipy
 python3 mandate/allocation_check.py
 python3 mandate/simulations.py
 python3 -m pytest tests
